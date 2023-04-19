@@ -12,16 +12,16 @@ Next, Clone the GitHub repository or pull the latest updates.
 
 In the terminal, navigate to the system directory:
 
-'''
+```
 cd deep_MultiData_mzClustering
-'''
+```
 
 Install the package in development mode to apply the latest updates automatically 
 after pulling from the GitHub repository:
 
-'''
+```
 python -m pip install -e .
-'''
+```
 
 
 > This code is published under the MIT license.
