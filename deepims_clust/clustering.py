@@ -14,8 +14,8 @@ class DeepClustering(object):
                  dataset_labels: np.ndarray,
                  ion_labels: np.ndarray,
                  num_cluster=7,
-                 initial_upper=0.98,
-                 initial_lower=0.46,
+                 initial_upper=98,
+                 initial_lower=46,
                  upper_iteration=1,
                  lower_iteration=4,
                  knn=True, k=10,
@@ -62,7 +62,7 @@ class DeepClustering(object):
         for i in range(0, self.sampleN):
             current_min = np.min(self.image_data[i, ::])
             current_max = np.max(self.image_data[i, ::])
-            self.image_data[i, ::] = (current_max - self.image_data[i, ::]) / (current_max - current_min)
+            self.image_data[i, ::] = (self.image_data[i, ::] - current_min) / (current_max - current_min)
 
         if knn:
             self.knn_adj = run_knn(self.image_data.reshape((self.image_data.shape[0], -1)),
