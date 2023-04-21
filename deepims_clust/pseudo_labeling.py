@@ -31,8 +31,8 @@ def compute_dataset_ublb(sim_mat: np.ndarray, ds_labels: np.ndarray,
     ds_lb = {}
     for ds in set(ds_labels):
 
-        curr_sim = [sim_mat[i][j] for i in range(0, sim_mat.size[0])
-                    for j in range(sim_mat.size[0]) if (i != j and ds_labels[i] == ds and ds_labels[j] == ds)]
+        curr_sim = [sim_mat[i][j] for i in range(0, sim_mat.shape[0])
+                    for j in range(sim_mat.shape[0]) if (i != j and ds_labels[i] == ds and ds_labels[j] == ds)]
 
         if len(curr_sim) > 2:
             ds_ub[ds] = np.percentile(curr_sim, upper_bound)
