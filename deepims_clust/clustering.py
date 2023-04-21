@@ -65,6 +65,13 @@ class DeepClustering(object):
         self.device = torch.device("cuda" if use_gpu else "cpu")
         self.random_seed = random_seed
 
+        if (self.initial_lower + (self.training_epochs * self.lower_iteration)) >= \
+                (self.initial_upper + (self.training_epochs * self.upper_iteration)):
+            raise ValueError(f'Lower percentile will be higher than Higher percentile parameter '
+                             f'after {self.training_epochs}.\n'
+                             f'Change initial_upper, initial_lower, upper_iteration, lower_iteration, '
+                             f'or training_epochs parameters.')
+
         # image normalization
         for i in range(0, self.sampleN):
             current_min = np.min(self.image_data[i, ::])
