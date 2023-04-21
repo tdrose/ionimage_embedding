@@ -7,7 +7,7 @@ from .utils import make_symmetric
 
 def run_knn(features: np.ndarray, k: int = 10):
     # Todo: Make a better solution for excluding self neighborhood
-    nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm='ball_tree', metric='cosine').fit(features)
+    nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm='ball_tree').fit(features)
     _, indices = nbrs.kneighbors(features)
     # Excluding self neighborhood here
     idx = indices[:, 1:]
