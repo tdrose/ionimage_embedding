@@ -56,7 +56,8 @@ def pseudo_labeling(ub: float, lb: float,
 
     if dataset_specific_percentiles:
         ub_m = np.ones(sim.shape)
-        lb_m = np.ones(sim.shape)
+        # TODO: should be zero matrix for lower bound probably, rethink that!
+        lb_m = np.zeros(sim.shape)
         for ds in set(ds_labels):
             ds_v = ds_labels == ds
             ub_m[np.ix_(ds_v, ds_v)] = dataset_ub[ds]
