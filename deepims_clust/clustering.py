@@ -5,7 +5,10 @@ from random import sample
 
 from .cae import CAE
 from .cnnClust import CNNClust
-from .pseudo_labeling import pseudo_labeling, run_knn, string_similarity_matrix
+from .pseudo_labeling import pseudo_labeling, \
+    run_knn, \
+    string_similarity_matrix, \
+    compute_dataset_ublb
 
 
 class DeepClustering(object):
@@ -20,11 +23,12 @@ class DeepClustering(object):
                  lower_iteration: float = 4,
                  dataset_specific_percentiles: bool = False,
                  knn: bool = False, k: int = 10,
-                 lr: float = 0.0001, batch_size: float = 128,
+                 lr: float = 0.0001, batch_size: int = 128,
                  pretraining_epochs: int = 11,
                  training_epochs: int = 11,
                  cae_encoder_dim: int = 7,
-                 use_gpu: bool = True):
+                 use_gpu: bool = True,
+                 random_seed: int = 1234):
         super(DeepClustering, self).__init__()
 
         # Image data
@@ -59,6 +63,7 @@ class DeepClustering(object):
         self.loss_func = torch.nn.MSELoss()
         self.cae_encoder_dim = cae_encoder_dim
         self.device = torch.device("cuda" if use_gpu else "cpu")
+        self.random_seed = random_seed
 
         # image normalization
         for i in range(0, self.sampleN):
@@ -74,7 +79,7 @@ class DeepClustering(object):
 
     @staticmethod
     def get_batch(train_image, batch_size, dataset_labels, ion_labels):
-        sample_id = sample(range(len(train_image)), batch_size)
+        sample_id = np.array(sample(range(len(train_image)), batch_size))
         # index = [[]]
         # index[0] = [x for x in range(batch_size)]
         # index.append(sample_id)
@@ -97,11 +102,10 @@ class DeepClustering(object):
         ll = self.initial_lower
         loss_list = list()
 
-        random_seed = 1224
-        torch.manual_seed(random_seed)
+        torch.manual_seed(self.random_seed)
         if self.use_gpu:
-            torch.cuda.manual_seed(random_seed)
-            torch.backends.cudnn.deterministic = True
+            torch.cuda.manual_seed(self.random_seed)
+            torch.backends.cudnn.deterministic = True # noqa
 
         # Pretraining of CAE only
         for epoch in range(0, self.pretraining_epochs):
@@ -172,18 +176,27 @@ class DeepClustering(object):
                 # Similarity computation as defined in formula 2 of the paper
                 sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
 
-                # Compute Dataset specific percentiles
-
                 sim_numpy = sim_mat.cpu().detach().numpy()
                 # Get all sim values from the batch excluding the diagonal
                 tmp2 = [sim_numpy[i][j] for i in range(0, self.batch_size)
                         for j in range(self.batch_size) if i != j]
+
                 # Compute upper and lower percentiles according to uu & ll
                 ub = np.percentile(tmp2, uu)
                 lb = np.percentile(tmp2, ll)
 
+                # Compute dataset specific percentiles
+                dataset_ub = None
+                dataset_lb = None
+                if self.dataset_specific_percentiles:
+                    dataset_ub, dataset_lb = compute_dataset_ublb(sim_numpy, ds_labels=train_datasets,
+                                                                  lower_bound=ll, upper_bound=uu)
+
                 pos_loc, neg_loc = pseudo_labeling(ub=ub, lb=lb, sim=sim_numpy, index=index, knn=self.KNN,
-                                                   knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat)
+                                                   knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
+                                                   dataset_specific_percentiles=self.dataset_specific_percentiles,
+                                                   dataset_ub=dataset_ub, dataset_lb=dataset_lb,
+                                                   ds_labels=train_datasets)
                 pos_loc = pos_loc.to(self.device)
                 neg_loc = neg_loc.to(self.device)
 

@@ -5,7 +5,7 @@ import numpy as np
 from .utils import make_symmetric
 
 
-def run_knn(features, k=10):
+def run_knn(features: np.ndarray, k: int = 10):
     # Todo: Make a better solution for excluding self neighborhood
     nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm='ball_tree').fit(features)
     _, indices = nbrs.kneighbors(features)
@@ -25,15 +25,49 @@ def string_similarity_matrix(string_list):
     return tmp
 
 
+def compute_dataset_ublb(sim_mat: np.ndarray, ds_labels: np.ndarray,
+                         lower_bound: int, upper_bound: int):
+    ds_ub = {}
+    ds_lb = {}
+    for ds in set(ds_labels):
+
+        curr_sim = [sim_mat[i][j] for i in range(0, sim_mat.size[0])
+                    for j in range(sim_mat.size[0]) if (i != j and ds_labels[i] == ds and ds_labels[j] == ds)]
+
+        if len(curr_sim) > 2:
+            ds_ub[ds] = np.percentile(curr_sim, upper_bound)
+            ds_lb[ds] = np.percentile(curr_sim, lower_bound)
+        else:
+            ds_ub[ds] = 1
+            ds_lb[ds] = 0
+
+    return ds_ub, ds_lb
+
+
 def pseudo_labeling(ub: float, lb: float,
                     sim: torch.tensor,
-                    index,
-                    ion_label_mat,
-                    knn: bool, knn_adj=None) -> Tuple[torch.tensor, torch.tensor]:
+                    index: np.ndarray,
+                    ion_label_mat: np.ndarray,
+                    knn: bool, knn_adj: np.ndarray = None,
+                    dataset_specific_percentiles: bool = False,
+                    dataset_ub: dict = None,
+                    dataset_lb: dict = None,
+                    ds_labels: np.ndarray = None) -> Tuple[torch.tensor, torch.tensor]:
 
-    # Align highly similar images
-    pos_loc = (sim >= ub).astype("float64")
-    neg_loc = (sim <= lb).astype("float64")
+    if dataset_specific_percentiles:
+        ub_m = np.ones(sim.shape)
+        lb_m = np.ones(sim.shape)
+        for ds in set(ds_labels):
+            ds_v = ds_labels == ds
+            ub_m[np.ix_(ds_v, ds_v)] = dataset_ub[ds]
+            lb_m[np.ix_(ds_v, ds_v)] = dataset_lb[ds]
+
+        pos_loc = (sim >= ub_m).astype("float64")
+        neg_loc = (sim <= lb_m).astype("float64")
+
+    else:
+        pos_loc = (sim >= ub).astype("float64")
+        neg_loc = (sim <= lb).astype("float64")
 
     # Align images within KNN
     if knn:
