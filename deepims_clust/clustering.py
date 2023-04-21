@@ -13,17 +13,18 @@ class DeepClustering(object):
                  images: np.ndarray,
                  dataset_labels: np.ndarray,
                  ion_labels: np.ndarray,
-                 num_cluster=7,
-                 initial_upper=98,
-                 initial_lower=46,
-                 upper_iteration=1,
-                 lower_iteration=4,
-                 knn=True, k=10,
-                 lr=0.0001, batch_size=128,
-                 pretraining_epochs= 11,
-                 training_epochs=11,
-                 cae_encoder_dim=7,
-                 use_gpu=True):
+                 num_cluster: int = 7,
+                 initial_upper: int = 98,
+                 initial_lower: int = 46,
+                 upper_iteration: float = 1,
+                 lower_iteration: float = 4,
+                 dataset_specific_percentiles: bool = False,
+                 knn: bool = False, k: int = 10,
+                 lr: float = 0.0001, batch_size: float = 128,
+                 pretraining_epochs: int = 11,
+                 training_epochs: int = 11,
+                 cae_encoder_dim: int = 7,
+                 use_gpu: bool = True):
         super(DeepClustering, self).__init__()
 
         # Image data
@@ -42,6 +43,7 @@ class DeepClustering(object):
         self.initial_lower = initial_lower
         self.upper_iteration = upper_iteration
         self.lower_iteration = lower_iteration
+        self.dataset_specific_percentiles = dataset_specific_percentiles
 
         # KNN parameters
         self.KNN = knn
@@ -170,9 +172,10 @@ class DeepClustering(object):
                 # Similarity computation as defined in formula 2 of the paper
                 sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
 
+                # Compute Dataset specific percentiles
+
                 sim_numpy = sim_mat.cpu().detach().numpy()
                 # Get all sim values from the batch excluding the diagonal
-                # Todo: why not complete batch size?
                 tmp2 = [sim_numpy[i][j] for i in range(0, self.batch_size)
                         for j in range(self.batch_size) if i != j]
                 # Compute upper and lower percentiles according to uu & ll
