@@ -231,11 +231,14 @@ class DeepClustering(object):
                 epoch, sum(losses) / len(losses)))
         return cae, clust
 
-    def inference(self, cae, clust):
+    def inference(self, cae, clust, new_data: np.ndarray = None):
         with torch.no_grad():
             prediction_label = list()
 
-            test_x = torch.Tensor(self.image_data).to(self.device)
+            if new_data is None:
+                test_x = torch.Tensor(self.image_data).to(self.device)
+            else:
+                test_x = torch.Tensor(new_data).to(self.device)
             test_x = test_x.reshape((-1, 1, self.height, self.width))
 
             x_p = cae(test_x)
@@ -247,10 +250,13 @@ class DeepClustering(object):
 
             return prediction_label
 
-    def predict_embeddings(self, cae, clust):
+    def predict_embeddings(self, cae, clust, new_data: np.ndarray = None):
         with torch.no_grad():
 
-            test_x = torch.Tensor(self.image_data).to(self.device)
+            if new_data is None:
+                test_x = torch.Tensor(self.image_data).to(self.device)
+            else:
+                test_x = torch.Tensor(new_data).to(self.device)
             test_x = test_x.reshape((-1, 1, self.height, self.width))
 
             x_p = cae(test_x)
