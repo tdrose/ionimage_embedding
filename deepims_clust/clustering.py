@@ -78,16 +78,29 @@ class DeepClustering(object):
                              f'or training_epochs parameters.')
 
         # image normalization
-        for i in range(0, self.sampleN):
-            current_min = np.min(self.image_data[i, ::])
-            current_max = np.max(self.image_data[i, ::])
-            self.image_data[i, ::] = (self.image_data[i, ::] - current_min) / (current_max - current_min)
+        self.image_normalization()
 
         if knn:
             self.knn_adj = run_knn(self.image_data.reshape((self.image_data.shape[0], -1)),
                                    k=self.k)
 
         self.ion_label_mat = string_similarity_matrix(self.ion_labels)
+
+    def image_normalization(self, new_data: np.ndarray = None):
+        if new_data is None:
+            for i in range(0, self.sampleN):
+                current_min = np.min(self.image_data[i, ::])
+                current_max = np.max(self.image_data[i, ::])
+                self.image_data[i, ::] = (self.image_data[i, ::] - current_min) / (current_max - current_min)
+
+        else:
+            nd = new_data.copy()
+            for i in range(0, nd.shape[0]):
+                current_min = np.min(nd[i, ::])
+                current_max = np.max(nd[i, ::])
+                nd[i, ::] = (nd[i, ::] - current_min) / (current_max - current_min)
+
+            return nd
 
     @staticmethod
     def get_batch(train_image, batch_size, dataset_labels, ion_labels):
@@ -238,7 +251,8 @@ class DeepClustering(object):
             if new_data is None:
                 test_x = torch.Tensor(self.image_data).to(self.device)
             else:
-                test_x = torch.Tensor(new_data).to(self.device)
+                nd = self.image_normalization(new_data=new_data)
+                test_x = torch.Tensor(nd).to(self.device)
             test_x = test_x.reshape((-1, 1, self.height, self.width))
 
             x_p = cae(test_x)
@@ -256,7 +270,8 @@ class DeepClustering(object):
             if new_data is None:
                 test_x = torch.Tensor(self.image_data).to(self.device)
             else:
-                test_x = torch.Tensor(new_data).to(self.device)
+                nd = self.image_normalization(new_data=new_data)
+                test_x = torch.Tensor(nd).to(self.device)
             test_x = test_x.reshape((-1, 1, self.height, self.width))
 
             x_p = cae(test_x)
