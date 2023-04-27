@@ -246,3 +246,14 @@ class DeepClustering(object):
             prediction_label = np.array(prediction_label)
 
             return prediction_label
+
+    def predict_embeddings(self, cae, clust):
+        with torch.no_grad():
+
+            test_x = torch.Tensor(self.image_data).to(self.device)
+            test_x = test_x.reshape((-1, 1, self.height, self.width))
+
+            x_p = cae(test_x)
+            embeddings = clust(x_p)
+
+            return embeddings.cpu().detach().numpy()
