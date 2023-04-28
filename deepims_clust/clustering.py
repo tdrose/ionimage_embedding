@@ -149,7 +149,8 @@ class DeepClustering(object):
                 train_x, index, train_datasets, train_ions = self.get_batch(self.image_data,
                                                                             self.batch_size,
                                                                             self.dataset_labels,
-                                                                            self.ion_labels)
+                                                                            self.ion_labels,
+                                                                            random_flip=self.random_flip)
 
                 train_x = torch.Tensor(train_x).to(self.device)
                 train_x = train_x.reshape((-1, 1, self.height, self.width))
@@ -176,7 +177,8 @@ class DeepClustering(object):
             train_x, index, train_datasets, train_ions = self.get_batch(self.image_data,
                                                                         self.batch_size,
                                                                         self.dataset_labels,
-                                                                        self.ion_labels)
+                                                                        self.ion_labels,
+                                                                        random_flip=self.random_flip)
 
             train_x = torch.Tensor(train_x).to(self.device)
             train_x = train_x.reshape((-1, 1, self.height, self.width))
@@ -194,7 +196,8 @@ class DeepClustering(object):
                 train_x, index, train_datasets, train_ions = self.get_batch(self.image_data,
                                                                             self.batch_size,
                                                                             self.dataset_labels,
-                                                                            self.ion_labels)
+                                                                            self.ion_labels,
+                                                                            random_flip=self.random_flip)
 
                 train_x = torch.Tensor(train_x).to(self.device)
                 train_x = train_x.reshape((-1, 1, self.height, self.width))
