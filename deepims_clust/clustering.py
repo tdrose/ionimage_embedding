@@ -9,6 +9,7 @@ from .pseudo_labeling import pseudo_labeling, \
     run_knn, \
     string_similarity_matrix, \
     compute_dataset_ublb
+from .utils import flip_images
 
 
 class DeepClustering(object):
@@ -22,6 +23,7 @@ class DeepClustering(object):
                  upper_iteration: float = 1,
                  lower_iteration: float = 4,
                  dataset_specific_percentiles: bool = False,
+                 random_flip: bool = False,
                  knn: bool = False, k: int = 10,
                  lr: float = 0.0001, batch_size: int = 128,
                  pretraining_epochs: int = 11,
@@ -41,6 +43,12 @@ class DeepClustering(object):
         self.height = self.image_data.shape[1]
         self.width = self.image_data.shape[2]
         self.sampleN = len(self.image_data)
+
+        if random_flip:
+            if self.height != self.width:
+                raise ValueError('random_transpose only possible if image height and width are equal.')
+            else:
+                self.random_flip = True
 
         # Pseudo labeling parameters
         self.initial_upper = initial_upper
@@ -103,12 +111,14 @@ class DeepClustering(object):
             return nd
 
     @staticmethod
-    def get_batch(train_image, batch_size, dataset_labels, ion_labels):
+    def get_batch(train_image, batch_size, dataset_labels, ion_labels, random_flip: bool = False):
         sample_id = np.array(sample(range(len(train_image)), batch_size))
-        # index = [[]]
-        # index[0] = [x for x in range(batch_size)]
-        # index.append(sample_id)
+
         batch_image = train_image[sample_id, ]
+
+        if random_flip:
+            batch_image = flip_images(batch_image)
+
         batch_datasets = dataset_labels[sample_id, ]
         batch_ions = ion_labels[sample_id, ]
 
@@ -250,6 +260,7 @@ class DeepClustering(object):
 
             if new_data is None:
                 test_x = torch.Tensor(self.image_data).to(self.device)
+                
             else:
                 nd = self.image_normalization(new_data=new_data)
                 test_x = torch.Tensor(nd).to(self.device)
