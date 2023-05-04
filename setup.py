@@ -29,7 +29,8 @@ setup(
         'pandas',
         'numpy',
         'torch',
-        'metaspace2020'
+        'metaspace2020',
+        'scikit-learn'
     ],
     python_requires=">=3.8",
 

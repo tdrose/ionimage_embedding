@@ -1,7 +1,9 @@
 import torch
 import numpy as np
 import torch.nn.functional as functional
+import torchvision.transforms as transforms
 from random import sample
+from sklearn import preprocessing
 
 from .cae import CAE
 from .cnnClust import CNNClust
@@ -10,6 +12,7 @@ from .pseudo_labeling import pseudo_labeling, \
     string_similarity_matrix, \
     compute_dataset_ublb
 from .utils import flip_images
+from .dataloader import get_dataloader
 
 
 class DeepClustering(object):
@@ -37,6 +40,12 @@ class DeepClustering(object):
         self.image_data = images
         self.dataset_labels = dataset_labels
         self.ion_labels = ion_labels
+        
+        self.ds_encoder = preprocessing.LabelEncoder()
+        self.dsl_int = self.ds_encoder.fit_transform(self.dataset_labels)
+
+        self.il_encoder = preprocessing.LabelEncoder()
+        self.ill_int = self.il_encoder.fit_transform(self.ion_labels)
 
         # Image parameters
         self.num_cluster = num_cluster
@@ -93,6 +102,18 @@ class DeepClustering(object):
                                    k=self.k)
 
         self.ion_label_mat = string_similarity_matrix(self.ion_labels)
+        
+        # Dataloader
+        self.dataloader = get_dataloader(images = self.image_data,
+                                         dataset_labels = self.dsl_int,
+                                         ion_labels = self.ill_int,
+                                         height = self.height,
+                                         width = self.width,
+                                         # Rotate images
+                                         transform=transforms.RandomRotation(degrees=(0, 360)),
+                                         batch_size=self.batch_size)
+        
+        
 
     def image_normalization(self, new_data: np.ndarray = None):
         if new_data is None:
@@ -109,6 +130,15 @@ class DeepClustering(object):
                 nd[i, ::] = (nd[i, ::] - current_min) / (current_max - current_min)
 
             return nd
+
+    def get_new_batch(self):
+        
+        dl_image, dl_sample_id, dl_dataset_label, dl_ion_label = next(iter(self.dataloader))
+        
+        return (dl_image, 
+                dl_sample_id.cpu().detach().numpy().reshape(-1), 
+                dl_dataset_label.cpu().detach().numpy().reshape(-1), 
+                dl_ion_label.cpu().detach().numpy().reshape(-1))    
 
     @staticmethod
     def get_batch(train_image, batch_size, dataset_labels, ion_labels, random_flip: bool = False):
@@ -146,14 +176,8 @@ class DeepClustering(object):
         for epoch in range(0, self.pretraining_epochs):
             losses = list()
             for it in range(501):
-                train_x, index, train_datasets, train_ions = self.get_batch(self.image_data,
-                                                                            self.batch_size,
-                                                                            self.dataset_labels,
-                                                                            self.ion_labels,
-                                                                            random_flip=self.random_flip)
-
-                train_x = torch.Tensor(train_x).to(self.device)
-                train_x = train_x.reshape((-1, 1, self.height, self.width))
+                train_x, index, train_datasets, train_ions = self.get_new_batch()
+                train_x = train_x.to(self.device)
                 optimizer.zero_grad()
                 x_p = cae(train_x)
 
@@ -174,14 +198,8 @@ class DeepClustering(object):
             losses = list()
             losses2 = list()
 
-            train_x, index, train_datasets, train_ions = self.get_batch(self.image_data,
-                                                                        self.batch_size,
-                                                                        self.dataset_labels,
-                                                                        self.ion_labels,
-                                                                        random_flip=self.random_flip)
-
-            train_x = torch.Tensor(train_x).to(self.device)
-            train_x = train_x.reshape((-1, 1, self.height, self.width))
+            train_x, index, train_datasets, train_ions = self.get_new_batch()
+            train_x = train_x.to(self.device)
 
             x_p = cae(train_x)
             features = clust(x_p)
@@ -193,14 +211,9 @@ class DeepClustering(object):
             sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
 
             for it in range(31):
-                train_x, index, train_datasets, train_ions = self.get_batch(self.image_data,
-                                                                            self.batch_size,
-                                                                            self.dataset_labels,
-                                                                            self.ion_labels,
-                                                                            random_flip=self.random_flip)
-
-                train_x = torch.Tensor(train_x).to(self.device)
-                train_x = train_x.reshape((-1, 1, self.height, self.width))
+                
+                train_x, index, train_datasets, train_ions = self.get_new_batch()
+                train_x = train_x.to(self.device)
 
                 optimizer.zero_grad()
                 x_p = cae(train_x)
