@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from typing import Literal
 import torch.nn.functional as functional
 import torchvision.transforms as transforms
 from random import sample
@@ -33,6 +34,7 @@ class DeepClustering(object):
                  training_epochs: int = 11,
                  cae_encoder_dim: int = 7,
                  use_gpu: bool = True,
+                 activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax',
                  random_seed: int = 1234):
         super(DeepClustering, self).__init__()
 
@@ -72,6 +74,7 @@ class DeepClustering(object):
         self.knn_adj = None
 
         # Pytorch parameters
+        self.activation = activation
         self.use_gpu = use_gpu
         self.lr = lr
         self.pretraining_epochs = pretraining_epochs
@@ -100,8 +103,11 @@ class DeepClustering(object):
         if knn:
             self.knn_adj = run_knn(self.image_data.reshape((self.image_data.shape[0], -1)),
                                    k=self.k)
-
         self.ion_label_mat = string_similarity_matrix(self.ion_labels)
+        
+        # Models
+        self.cae = None
+        self.clust = None
         
         # Dataloader
         self.dataloader = get_dataloader(images = self.image_data,
@@ -157,7 +163,7 @@ class DeepClustering(object):
     def train(self):
         
         cae = CAE(height=self.height, width=self.width, encoder_dim=self.cae_encoder_dim).to(self.device)
-        clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width).to(self.device)
+        clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, activation=self.activation).to(self.device)
         
         model_params = list(cae.parameters()) + list(clust.parameters())
         optimizer = torch.optim.RMSprop(params=model_params, lr=0.001, weight_decay=0)
@@ -268,9 +274,20 @@ class DeepClustering(object):
             ll = ll + self.lower_iteration
             print('Training Epoch: {} Loss: {:.6f}'.format(
                 epoch, sum(losses) / len(losses)))
-        return cae, clust
+            
+            
+        self.cae = cae
+        self.clust = clust
+        
+        return 0
 
-    def inference(self, cae, clust, new_data: np.ndarray = None):
+    def inference(self, cae = None, clust = None, new_data: np.ndarray = None):
+        
+        if cae is None:
+            cae = self.cae   
+        if clust is None:
+            clust = self.clust
+        
         with torch.no_grad():
             prediction_label = list()
 
@@ -291,9 +308,14 @@ class DeepClustering(object):
 
             return prediction_label
 
-    def predict_embeddings(self, cae, clust, new_data: np.ndarray = None):
+    def predict_embeddings(self, cae = None, clust = None, new_data: np.ndarray = None):
+        
+        if cae is None:
+            cae = self.cae   
+        if clust is None:
+            clust = self.clust
+            
         with torch.no_grad():
-
             if new_data is None:
                 test_x = torch.Tensor(self.image_data).to(self.device)
             else:

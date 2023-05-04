@@ -1,10 +1,17 @@
 import torch.nn as nn
+from typing import Literal
+
 from .cae import conv2d_hwout
 
 
 class CNNClust(nn.Module):
 
-    def __init__(self, num_clust, height, width):
+    def __init__(self, 
+                 num_clust: int, 
+                 height: int, 
+                 width: int,
+                 activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax'
+                ):
         super(CNNClust, self).__init__()
         self.num_clust = num_clust
         self.height = height
@@ -64,10 +71,21 @@ class CNNClust(nn.Module):
 
         self.final_conv_dim = l6h*l6w
         print(f'CNNClust final conv dim = {self.final_conv_dim}')
-
-        self.fc = nn.Sequential(nn.Linear(self.final_conv_dim, num_clust),
-                                nn.BatchNorm1d(num_clust, momentum=0.01),
-                                nn.Softmax(dim=1))
+        
+        if activation == 'softmax':
+            self.fc = nn.Sequential(nn.Linear(self.final_conv_dim, num_clust),
+                                    nn.BatchNorm1d(num_clust, momentum=0.01),
+                                    nn.Softmax(dim=1))
+        elif activation == 'sigmoid':
+            self.fc = nn.Sequential(nn.Linear(self.final_conv_dim, num_clust),
+                                    nn.BatchNorm1d(num_clust, momentum=0.01),
+                                    nn.sigmoid())
+        elif activation == 'relu':
+            self.fc = nn.Sequential(nn.Linear(self.final_conv_dim, num_clust),
+                                    nn.BatchNorm1d(num_clust, momentum=0.01),
+                                    nn.ReLU())
+        else:
+            raise ValueError('Activation function not available. Use softmax, relu, or sigmoid.')
 
     def forward(self, x):
         x = self.conv1(x)
