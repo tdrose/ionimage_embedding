@@ -35,6 +35,8 @@ class DeepClustering(object):
                  cae_encoder_dim: int = 7,
                  use_gpu: bool = True,
                  activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax',
+                 clip_gradients: float = None,
+                 overweight_cae: float = 1000,
                  random_seed: int = 1234):
         super(DeepClustering, self).__init__()
 
@@ -84,6 +86,8 @@ class DeepClustering(object):
         self.cae_encoder_dim = cae_encoder_dim
         self.device = torch.device("cuda" if use_gpu else "cpu")
         self.random_seed = random_seed
+        self.clip_gradients = clip_gradients
+        self.overweight_cae = overweight_cae
 
         print(f'After {self.training_epochs} epochs, the upper bound will be: '
               f'{self.initial_upper - (self.training_epochs * self.upper_iteration)}.')
@@ -108,6 +112,8 @@ class DeepClustering(object):
         # Models
         self.cae = None
         self.clust = None
+        
+        self.loss_list = []
         
         # Dataloader
         self.dataloader = get_dataloader(images = self.image_data,
@@ -166,6 +172,8 @@ class DeepClustering(object):
         clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, activation=self.activation).to(self.device)
         
         model_params = list(cae.parameters()) + list(clust.parameters())
+        
+        
         optimizer = torch.optim.RMSprop(params=model_params, lr=0.001, weight_decay=0)
         # torch.optim.Adam(model_params, lr=lr)
 
@@ -200,9 +208,13 @@ class DeepClustering(object):
 
         # Full model training
         for epoch in range(0, self.training_epochs):
-
+            
+            # CAE loss
             losses = list()
+            # CNN loss
             losses2 = list()
+            # combined loss
+            loss_combined = list()
 
             train_x, index, train_datasets, train_ions = self.get_new_batch()
             train_x = train_x.to(self.device)
@@ -259,23 +271,33 @@ class DeepClustering(object):
 
                 pos_entropy = torch.mul(-torch.log(torch.clip(sim_mat, 1e-10, 1)), pos_loc)
                 neg_entropy = torch.mul(-torch.log(torch.clip(1-sim_mat, 1e-10, 1)), neg_loc)
-
+                
+                # CNN loss
                 loss2 = pos_entropy.sum()/pos_loc.sum() + neg_entropy.sum()/neg_loc.sum()
 
-                loss = 1000*loss1 + loss2
-
+                loss = self.overweight_cae*loss1 + loss2
+                
+                # CAE loss
                 losses.append(loss1.item())
+                # CNN loss
                 losses2.append(loss2.item())
+                loss_combined.append(loss.item())
+                
                 loss.backward()
+                
+                if self.clip_gradients is not None:
+                    torch.nn.utils.clip_grad_value_(model_params, clip_value=self.clip_gradients)
+                
                 optimizer.step()
-                loss_list.append(sum(losses)/len(losses))
+                loss_list.append(sum(loss_combined)/len(loss_combined))
 
             uu = uu - self.upper_iteration
             ll = ll + self.lower_iteration
-            print('Training Epoch: {} Loss: {:.6f}'.format(
-                epoch, sum(losses) / len(losses)))
             
+            print('Training Epoch: {} | CAE-Loss: {:.6f} | CNN-Loss: {:.6f} | Total loss: {:.6f}'.format(
+                epoch, sum(losses) / len(losses), sum(losses2) / len(losses2), sum(loss_combined) / len(loss_combined)))
             
+        self.loss_list = loss_list
         self.cae = cae
         self.clust = clust
         
