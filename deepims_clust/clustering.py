@@ -5,6 +5,7 @@ import torch.nn.functional as functional
 import torchvision.transforms as transforms
 from random import sample
 from sklearn import preprocessing
+import math
 
 from .cae import CAE
 from .cnnClust import CNNClust
@@ -21,6 +22,7 @@ class DeepClustering(object):
                  images: np.ndarray,
                  dataset_labels: np.ndarray,
                  ion_labels: np.ndarray,
+                 val_data_fraction: float = 0.2,
                  num_cluster: int = 7,
                  initial_upper: int = 98,
                  initial_lower: int = 46,
@@ -108,22 +110,31 @@ class DeepClustering(object):
             self.knn_adj = run_knn(self.image_data.reshape((self.image_data.shape[0], -1)),
                                    k=self.k)
         self.ion_label_mat = string_similarity_matrix(self.ion_labels)
-        
+
         # Models
         self.cae = None
         self.clust = None
-        
         self.loss_list = []
-        
+
         # Dataloader
-        self.dataloader = get_dataloader(images=self.image_data,
-                                         dataset_labels=self.dsl_int,
-                                         ion_labels=self.ill_int,
-                                         height=self.height,
-                                         width=self.width,
-                                         # Rotate images
-                                         transform=transforms.RandomRotation(degrees=(0, 360)),
-                                         batch_size=self.batch_size)
+        val_mask = np.random.randint(self.image_data.shape[0],
+                                     size=math.floor(self.image_data.shape[0] * val_data_fraction))
+        training_mask = np.ones(len(self.image_data), bool)
+        training_mask[val_mask] = 0
+        self.training_dataloader = get_dataloader(images=self.image_data[training_mask],
+                                                  dataset_labels=self.dsl_int[training_mask],
+                                                  ion_labels=self.ill_int[training_mask],
+                                                  height=self.height,
+                                                  width=self.width,
+                                                  index=np.arange(self.image_data.shape[0])[training_mask],
+                                                  # Rotate images
+                                                  transform=transforms.RandomRotation(degrees=(0, 360)),
+                                                  batch_size=self.batch_size)
+
+        self.val_x = self.image_data[val_mask]
+        self.val_dsl_int = self.dsl_int[training_mask]
+        self.val_ill_int = self.ill_int[training_mask]
+        self.val_sample_id = val_mask
 
     def image_normalization(self, new_data: np.ndarray = None):
         if new_data is None:
@@ -143,7 +154,7 @@ class DeepClustering(object):
 
     def get_new_batch(self):
         
-        dl_image, dl_sample_id, dl_dataset_label, dl_ion_label = next(iter(self.dataloader))
+        dl_image, dl_sample_id, dl_dataset_label, dl_ion_label = next(iter(self.training_dataloader))
         
         return (dl_image, 
                 dl_sample_id.cpu().detach().numpy().reshape(-1), 
@@ -206,7 +217,8 @@ class DeepClustering(object):
     def train(self):
         
         cae = CAE(height=self.height, width=self.width, encoder_dim=self.cae_encoder_dim).to(self.device)
-        clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, activation=self.activation).to(self.device)
+        clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width,
+                         activation=self.activation).to(self.device)
         
         model_params = list(cae.parameters()) + list(clust.parameters())
 
@@ -222,10 +234,14 @@ class DeepClustering(object):
             torch.cuda.manual_seed(self.random_seed)
             torch.backends.cudnn.deterministic = True # noqa
 
+        val_x = torch.tensor(self.val_x).reshape((-1, 1, self.height, self.width))
+        val_x = val_x.to(self.device)
+
         # Pretraining of CAE only
         for epoch in range(0, self.pretraining_epochs):
             losses = list()
             for it in range(501):
+                cae.train()
                 train_x, index, train_datasets, train_ions = self.get_new_batch()
                 train_x = train_x.to(self.device)
                 optimizer.zero_grad()
@@ -236,8 +252,14 @@ class DeepClustering(object):
                 optimizer.step()
                 losses.append(loss.item())
 
-            print('Pretraining Epoch: {} Loss: {:.6f}'.format(
-                      epoch, sum(losses)/len(losses)))
+            cae.eval()
+            with torch.no_grad():
+                x_p = cae(val_x)
+                optimizer.zero_grad()
+                val_loss = self.mse_loss(x_p, val_x)
+
+            print('Pretraining Epoch: {} Training Loss: {:.6f} | Validation Loss {:.6f}'.format(
+                      epoch, sum(losses)/len(losses), val_loss))
 
         # Todo: Why is optimizer initialized a second time?
         optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=0.0)
@@ -252,6 +274,8 @@ class DeepClustering(object):
             # combined loss
             loss_combined = list()
 
+            cae.train()
+            clust.train()
             for it in range(31):
                 
                 train_x, index, train_datasets, train_ions = self.get_new_batch()
@@ -261,7 +285,6 @@ class DeepClustering(object):
                 x_p = cae(train_x)
 
                 loss_cae = self.mse_loss(x_p, train_x)
-
                 features = clust(x_p)
 
                 loss_clust = self.contrastive_loss(features=features, uu=uu, ll=ll,
@@ -279,15 +302,26 @@ class DeepClustering(object):
                 optimizer.step()
                 loss_list.append(sum(loss_combined)/len(loss_combined))
 
+            cae.eval()
+            clust.eval()
+            with torch.no_grad():
+                x_p = cae(val_x)
+                optimizer.zero_grad()
+                val_cael = self.mse_loss(x_p, val_x)
+                features = clust(x_p)
+                val_cnnl = self.contrastive_loss(features=features, uu=uu, ll=ll,
+                                                 train_datasets=self.val_dsl_int, index=self.val_sample_id)
+
             uu = uu - self.upper_iteration
             ll = ll + self.lower_iteration
             
-            print('Training Epoch: {} | CAE-Loss: {:.6f} | CNN-Loss: {:.6f} | Total loss: {:.6f}'.format(
+            print('Epoch: {} | CAE-Loss: {:.6f} | CNN-Loss: {:.6f} | Total loss: {:.6f}'.format(
                                                                         epoch,
                                                                         sum(losses_cae) / len(losses_cae),
                                                                         sum(losses_clust) / len(losses_clust),
                                                                         sum(loss_combined) / len(loss_combined))
                   )
+            print('            Val CAE-Loss {:.6f} | Val CNN-Loss {:.6f}'.format(val_cael, val_cnnl))
             
         self.loss_list = loss_list
         self.cae = cae
@@ -322,7 +356,7 @@ class DeepClustering(object):
 
             return prediction_label
 
-    def predict_embeddings(self, cae = None, clust = None, new_data: np.ndarray = None):
+    def predict_embeddings(self, cae=None, clust=None, new_data: np.ndarray = None):
         
         if cae is None:
             cae = self.cae   

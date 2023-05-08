@@ -29,6 +29,7 @@ setup(
         'pandas',
         'numpy',
         'torch',
+        'torchvision',
         'metaspace2020',
         'scikit-learn'
     ],
