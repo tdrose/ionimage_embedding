@@ -29,7 +29,7 @@ class DeepClustering(object):
                  dataset_specific_percentiles: bool = False,
                  random_flip: bool = False,
                  knn: bool = False, k: int = 10,
-                 lr: float = 0.0001, batch_size: int = 128,
+                 lr: float = 0.01, batch_size: int = 128,
                  pretraining_epochs: int = 11,
                  training_epochs: int = 11,
                  cae_encoder_dim: int = 7,
@@ -82,7 +82,7 @@ class DeepClustering(object):
         self.pretraining_epochs = pretraining_epochs
         self.training_epochs = training_epochs
         self.batch_size = batch_size
-        self.loss_func = torch.nn.MSELoss()
+        self.mse_loss = torch.nn.MSELoss()
         self.cae_encoder_dim = cae_encoder_dim
         self.device = torch.device("cuda" if use_gpu else "cpu")
         self.random_seed = random_seed
@@ -116,16 +116,14 @@ class DeepClustering(object):
         self.loss_list = []
         
         # Dataloader
-        self.dataloader = get_dataloader(images = self.image_data,
-                                         dataset_labels = self.dsl_int,
-                                         ion_labels = self.ill_int,
-                                         height = self.height,
-                                         width = self.width,
+        self.dataloader = get_dataloader(images=self.image_data,
+                                         dataset_labels=self.dsl_int,
+                                         ion_labels=self.ill_int,
+                                         height=self.height,
+                                         width=self.width,
                                          # Rotate images
                                          transform=transforms.RandomRotation(degrees=(0, 360)),
                                          batch_size=self.batch_size)
-        
-        
 
     def image_normalization(self, new_data: np.ndarray = None):
         if new_data is None:
@@ -166,15 +164,53 @@ class DeepClustering(object):
 
         return batch_image, sample_id, batch_datasets, batch_ions
 
+    def contrastive_loss(self, features, uu, ll, train_datasets, index):
+
+        features = functional.normalize(features, p=2, dim=-1)
+        features = features / features.norm(dim=1)[:, None]
+
+        sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
+
+        sim_numpy = sim_mat.cpu().detach().numpy()
+
+        # Get all sim values from the batch excluding the diagonal
+        tmp2 = [sim_numpy[i][j] for i in range(0, self.batch_size)
+                for j in range(self.batch_size) if i != j]
+
+        ub = np.percentile(tmp2, uu)
+        lb = np.percentile(tmp2, ll)
+
+        dataset_ub = None
+        dataset_lb = None
+        if self.dataset_specific_percentiles:
+            dataset_ub, dataset_lb = compute_dataset_ublb(sim_numpy, ds_labels=train_datasets,
+                                                          lower_bound=ll, upper_bound=uu)
+
+        pos_loc, neg_loc = pseudo_labeling(ub=ub, lb=lb, sim=sim_numpy, index=index, knn=self.KNN,
+                                           knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
+                                           dataset_specific_percentiles=self.dataset_specific_percentiles,
+                                           dataset_ub=dataset_ub, dataset_lb=dataset_lb,
+                                           ds_labels=train_datasets)
+
+        pos_loc = pos_loc.to(self.device)
+        neg_loc = neg_loc.to(self.device)
+
+        pos_entropy = torch.mul(-torch.log(torch.clip(sim_mat, 1e-10, 1)), pos_loc)
+        neg_entropy = torch.mul(-torch.log(torch.clip(1 - sim_mat, 1e-10, 1)), neg_loc)
+
+        # CNN loss
+        contrastive_loss = pos_entropy.sum() / pos_loc.sum() + neg_entropy.sum() / neg_loc.sum()
+
+        return contrastive_loss
+
     def train(self):
         
         cae = CAE(height=self.height, width=self.width, encoder_dim=self.cae_encoder_dim).to(self.device)
         clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, activation=self.activation).to(self.device)
         
         model_params = list(cae.parameters()) + list(clust.parameters())
-        
-        
-        optimizer = torch.optim.RMSprop(params=model_params, lr=0.001, weight_decay=0)
+
+        optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=0)
         # torch.optim.Adam(model_params, lr=lr)
 
         uu = self.initial_upper
@@ -195,7 +231,7 @@ class DeepClustering(object):
                 optimizer.zero_grad()
                 x_p = cae(train_x)
 
-                loss = self.loss_func(x_p, train_x)
+                loss = self.mse_loss(x_p, train_x)
                 loss.backward()
                 optimizer.step()
                 losses.append(loss.item())
@@ -204,29 +240,17 @@ class DeepClustering(object):
                       epoch, sum(losses)/len(losses)))
 
         # Todo: Why is optimizer initialized a second time?
-        optimizer = torch.optim.RMSprop(params=model_params, lr=0.01, weight_decay=0.0)
+        optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=0.0)
 
         # Full model training
         for epoch in range(0, self.training_epochs):
             
             # CAE loss
-            losses = list()
+            losses_cae = list()
             # CNN loss
-            losses2 = list()
+            losses_clust = list()
             # combined loss
             loss_combined = list()
-
-            train_x, index, train_datasets, train_ions = self.get_new_batch()
-            train_x = train_x.to(self.device)
-
-            x_p = cae(train_x)
-            features = clust(x_p)
-            # Normalization of clustering features
-            features = functional.normalize(features, p=2, dim=-1)
-            # Another normalization !?
-            features = features / features.norm(dim=1)[:, None]
-            # Similarity as defined in formula 2 of the paper
-            sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
 
             for it in range(31):
                 
@@ -236,58 +260,22 @@ class DeepClustering(object):
                 optimizer.zero_grad()
                 x_p = cae(train_x)
 
-                loss1 = self.loss_func(x_p, train_x)
+                loss_cae = self.mse_loss(x_p, train_x)
 
                 features = clust(x_p)
-                # Feature normalization
-                features = functional.normalize(features, p=2, dim=-1)
-                features = features / features.norm(dim=1)[:, None]
-                # Similarity computation as defined in formula 2 of the paper
-                sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
 
-                sim_numpy = sim_mat.cpu().detach().numpy()
-                # Get all sim values from the batch excluding the diagonal
-                tmp2 = [sim_numpy[i][j] for i in range(0, self.batch_size)
-                        for j in range(self.batch_size) if i != j]
+                loss_clust = self.contrastive_loss(features=features, uu=uu, ll=ll,
+                                                   train_datasets=train_datasets, index=index)
 
-                # Compute upper and lower percentiles according to uu & ll
-                ub = np.percentile(tmp2, uu)
-                lb = np.percentile(tmp2, ll)
+                loss = self.overweight_cae*loss_cae + loss_clust
 
-                # Compute dataset specific percentiles
-                dataset_ub = None
-                dataset_lb = None
-                if self.dataset_specific_percentiles:
-                    dataset_ub, dataset_lb = compute_dataset_ublb(sim_numpy, ds_labels=train_datasets,
-                                                                  lower_bound=ll, upper_bound=uu)
-
-                pos_loc, neg_loc = pseudo_labeling(ub=ub, lb=lb, sim=sim_numpy, index=index, knn=self.KNN,
-                                                   knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
-                                                   dataset_specific_percentiles=self.dataset_specific_percentiles,
-                                                   dataset_ub=dataset_ub, dataset_lb=dataset_lb,
-                                                   ds_labels=train_datasets)
-                pos_loc = pos_loc.to(self.device)
-                neg_loc = neg_loc.to(self.device)
-
-                pos_entropy = torch.mul(-torch.log(torch.clip(sim_mat, 1e-10, 1)), pos_loc)
-                neg_entropy = torch.mul(-torch.log(torch.clip(1-sim_mat, 1e-10, 1)), neg_loc)
-                
-                # CNN loss
-                loss2 = pos_entropy.sum()/pos_loc.sum() + neg_entropy.sum()/neg_loc.sum()
-
-                loss = self.overweight_cae*loss1 + loss2
-                
-                # CAE loss
-                losses.append(loss1.item())
-                # CNN loss
-                losses2.append(loss2.item())
+                losses_cae.append(loss_cae.item())
+                losses_clust.append(loss_clust.item())
                 loss_combined.append(loss.item())
                 
                 loss.backward()
-                
                 if self.clip_gradients is not None:
                     torch.nn.utils.clip_grad_value_(model_params, clip_value=self.clip_gradients)
-                
                 optimizer.step()
                 loss_list.append(sum(loss_combined)/len(loss_combined))
 
@@ -295,7 +283,11 @@ class DeepClustering(object):
             ll = ll + self.lower_iteration
             
             print('Training Epoch: {} | CAE-Loss: {:.6f} | CNN-Loss: {:.6f} | Total loss: {:.6f}'.format(
-                epoch, sum(losses) / len(losses), sum(losses2) / len(losses2), sum(loss_combined) / len(loss_combined)))
+                                                                        epoch,
+                                                                        sum(losses_cae) / len(losses_cae),
+                                                                        sum(losses_clust) / len(losses_clust),
+                                                                        sum(loss_combined) / len(loss_combined))
+                  )
             
         self.loss_list = loss_list
         self.cae = cae
@@ -303,7 +295,7 @@ class DeepClustering(object):
         
         return 0
 
-    def inference(self, cae = None, clust = None, new_data: np.ndarray = None):
+    def inference(self, cae=None, clust=None, new_data: np.ndarray = None):
         
         if cae is None:
             cae = self.cae   
