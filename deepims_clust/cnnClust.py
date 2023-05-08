@@ -3,6 +3,11 @@ from typing import Literal
 
 from .cae import conv2d_hwout
 
+def init_weights(m):
+    if type(m) == nn.Linear:
+        nn.init.normal_(m.weight, mean=0, std=0.01)
+        nn.init.zeros_(m.bias)
+
 
 class CNNClust(nn.Module):
 
@@ -10,7 +15,8 @@ class CNNClust(nn.Module):
                  num_clust: int, 
                  height: int, 
                  width: int,
-                 activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax'
+                 activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax',
+                 dropout: float=0.1
                 ):
         super(CNNClust, self).__init__()
         self.num_clust = num_clust
@@ -27,17 +33,20 @@ class CNNClust(nn.Module):
                                    nn.ReLU(),
                                    nn.MaxPool2d((2, 2), (2, 2)),
                                    nn.BatchNorm2d(8),
-                                   nn.ReLU()
+                                   nn.ReLU(),
+                                   nn.Dropout(p=dropout)
                                    )
 
         self.conv3 = nn.Sequential(nn.Conv2d(8, 8, kernel_size=(2, 2), stride=(1, 1), bias=False),
                                    nn.BatchNorm2d(8),
-                                   nn.ReLU()
+                                   nn.ReLU(),
+                                   nn.Dropout(p=dropout)
                                    )
 
         self.conv4 = nn.Sequential(nn.Conv2d(8, 16, kernel_size=(3, 3), stride=(1, 1), bias=False),
                                    nn.BatchNorm2d(16),
-                                   nn.ReLU()
+                                   nn.ReLU(),
+                                   nn.Dropout(p=dropout)
                                    )
 
         self.conv5 = nn.Sequential(nn.Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), bias=False),
@@ -45,7 +54,8 @@ class CNNClust(nn.Module):
                                    nn.ReLU(),
                                    nn.MaxPool2d((2, 2), (2, 2)),
                                    nn.BatchNorm2d(16),
-                                   nn.ReLU()
+                                   nn.ReLU(),
+                                   nn.Dropout(p=dropout)
                                    )
 
         self.conv6 = nn.Sequential(nn.Conv2d(16, 1, kernel_size=(3, 3), stride=(1, 1), bias=False),
@@ -86,6 +96,9 @@ class CNNClust(nn.Module):
                                     nn.ReLU())
         else:
             raise ValueError('Activation function not available. Use softmax, relu, or sigmoid.')
+        
+        # Init lower weights
+        self.apply(init_weights)
 
     def forward(self, x):
         x = self.conv1(x)

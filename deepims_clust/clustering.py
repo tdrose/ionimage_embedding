@@ -39,6 +39,8 @@ class DeepClustering(object):
                  activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax',
                  clip_gradients: float = None,
                  overweight_cae: float = 1000,
+                 cnn_dropout: float = 0.1,
+                 weight_decay: float = 1e-4,
                  random_seed: int = 1234):
         super(DeepClustering, self).__init__()
 
@@ -90,6 +92,8 @@ class DeepClustering(object):
         self.random_seed = random_seed
         self.clip_gradients = clip_gradients
         self.overweight_cae = overweight_cae
+        self.cnn_dropout = cnn_dropout
+        self.weight_decay = weight_decay
 
         print(f'After {self.training_epochs} epochs, the upper bound will be: '
               f'{self.initial_upper - (self.training_epochs * self.upper_iteration)}.')
@@ -115,6 +119,8 @@ class DeepClustering(object):
         self.cae = None
         self.clust = None
         self.loss_list = []
+        self.val_losses_cae = []
+        self.val_losses_clust = []
 
         # Dataloader
         val_mask = np.random.randint(self.image_data.shape[0],
@@ -132,8 +138,8 @@ class DeepClustering(object):
                                                   batch_size=self.batch_size)
 
         self.val_x = self.image_data[val_mask]
-        self.val_dsl_int = self.dsl_int[training_mask]
-        self.val_ill_int = self.ill_int[training_mask]
+        self.val_dsl_int = self.dsl_int[val_mask]
+        self.val_ill_int = self.ill_int[val_mask]
         self.val_sample_id = val_mask
 
     def image_normalization(self, new_data: np.ndarray = None):
@@ -218,11 +224,11 @@ class DeepClustering(object):
         
         cae = CAE(height=self.height, width=self.width, encoder_dim=self.cae_encoder_dim).to(self.device)
         clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width,
-                         activation=self.activation).to(self.device)
+                         activation=self.activation, dropout=self.cnn_dropout).to(self.device)
         
         model_params = list(cae.parameters()) + list(clust.parameters())
 
-        optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=0)
+        optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=self.weight_decay)
         # torch.optim.Adam(model_params, lr=lr)
 
         uu = self.initial_upper
@@ -236,7 +242,10 @@ class DeepClustering(object):
 
         val_x = torch.tensor(self.val_x).reshape((-1, 1, self.height, self.width))
         val_x = val_x.to(self.device)
-
+        
+        val_losses_cae = list()
+        val_losses_clust = list()
+            
         # Pretraining of CAE only
         for epoch in range(0, self.pretraining_epochs):
             losses = list()
@@ -258,11 +267,11 @@ class DeepClustering(object):
                 optimizer.zero_grad()
                 val_loss = self.mse_loss(x_p, val_x)
 
-            print('Pretraining Epoch: {} Training Loss: {:.6f} | Validation Loss {:.6f}'.format(
+            print('Pretraining Epoch: {:02d} Training Loss: {:.6f} | Validation Loss: {:.6f}'.format(
                       epoch, sum(losses)/len(losses), val_loss))
 
         # Todo: Why is optimizer initialized a second time?
-        optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=0.0)
+        optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=self.weight_decay)
 
         # Full model training
         for epoch in range(0, self.training_epochs):
@@ -311,19 +320,25 @@ class DeepClustering(object):
                 features = clust(x_p)
                 val_cnnl = self.contrastive_loss(features=features, uu=uu, ll=ll,
                                                  train_datasets=self.val_dsl_int, index=self.val_sample_id)
-
+                
+                val_losses_cae.append(float(val_cael))
+                val_losses_clust.append(float(val_cnnl))
+                
             uu = uu - self.upper_iteration
             ll = ll + self.lower_iteration
             
-            print('Epoch: {} | CAE-Loss: {:.6f} | CNN-Loss: {:.6f} | Total loss: {:.6f}'.format(
+            print('Epoch: {:02d} | CAE-Loss: {:.6f} | CNN-Loss: {:.6f} | Total loss: {:.6f}'.format(
                                                                         epoch,
                                                                         sum(losses_cae) / len(losses_cae),
                                                                         sum(losses_clust) / len(losses_clust),
                                                                         sum(loss_combined) / len(loss_combined))
                   )
-            print('            Val CAE-Loss {:.6f} | Val CNN-Loss {:.6f}'.format(val_cael, val_cnnl))
+            print('  * Val:  | CAE-Loss: {:.6f} | CNN-Loss: {:.6f}'.format(val_cael, val_cnnl))
             
         self.loss_list = loss_list
+        self.val_losses_cae = val_losses_cae
+        self.val_losses_clust = val_losses_clust
+        
         self.cae = cae
         self.clust = clust
         
