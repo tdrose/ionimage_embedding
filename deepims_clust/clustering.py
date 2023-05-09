@@ -48,6 +48,7 @@ class DeepClustering(object):
         self.image_data = images
         self.dataset_labels = dataset_labels
         self.ion_labels = ion_labels
+        self.val_data_fraction = val_data_fraction
         
         self.ds_encoder = preprocessing.LabelEncoder()
         self.dsl_int = self.ds_encoder.fit_transform(self.dataset_labels)
@@ -123,10 +124,19 @@ class DeepClustering(object):
         self.val_losses_clust = []
 
         # Dataloader
-        val_mask = np.random.randint(self.image_data.shape[0],
-                                     size=math.floor(self.image_data.shape[0] * val_data_fraction))
-        training_mask = np.ones(len(self.image_data), bool)
-        training_mask[val_mask] = 0
+        if val_data_fraction <= 0:
+            training_mask = np.arange(self.image_data.shape[0])
+        else:
+            val_mask = np.random.randint(self.image_data.shape[0],
+                                         size=math.floor(self.image_data.shape[0] * val_data_fraction))
+            training_mask = np.ones(len(self.image_data), bool)
+            training_mask[val_mask] = 0
+
+            self.val_x = self.image_data[val_mask]
+            self.val_dsl_int = self.dsl_int[val_mask]
+            self.val_ill_int = self.ill_int[val_mask]
+            self.val_sample_id = val_mask
+        
         self.training_dataloader = get_dataloader(images=self.image_data[training_mask],
                                                   dataset_labels=self.dsl_int[training_mask],
                                                   ion_labels=self.ill_int[training_mask],
@@ -137,10 +147,7 @@ class DeepClustering(object):
                                                   transform=transforms.RandomRotation(degrees=(0, 360)),
                                                   batch_size=self.batch_size)
 
-        self.val_x = self.image_data[val_mask]
-        self.val_dsl_int = self.dsl_int[val_mask]
-        self.val_ill_int = self.ill_int[val_mask]
-        self.val_sample_id = val_mask
+        
 
     def image_normalization(self, new_data: np.ndarray = None):
         if new_data is None:
@@ -260,12 +267,15 @@ class DeepClustering(object):
                 loss.backward()
                 optimizer.step()
                 losses.append(loss.item())
-
-            cae.eval()
-            with torch.no_grad():
-                x_p = cae(val_x)
-                optimizer.zero_grad()
-                val_loss = self.mse_loss(x_p, val_x)
+                
+            if self.val_data_fraction <= 0:
+                val_loss = 0
+            else:
+                cae.eval()
+                with torch.no_grad():
+                    x_p = cae(val_x)
+                    optimizer.zero_grad()
+                    val_loss = self.mse_loss(x_p, val_x)
 
             print('Pretraining Epoch: {:02d} Training Loss: {:.6f} | Validation Loss: {:.6f}'.format(
                       epoch, sum(losses)/len(losses), val_loss))
@@ -310,19 +320,23 @@ class DeepClustering(object):
                     torch.nn.utils.clip_grad_value_(model_params, clip_value=self.clip_gradients)
                 optimizer.step()
                 loss_list.append(sum(loss_combined)/len(loss_combined))
+            
+            if self.val_data_fraction <= 0:
+                val_cael = 0
+                val_cnnl = 0
+            else:
+                cae.eval()
+                clust.eval()
+                with torch.no_grad():
+                    x_p = cae(val_x)
+                    optimizer.zero_grad()
+                    val_cael = self.mse_loss(x_p, val_x)
+                    features = clust(x_p)
+                    val_cnnl = self.contrastive_loss(features=features, uu=uu, ll=ll,
+                                                     train_datasets=self.val_dsl_int, index=self.val_sample_id)
 
-            cae.eval()
-            clust.eval()
-            with torch.no_grad():
-                x_p = cae(val_x)
-                optimizer.zero_grad()
-                val_cael = self.mse_loss(x_p, val_x)
-                features = clust(x_p)
-                val_cnnl = self.contrastive_loss(features=features, uu=uu, ll=ll,
-                                                 train_datasets=self.val_dsl_int, index=self.val_sample_id)
-                
-                val_losses_cae.append(float(val_cael))
-                val_losses_clust.append(float(val_cnnl))
+                    val_losses_cae.append(float(val_cael))
+                    val_losses_clust.append(float(val_cnnl))
                 
             uu = uu - self.upper_iteration
             ll = ll + self.lower_iteration
