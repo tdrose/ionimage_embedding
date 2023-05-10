@@ -89,7 +89,7 @@ class CNNClust(nn.Module):
         elif activation == 'sigmoid':
             self.fc = nn.Sequential(nn.Linear(self.final_conv_dim, num_clust),
                                     nn.BatchNorm1d(num_clust, momentum=0.01),
-                                    nn.sigmoid())
+                                    nn.Sigmoid())
         elif activation == 'relu':
             self.fc = nn.Sequential(nn.Linear(self.final_conv_dim, num_clust),
                                     nn.BatchNorm1d(num_clust, momentum=0.01),

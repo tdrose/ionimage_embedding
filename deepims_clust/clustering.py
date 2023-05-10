@@ -385,7 +385,7 @@ class DeepClustering(object):
 
             return prediction_label
 
-    def predict_embeddings(self, cae=None, clust=None, new_data: np.ndarray = None):
+    def predict_embeddings(self, cae=None, clust=None, new_data: np.ndarray = None, normalize=True):
         
         if cae is None:
             cae = self.cae   
@@ -402,5 +402,9 @@ class DeepClustering(object):
 
             x_p = cae(test_x)
             embeddings = clust(x_p)
+            
+            if normalize:
+                embeddings = functional.normalize(embeddings, p=2, dim=-1)
+                embeddings = embeddings / embeddings.norm(dim=1)[:, None]
 
             return embeddings.cpu().detach().numpy()
