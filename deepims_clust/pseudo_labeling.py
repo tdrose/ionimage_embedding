@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from typing import Tuple
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
@@ -25,22 +26,27 @@ def string_similarity_matrix(string_list):
     return tmp
 
 
-def compute_dataset_ublb(sim_mat: np.ndarray, ds_labels: np.ndarray,
+def compute_dataset_ublb(sim_mat, ds_labels: np.ndarray,
                          lower_bound: int, upper_bound: int):
-    ds_ub = {}
-    ds_lb = {}
-    for ds in set(ds_labels):
-
-        curr_sim = [sim_mat[i][j] for i in range(0, sim_mat.shape[0])
-                    for j in range(sim_mat.shape[0]) if (i != j and ds_labels[i] == ds and ds_labels[j] == ds)]
-
-        if len(curr_sim) > 2:
-            ds_ub[ds] = np.percentile(curr_sim, upper_bound)
-            ds_lb[ds] = np.percentile(curr_sim, lower_bound)
+    
+    ds_ub = torch.zeros(torch.unique(ds_labels).size(0)).to('cuda')
+    ds_lb = torch.zeros(torch.unique(ds_labels).size(0)).to('cuda')
+    for ds in torch.unique(ds_labels):
+        
+        labels = ds_labels==ds
+        
+        if labels.sum() > 2:
+            ds_mat = sim_mat[labels, :][:, labels]
+            mask = torch.eye(ds_mat.size(0), dtype=torch.bool)
+            masked_dsmat = ds_mat[~mask]
+            ds_ub[ds] = torch.quantile(masked_dsmat, upper_bound/100)
+            ds_lb[ds] = torch.quantile(masked_dsmat, lower_bound/100)
+            
         else:
+            # TODO: Potential issue here with numbers not being on the gpu
             ds_ub[ds] = 1
             ds_lb[ds] = 0
-
+    
     return ds_ub, ds_lb
 
 
