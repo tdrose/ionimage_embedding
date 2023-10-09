@@ -51,10 +51,10 @@ class DeepClustering(object):
         self.val_data_fraction = val_data_fraction
         
         self.ds_encoder = preprocessing.LabelEncoder()
-        self.dsl_int = self.ds_encoder.fit_transform(self.dataset_labels)
+        self.dsl_int = torch.tensor(self.ds_encoder.fit_transform(self.dataset_labels))
 
         self.il_encoder = preprocessing.LabelEncoder()
-        self.ill_int = self.il_encoder.fit_transform(self.ion_labels)
+        self.ill_int = torch.tensor(self.il_encoder.fit_transform(self.ion_labels))
 
         # Image parameters
         self.num_cluster = num_cluster
@@ -112,9 +112,9 @@ class DeepClustering(object):
         self.image_normalization()
 
         if knn:
-            self.knn_adj = run_knn(self.image_data.reshape((self.image_data.shape[0], -1)),
-                                   k=self.k)
-        self.ion_label_mat = string_similarity_matrix(self.ion_labels)
+            self.knn_adj = torch.tensor(run_knn(self.image_data.reshape((self.image_data.shape[0], -1)), k=self.k)).to(self.device)
+            
+        self.ion_label_mat = torch.tensor(string_similarity_matrix(self.ion_labels)).to(self.device)
 
         # Models
         self.cae = None
@@ -170,55 +170,11 @@ class DeepClustering(object):
         dl_image, dl_sample_id, dl_dataset_label, dl_ion_label = next(iter(self.training_dataloader))
         
         return (dl_image, 
-                dl_sample_id.cpu().detach().numpy().reshape(-1), 
-                dl_dataset_label.cpu().detach().numpy().reshape(-1), 
-                dl_ion_label.cpu().detach().numpy().reshape(-1))    
+                dl_sample_id.detach().reshape(-1).to(self.device), # dl_sample_id.cpu().detach().numpy().reshape(-1), 
+                dl_dataset_label.detach().reshape(-1).to(self.device), #dl_dataset_label.cpu().detach().numpy().reshape(-1), 
+                dl_ion_label.detach().reshape(-1).to(self.device)) #dl_ion_label.cpu().detach().numpy().reshape(-1))    
 
-    @staticmethod
-    def get_batch(train_image, batch_size, dataset_labels, ion_labels, random_flip: bool = False):
-        sample_id = np.array(sample(range(len(train_image)), batch_size))
-
-        batch_image = train_image[sample_id, ]
-
-        if random_flip:
-            batch_image = flip_images(batch_image)
-
-        batch_datasets = dataset_labels[sample_id, ]
-        batch_ions = ion_labels[sample_id, ]
-
-        return batch_image, sample_id, batch_datasets, batch_ions
-
-    def contrastive_loss(self, features, uu, ll, train_datasets, index):
-
-        features = functional.normalize(features, p=2, dim=-1)
-        features = features / features.norm(dim=1)[:, None]
-
-        sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
-
-        sim_numpy = sim_mat.cpu().detach().numpy()
-
-        # Get all sim values from the batch excluding the diagonal
-        tmp2 = [sim_numpy[i][j] for i in range(0, self.batch_size)
-                for j in range(self.batch_size) if i != j]
-
-        ub = np.percentile(tmp2, uu)
-        lb = np.percentile(tmp2, ll)
-
-        dataset_ub = None
-        dataset_lb = None
-        if self.dataset_specific_percentiles:
-            dataset_ub, dataset_lb = compute_dataset_ublb(sim_numpy, ds_labels=train_datasets,
-                                                          lower_bound=ll, upper_bound=uu)
-
-        pos_loc, neg_loc = pseudo_labeling(ub=ub, lb=lb, sim=sim_numpy, index=index, knn=self.KNN,
-                                           knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
-                                           dataset_specific_percentiles=self.dataset_specific_percentiles,
-                                           dataset_ub=dataset_ub, dataset_lb=dataset_lb,
-                                           ds_labels=train_datasets)
-
-        pos_loc = pos_loc.to(self.device)
-        neg_loc = neg_loc.to(self.device)
-
+    def cl(self, neg_loc, pos_loc, sim_mat):
         pos_entropy = torch.mul(-torch.log(torch.clip(sim_mat, 1e-10, 1)), pos_loc)
         neg_entropy = torch.mul(-torch.log(torch.clip(1 - sim_mat, 1e-10, 1)), neg_loc)
 
@@ -226,37 +182,77 @@ class DeepClustering(object):
         contrastive_loss = pos_entropy.sum() / pos_loc.sum() + neg_entropy.sum() / neg_loc.sum()
 
         return contrastive_loss
+    
+    def compute_ublb(self, features, uu, ll, train_datasets, index):
+        features = functional.normalize(features, p=2, dim=-1)
+        features = features / features.norm(dim=1)[:, None]
 
-    def train(self):
+        sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
+
+        mask = torch.eye(sim_mat.size(0), dtype=torch.bool)
+        masked_matrix = sim_mat[~mask]
+
+        ub = torch.quantile(masked_matrix, uu/100).detach()
+        lb = torch.quantile(masked_matrix, ll/100).detach()
+
+        return ub, lb, sim_mat
+
+    def contrastive_loss(self, features, uu, ll, train_datasets, index):
+
+        ub, lb, sim_mat = self.compute_ublb(features, uu, ll, train_datasets, index)
         
+        dataset_ub = None
+        dataset_lb = None
+        if self.dataset_specific_percentiles:
+            
+            dataset_ub, dataset_lb = compute_dataset_ublb(sim_mat, ds_labels=train_datasets,
+                                                          lower_bound=ll, upper_bound=uu)
+
+        pos_loc, neg_loc = pseudo_labeling(ub=ub, lb=lb, sim=sim_mat, index=index, knn=self.KNN,
+                                           knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
+                                           dataset_specific_percentiles=self.dataset_specific_percentiles,
+                                           dataset_ub=dataset_ub, dataset_lb=dataset_lb,
+                                           ds_labels=train_datasets, device=self.device)
+
+
+        return self.cl(neg_loc, pos_loc, sim_mat)
+
+    def initialize_models(self):
         cae = CAE(height=self.height, width=self.width, encoder_dim=self.cae_encoder_dim).to(self.device)
         clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width,
                          activation=self.activation, dropout=self.cnn_dropout).to(self.device)
         
         model_params = list(cae.parameters()) + list(clust.parameters())
-
         optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=self.weight_decay)
-        # torch.optim.Adam(model_params, lr=lr)
-
-        uu = self.initial_upper
-        ll = self.initial_lower
-        loss_list = list()
-
+        
         torch.manual_seed(self.random_seed)
         if self.use_gpu:
             torch.cuda.manual_seed(self.random_seed)
             torch.backends.cudnn.deterministic = True # noqa
+        
+        return cae, clust, optimizer
+    
+    def train(self):
+        
+        cae, clust, optimizer = self.initialize_models()
+        
+        uu = self.initial_upper
+        ll = self.initial_lower
+        
 
+        
+        # Get validation data
         val_x = torch.tensor(self.val_x).reshape((-1, 1, self.height, self.width))
         val_x = val_x.to(self.device)
         
         val_losses_cae = list()
         val_losses_clust = list()
+        loss_list = list()
             
         # Pretraining of CAE only
         for epoch in range(0, self.pretraining_epochs):
             losses = list()
-            for it in range(501):
+            for it in range(100):
                 cae.train()
                 train_x, index, train_datasets, train_ions = self.get_new_batch()
                 train_x = train_x.to(self.device)
@@ -281,7 +277,7 @@ class DeepClustering(object):
                       epoch, sum(losses)/len(losses), val_loss))
 
         # Todo: Why is optimizer initialized a second time?
-        optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=self.weight_decay)
+        # optimizer = torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=self.weight_decay)
 
         # Full model training
         for epoch in range(0, self.training_epochs):

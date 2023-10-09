@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from typing import Tuple
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
@@ -25,23 +26,28 @@ def string_similarity_matrix(string_list):
     return tmp
 
 
-def compute_dataset_ublb(sim_mat: np.ndarray, ds_labels: np.ndarray,
+def compute_dataset_ublb(sim_mat, ds_labels,
                          lower_bound: int, upper_bound: int):
-    ds_ub = {}
-    ds_lb = {}
-    for ds in set(ds_labels):
-
-        curr_sim = [sim_mat[i][j] for i in range(0, sim_mat.shape[0])
-                    for j in range(sim_mat.shape[0]) if (i != j and ds_labels[i] == ds and ds_labels[j] == ds)]
-
-        if len(curr_sim) > 2:
-            ds_ub[ds] = np.percentile(curr_sim, upper_bound)
-            ds_lb[ds] = np.percentile(curr_sim, lower_bound)
+    # print(ds_labels)
+    ds_ub = torch.zeros(torch.unique(ds_labels).size(0)).to('cuda')
+    ds_lb = torch.zeros(torch.unique(ds_labels).size(0)).to('cuda')
+    for ds in torch.unique(ds_labels):
+        
+        labels = ds_labels==ds
+        
+        if labels.sum() > 2:
+            ds_mat = sim_mat[labels, :][:, labels]
+            mask = torch.eye(ds_mat.size(0), dtype=torch.bool)
+            masked_dsmat = ds_mat[~mask]
+            ds_ub[ds] = torch.quantile(masked_dsmat, upper_bound/100)
+            ds_lb[ds] = torch.quantile(masked_dsmat, lower_bound/100)
+            
         else:
+            # TODO: Potential issue here with numbers not being on the gpu
             ds_ub[ds] = 1
             ds_lb[ds] = 0
-
-    return ds_ub, ds_lb
+    
+    return ds_ub.detach(), ds_lb.detach()
 
 
 def pseudo_labeling(ub: float, lb: float,
@@ -52,37 +58,37 @@ def pseudo_labeling(ub: float, lb: float,
                     dataset_specific_percentiles: bool = False,
                     dataset_ub: dict = None,
                     dataset_lb: dict = None,
-                    ds_labels: np.ndarray = None) -> Tuple[torch.tensor, torch.tensor]:
+                    ds_labels: np.ndarray = None, device: str = None) -> Tuple[torch.tensor, torch.tensor]:
 
     if dataset_specific_percentiles:
-        ub_m = np.ones(sim.shape)
+        ub_m = torch.ones(sim.shape).to(device)
         # TODO: should be zero matrix for lower bound probably, rethink that!
-        lb_m = np.zeros(sim.shape)
-        for ds in set(ds_labels):
+        lb_m = torch.zeros(sim.shape).to(device)
+        for ds in torch.unique(ds_labels):
             ds_v = ds_labels == ds
-            ub_m[np.ix_(ds_v, ds_v)] = dataset_ub[ds]
-            lb_m[np.ix_(ds_v, ds_v)] = dataset_lb[ds]
+            mask = torch.outer(ds_v, ds_v)
+            
+            ub_m[mask] = dataset_ub[ds]
+            lb_m[mask] = dataset_lb[ds]
 
-        pos_loc = (sim >= ub_m).astype("float64")
-        neg_loc = (sim <= lb_m).astype("float64")
+        pos_loc = (sim >= ub_m).float()
+        neg_loc = (sim <= lb_m).float()
 
     else:
-        pos_loc = (sim >= ub).astype("float64")
-        neg_loc = (sim <= lb).astype("float64")
+        pos_loc = (sim >= ub).float()
+        neg_loc = (sim <= lb).float()
 
     # Align images within KNN
     if knn:
-        knn_submat = knn_adj[np.ix_(index, index)]
+        knn_submat = knn_adj[index, :][:, index]
         # Todo: Not 100% sure with this one, should be checked again
-        pos_loc = np.maximum(pos_loc, knn_submat)
-        neg_loc = np.minimum(neg_loc, 1-knn_submat)
+        pos_loc = torch.maximum(pos_loc, knn_submat)
+        neg_loc = torch.minimum(neg_loc, 1-knn_submat)
 
     # Align the same ions
-    ion_submat = ion_label_mat[np.ix_(index, index)]
-    pos_loc = np.maximum(pos_loc, ion_submat)
-    neg_loc = np.minimum(neg_loc, 1 - ion_submat)
-
-    pos_loc = torch.tensor(pos_loc)
-    neg_loc = torch.tensor(neg_loc)
+    ion_submat = ion_label_mat[index, :][:, index]
+    
+    pos_loc = torch.maximum(pos_loc, ion_submat)
+    neg_loc = torch.minimum(neg_loc, 1 - ion_submat)
 
     return pos_loc, neg_loc
