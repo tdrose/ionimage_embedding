@@ -43,16 +43,16 @@ class mzImageDataset(Dataset):
         return image, sample_id, dataset_label, ion_label
 
 
-def get_dataloader(images: np.ndarray,
-                   dataset_labels: np.ndarray,
-                   ion_labels: np.ndarray,
-                   height,
-                   width,
-                   index,
-                   # Rotate images
-                   transform=T.RandomRotation(degrees=(0, 360)),
-                   batch_size=128
-                  ):
+def get_clr_dataloader(images: np.ndarray,
+                       dataset_labels: np.ndarray,
+                       ion_labels: np.ndarray,
+                       height,
+                       width,
+                       index,
+                       # Rotate images
+                       transform=T.RandomRotation(degrees=(0, 360)),
+                       batch_size=128
+                      ):
     
     dataset = mzImageDataset(images=images, 
                              dataset_labels=dataset_labels,
