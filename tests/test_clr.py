@@ -9,14 +9,16 @@ from ionimage_embedding.models import CLR
 from ionimage_embedding.models.clr.pseudo_labeling import compute_dataset_ublb, pseudo_labeling
 from ionimage_embedding.models.clr.utils import size_adaption, size_adaption_symmetric
 
-from test_clr_utils import original_ublb, original_dataset_ublb, original_ps
+from .test_clr_utils import original_ublb, original_dataset_ublb, original_ps
 
 import unittest
 
 # ############################
 # Preprocessing - Loading data
 # ############################
+print('##############')
 print('Starting download of data and preprocessing')
+print('##############')
 
 evaluation_datasets = [
     '2022-12-07_02h13m50s',
@@ -123,7 +125,9 @@ features = clust(x_p)
 uu = 85
 ll=55
 
+print('##############')
 print('Preprocessing done')
+print('##############')
 
 class TestCLR(unittest.TestCase):
     
