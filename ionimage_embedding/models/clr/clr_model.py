@@ -14,10 +14,10 @@ from .pseudo_labeling import pseudo_labeling, \
     string_similarity_matrix, \
     compute_dataset_ublb
 from .utils import flip_images
-from .dataloader import get_dataloader
+from ...dataloader.clr_dataloader import get_clr_dataloader
 
 
-class DeepClustering(object):
+class CLR:
     def __init__(self,
                  images: np.ndarray,
                  dataset_labels: np.ndarray,
@@ -42,7 +42,6 @@ class DeepClustering(object):
                  cnn_dropout: float = 0.1,
                  weight_decay: float = 1e-4,
                  random_seed: int = 1234):
-        super(DeepClustering, self).__init__()
 
         # Image data
         self.image_data = images
@@ -137,15 +136,15 @@ class DeepClustering(object):
             self.val_ill_int = self.ill_int[val_mask]
             self.val_sample_id = val_mask
         
-        self.training_dataloader = get_dataloader(images=self.image_data[training_mask],
-                                                  dataset_labels=self.dsl_int[training_mask],
-                                                  ion_labels=self.ill_int[training_mask],
-                                                  height=self.height,
-                                                  width=self.width,
-                                                  index=np.arange(self.image_data.shape[0])[training_mask],
-                                                  # Rotate images
-                                                  transform=transforms.RandomRotation(degrees=(0, 360)),
-                                                  batch_size=self.batch_size)
+        self.training_dataloader = get_clr_dataloader(images=self.image_data[training_mask],
+                                                      dataset_labels=self.dsl_int[training_mask],
+                                                      ion_labels=self.ill_int[training_mask],
+                                                      height=self.height,
+                                                      width=self.width,
+                                                      index=np.arange(self.image_data.shape[0])[training_mask],
+                                                      # Rotate images
+                                                      transform=transforms.RandomRotation(degrees=(0, 360)),
+                                                      batch_size=self.batch_size)
 
         
 

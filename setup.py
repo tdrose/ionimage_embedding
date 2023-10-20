@@ -5,17 +5,17 @@ here = pathlib.Path(__file__).parent.resolve()
 long_description = (here / 'README.md').read_text(encoding='utf-8')
 
 setup(
-    name='deepims_clust',
-    version='0.1.0',
+    name='ionimage_embedding',
+    version='0.2.0',
 
     description='Deep learning-based clustering approach to cluster ion images from mass spectrometry imaging data '
                 'across datasets. Optimized to work with datasets from the METASPACE database.',
     long_description=long_description,
     long_description_content_type='text/markdown',
 
-    url='https://github.com/tdrose/deep_MultiData_mzClustering',
+    url='https://github.com/tdrose/ionimage_embedding',
     project_urls={  # Optional
-        'Source': 'https://github.com/tdrose/deep_MultiData_mzClustering',
+        'Source': 'https://github.com/tdrose/ionimage_embedding',
         #'Publication': ""
     },
 
