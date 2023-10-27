@@ -1,1 +1,1 @@
-from .clr.clr_model import CLR
+from .clr.clr import CLR

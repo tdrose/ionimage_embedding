@@ -12,6 +12,8 @@ import lightning.pytorch as pl
 
 from ionimage_embedding.dataloader.clr_dataloader import get_clr_dataloader
 from ionimage_embedding.models.clr.cae import CAE
+from ionimage_embedding.models.clr.clr_model import CLRmodel
+from ionimage_embedding.models.clr.pseudo_labeling import run_knn, string_similarity_matrix
 
 from .test_clr_utils import load_data
 
@@ -71,6 +73,11 @@ class TestCLRlightning(unittest.TestCase):
         self.random_seed = np.random.randint(0, 10000)
         torch.cuda.manual_seed(self.random_seed)
         torch.backends.cudnn.deterministic = True
+        
+        # Get KNN if knn:
+        self.knn_adj = torch.tensor(run_knn(training_data.reshape((training_data.shape[0], -1)), k=10))
+            
+        self.ion_label_mat = torch.tensor(string_similarity_matrix(training_ions))
     
     def get_new_batch(self, device):
         
@@ -81,41 +88,51 @@ class TestCLRlightning(unittest.TestCase):
                 dl_dataset_label.detach().reshape(-1).to(device), #dl_dataset_label.cpu().detach().numpy().reshape(-1), 
                 dl_ion_label.detach().reshape(-1).to(device))
     
-    def test_1_original_loss(self):
-        print('Testing original loss')
+#     def test_1_original_loss(self):
+#         print('Testing original loss')
         
-        torch.manual_seed(self.random_seed)
+#         torch.manual_seed(self.random_seed)
         
         
-        optimizer = torch.optim.RMSprop(params=self.cae_model.parameters(), lr=0.01)
-        mse_loss = torch.nn.MSELoss()
-        for epoch in range(0, 5):
-            losses = list()
-            for it in range(100):
-                self.cae_model.to('cuda')
-                self.cae_model.train()
-                train_x, index, train_datasets, train_ions = self.get_new_batch('cuda')
-                train_x = train_x.to('cuda')
-                optimizer.zero_grad()
-                x_p = self.cae_model(train_x)
+#         optimizer = torch.optim.RMSprop(params=self.cae_model.parameters(), lr=0.01)
+#         mse_loss = torch.nn.MSELoss()
+#         for epoch in range(0, 5):
+#             losses = list()
+#             for it in range(100):
+#                 self.cae_model.to('cuda')
+#                 self.cae_model.train()
+#                 train_x, index, train_datasets, train_ions = self.get_new_batch('cuda')
+#                 train_x = train_x.to('cuda')
+#                 optimizer.zero_grad()
+#                 x_p = self.cae_model(train_x)
 
-                loss = mse_loss(x_p, train_x)
-                loss.backward()
-                optimizer.step()
-                losses.append(loss.item())
+#                 loss = mse_loss(x_p, train_x)
+#                 loss.backward()
+#                 optimizer.step()
+#                 losses.append(loss.item())
 
-            print('Pretraining Epoch: {:02d} Training Loss: {:.6f}'.format(
-                      epoch, sum(losses)/len(losses)))
+#             print('Pretraining Epoch: {:02d} Training Loss: {:.6f}'.format(
+#                       epoch, sum(losses)/len(losses)))
         
-        self.assertTrue(True)
+#         self.assertTrue(True)
     
     def test_2_cae_train(self):
-        
+        print('Test cae')
         trainer = pl.Trainer(devices=1, accelerator='gpu', max_epochs=10, logger=False)
         trainer.fit(self.cae_model, self.train_dataloader, self.val_dataloader)
         
         self.assertTrue(True)
-
+        
+    def test_3_fullmodel_train(self):
+        print('Test full model')
+        model = CLRmodel(height=self.height, width=self.width, num_cluster=8, 
+                         encoder_dim=7, lr=0.01, knn=True, knn_adj=self.knn_adj, 
+                         ion_label_mat=self.ion_label_mat, dataset_specific_percentiles=True, cae_pretrained_model=self.cae_model)
+        
+        trainer = pl.Trainer(devices=1, accelerator='gpu', max_epochs=10, logger=False)
+        trainer.fit(model, self.train_dataloader, self.val_dataloader)
+        
+        self.assertTrue(True)
 
 
 if __name__ == '__main__':

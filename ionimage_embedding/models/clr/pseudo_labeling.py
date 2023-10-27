@@ -34,7 +34,6 @@ def compute_dataset_ublb(sim_mat, ds_labels,
     for ds in torch.unique(ds_labels):
         
         labels = ds_labels==ds
-        
         if labels.sum() > 2:
             ds_mat = sim_mat[labels, :][:, labels]
             mask = torch.eye(ds_mat.size(0), dtype=torch.bool)
@@ -61,9 +60,10 @@ def pseudo_labeling(ub: float, lb: float,
                     ds_labels: np.ndarray = None, device: str = None) -> Tuple[torch.tensor, torch.tensor]:
 
     if dataset_specific_percentiles:
-        ub_m = torch.ones(sim.shape).to(device)
+        # in lightning version this should work without device
+        ub_m = torch.ones(sim.shape)#.to(device)
         # TODO: should be zero matrix for lower bound probably, rethink that!
-        lb_m = torch.zeros(sim.shape).to(device)
+        lb_m = torch.zeros(sim.shape)#.to(device)
         for ds in torch.unique(ds_labels):
             ds_v = ds_labels == ds
             mask = torch.outer(ds_v, ds_v)

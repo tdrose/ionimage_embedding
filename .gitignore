@@ -133,4 +133,5 @@ dmypy.json
 
 
 # Lightning
-lightning_logs
+lightning_logs/
+checkpoints/
