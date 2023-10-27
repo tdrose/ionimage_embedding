@@ -102,3 +102,8 @@ class CAE(nn.Module):
         z = self.encode(x)
         xp = self.decode(z)
         return xp
+
+    
+    
+    
+    
