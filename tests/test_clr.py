@@ -1,4 +1,3 @@
-from metaspace import SMInstance
 import numpy as np
 import pandas as pd
 
@@ -9,7 +8,7 @@ from ionimage_embedding.models import CLR
 from ionimage_embedding.models.clr.pseudo_labeling import compute_dataset_ublb, pseudo_labeling
 from ionimage_embedding.models.clr.utils import size_adaption, size_adaption_symmetric
 
-from .test_clr_utils import original_ublb, original_dataset_ublb, original_ps
+from .test_clr_utils import original_ublb, original_dataset_ublb, original_ps, load_data
 
 import unittest
 
@@ -20,78 +19,7 @@ print('##############')
 print('Starting download of data and preprocessing')
 print('##############')
 
-evaluation_datasets = [
-    '2022-12-07_02h13m50s',
-    '2022-12-07_02h13m20s',
-    '2022-12-07_02h10m45s',
-    '2022-12-07_02h09m41s',
-    '2022-12-07_02h08m52s',
-    '2022-12-07_01h02m53s',
-    '2022-12-07_01h01m06s'
-                  ]
-
-training_results = {}
-training_images = {}
-training_if = {}
-polarity = '+'
-
-sm = SMInstance()
-
-for k in evaluation_datasets:
-    ds = sm.dataset(id=k)
-    results = ds.results(database=("HMDB", "v4"), fdr=0.2).reset_index()
-    training_results[k] = results
-    tmp = ds.all_annotation_images(fdr=0.2, database=("HMDB", "v4"), only_first_isotope=True)
-    onsample = dict(zip(results['formula'].str.cat(results['adduct']), ~results['offSample']))
-    formula = [x.formula+x.adduct for x in tmp if onsample[x.formula+x.adduct]]
-    tmp = np.array([x._images[0] for x in tmp if onsample[x.formula+x.adduct]])
-    training_images[k] = tmp
-    training_if[k] = formula
-    
-padding_images = size_adaption_symmetric(training_images)
-
-training_dsid = [
-    '2022-12-07_01h01m06s',
-    '2022-12-07_02h13m20s',
-    '2022-12-07_02h10m45s',
-    '2022-12-07_02h09m41s',
-    '2022-12-07_02h08m52s',
-    '2022-12-07_01h02m53s'
-                  ]
-
-testing_dsid = [
-    '2022-12-07_02h13m50s'
-]
-
-
-training_data = []
-training_datasets = [] 
-training_ions = []
-
-testing_data = []
-testing_datasets = [] 
-testing_ions = []
-
-
-for dsid, imgs in padding_images.items():
-    
-    if dsid in training_dsid:
-        training_data.append(imgs)
-        training_datasets += [dsid] * imgs.shape[0]
-        training_ions += training_if[dsid]
-    
-    testing_data.append(imgs)
-    testing_datasets += [dsid] * imgs.shape[0]
-    testing_ions += training_if[dsid]
-        
-    
-training_data = np.concatenate(training_data)
-training_datasets = np.array(training_datasets)
-training_ions = np.array(training_ions)
-
-testing_data = np.concatenate(testing_data)
-testing_datasets = np.array(testing_datasets)
-testing_ions = np.array(testing_ions)
+training_data, training_datasets, training_ions, testing_data, testing_datasets, testing_ions = load_data(cache=True)
 
 model = CLR(
             images=training_data,
