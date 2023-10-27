@@ -27,10 +27,10 @@ def string_similarity_matrix(string_list):
 
 
 def compute_dataset_ublb(sim_mat, ds_labels,
-                         lower_bound: int, upper_bound: int):
-    # print(ds_labels)
-    ds_ub = torch.zeros(torch.unique(ds_labels).size(0)).to('cuda')
-    ds_lb = torch.zeros(torch.unique(ds_labels).size(0)).to('cuda')
+                         lower_bound: int, upper_bound: int, device=None):
+    
+    ds_ub = torch.zeros(torch.max(torch.unique(ds_labels))+1, device=device)
+    ds_lb = torch.zeros(torch.max(torch.unique(ds_labels))+1, device=device)
     for ds in torch.unique(ds_labels):
         
         labels = ds_labels==ds
@@ -60,10 +60,10 @@ def pseudo_labeling(ub: float, lb: float,
                     ds_labels: np.ndarray = None, device: str = None) -> Tuple[torch.tensor, torch.tensor]:
 
     if dataset_specific_percentiles:
-        # in lightning version this should work without device
-        ub_m = torch.ones(sim.shape)#.to(device)
+
+        ub_m = torch.ones(sim.shape, device=device)#.to(device)
         # TODO: should be zero matrix for lower bound probably, rethink that!
-        lb_m = torch.zeros(sim.shape)#.to(device)
+        lb_m = torch.zeros(sim.shape, device=device)#.to(device)
         for ds in torch.unique(ds_labels):
             ds_v = ds_labels == ds
             mask = torch.outer(ds_v, ds_v)

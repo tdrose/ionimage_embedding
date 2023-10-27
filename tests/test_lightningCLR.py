@@ -115,19 +115,18 @@ class TestCLRlightning(unittest.TestCase):
 #                       epoch, sum(losses)/len(losses)))
         
 #         self.assertTrue(True)
-    
-    def test_2_cae_train(self):
-        print('Test cae')
+        
+    def test_fullmodel_train(self):
+        print('Test full model')
+        
         trainer = pl.Trainer(devices=1, accelerator='gpu', max_epochs=10, logger=False)
         trainer.fit(self.cae_model, self.train_dataloader, self.val_dataloader)
         
-        self.assertTrue(True)
         
-    def test_3_fullmodel_train(self):
-        print('Test full model')
         model = CLRmodel(height=self.height, width=self.width, num_cluster=8, 
                          encoder_dim=7, lr=0.01, knn=True, knn_adj=self.knn_adj, 
-                         ion_label_mat=self.ion_label_mat, dataset_specific_percentiles=True, cae_pretrained_model=self.cae_model)
+                         ion_label_mat=self.ion_label_mat, dataset_specific_percentiles=True, 
+                         cae_pretrained_model=self.cae_model, overweight_cae=1000.)
         
         trainer = pl.Trainer(devices=1, accelerator='gpu', max_epochs=10, logger=False)
         trainer.fit(model, self.train_dataloader, self.val_dataloader)

@@ -16,16 +16,17 @@ class CLRmodel(pl.LightningModule):
                  ion_label_mat,
                  activation='softmax',
                  encoder_dim=7,
-                 initial_upper: int = 98,
-                 initial_lower: int = 46,
+                 initial_upper: float = 98.,
+                 initial_lower: float = 46.,
                  upper_iteration: float = 1,
-                 lower_iteration: float = 4,
+                 lower_iteration: float = 1,
                  dataset_specific_percentiles: bool = False,
                  lr=0.01,
                  cae_pretrained_model=None,
                  knn=False, knn_adj = None,
                  cnn_dropout=0.1, weight_decay=1e-4,
-                 clip_gradients: float = None, overweight_cae=1000
+                 clip_gradients: float = None, 
+                 overweight_cae=1000.
                 ):
         
         super(CLRmodel, self).__init__()
@@ -43,7 +44,7 @@ class CLRmodel(pl.LightningModule):
         # Trainig related
         self.weight_decay = weight_decay
         self.lr = lr
-        self.clip_gradients = clip_gradients
+        self.clip_grads = clip_gradients
         self.overweight_cae = overweight_cae
         self.mse_loss = torch.nn.MSELoss()
         
@@ -96,13 +97,13 @@ class CLRmodel(pl.LightningModule):
         if self.dataset_specific_percentiles:
             
             dataset_ub, dataset_lb = compute_dataset_ublb(sim_mat, ds_labels=train_datasets,
-                                                          lower_bound=ll, upper_bound=uu)
+                                                          lower_bound=ll, upper_bound=uu, device=self.device)
 
         pos_loc, neg_loc = pseudo_labeling(ub=ub, lb=lb, sim=sim_mat, index=index, knn=self.KNN,
                                            knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
                                            dataset_specific_percentiles=self.dataset_specific_percentiles,
                                            dataset_ub=dataset_ub, dataset_lb=dataset_lb,
-                                           ds_labels=train_datasets, device=None)
+                                           ds_labels=train_datasets, device=self.device)
 
 
         return self.cl(neg_loc, pos_loc, sim_mat)
@@ -113,10 +114,11 @@ class CLRmodel(pl.LightningModule):
         return features, x_p
     
     def training_step(self, batch, batch_idx):
-        self.curr_upper -= self.upper_iteration
-        self.curr_lower += self.lower_iteration
         
         train_x, index, train_datasets, train_ions = batch
+        
+        self.knn_adj = self.knn_adj.to(self.device)
+        self.ion_label_mat = self.ion_label_mat.to(self.device)
         
         train_datasets = train_datasets.reshape(-1)
         train_ions = train_ions.reshape(-1)
@@ -126,10 +128,18 @@ class CLRmodel(pl.LightningModule):
         loss_cae = self.mse_loss(x_p, train_x)
         loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, index=index)
         
-        return self.overweight_cae*loss_cae + loss_clust
+        loss = loss_cae + loss_clust
+        self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+        self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+        self.log('Training CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+        
+        return loss
     
     def validation_step(self, batch, batch_idx):
         val_x, index, val_datasets, val_ions = batch
+        
+        self.knn_adj = self.knn_adj.to(self.device)
+        self.ion_label_mat = self.ion_label_mat.to(self.device)
         
         val_datasets = val_datasets.reshape(-1)
         val_ions = val_ions.reshape(-1)
@@ -139,10 +149,16 @@ class CLRmodel(pl.LightningModule):
         loss_cae = self.mse_loss(x_p, val_x)
         loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, index=index)
         
+        loss = loss_cae + loss_clust
+        self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+        self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+        self.log('Validation CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+        
+        return loss
+    
+    def on_train_epoch_end(self, *args, **kwargs):
         self.curr_upper -= self.upper_iteration
         self.curr_lower += self.lower_iteration
-
-        return self.overweight_cae*loss_cae + loss_clust
     
     def configure_optimizers(self):
         model_params = list(self.cae.parameters()) + list(self.clust.parameters())
