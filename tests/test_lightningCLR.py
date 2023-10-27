@@ -111,7 +111,7 @@ class TestCLRlightning(unittest.TestCase):
     
     def test_2_cae_train(self):
         
-        trainer = pl.Trainer(devices=1, accelerator='gpu', max_epochs=10)
+        trainer = pl.Trainer(devices=1, accelerator='gpu', max_epochs=10, logger=False)
         trainer.fit(self.cae_model, self.train_dataloader, self.val_dataloader)
         
         self.assertTrue(True)
