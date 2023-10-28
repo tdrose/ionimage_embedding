@@ -25,8 +25,7 @@ class CLRmodel(pl.LightningModule):
                  cae_pretrained_model=None,
                  knn=False, knn_adj = None,
                  cnn_dropout=0.1, weight_decay=1e-4,
-                 clip_gradients: float = None, 
-                 overweight_cae=1000.
+                 clip_gradients: float = None
                 ):
         
         super(CLRmodel, self).__init__()
@@ -45,7 +44,7 @@ class CLRmodel(pl.LightningModule):
         self.weight_decay = weight_decay
         self.lr = lr
         self.clip_grads = clip_gradients
-        self.overweight_cae = overweight_cae
+        # self.overweight_cae = overweight_cae
         self.mse_loss = torch.nn.MSELoss()
         
         # Pseudo labeling parameters
