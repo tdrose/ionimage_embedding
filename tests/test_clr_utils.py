@@ -1,7 +1,12 @@
 import numpy as np
 import torch.nn.functional as functional
 import torch
+from metaspace import SMInstance
+import pandas as pd
+import os
+import pickle
 
+from ionimage_embedding.models.clr.utils import size_adaption, size_adaption_symmetric
 
 def original_ublb(model, features, uu, ll, train_datasets, index):
     features = functional.normalize(features, p=2, dim=-1)
@@ -83,3 +88,95 @@ def original_ps(ub: float, lb: float,
     neg_loc = torch.tensor(neg_loc)
 
     return pos_loc, neg_loc
+
+
+def download_data(evaluation_datasets, testing_dsid, training_dsid):
+    training_results = {}
+    training_images = {}
+    training_if = {}
+    polarity = '+'
+
+    sm = SMInstance()
+
+    for k in evaluation_datasets:
+        ds = sm.dataset(id=k)
+        results = ds.results(database=("HMDB", "v4"), fdr=0.2).reset_index()
+        training_results[k] = results
+        tmp = ds.all_annotation_images(fdr=0.2, database=("HMDB", "v4"), only_first_isotope=True)
+        onsample = dict(zip(results['formula'].str.cat(results['adduct']), ~results['offSample']))
+        formula = [x.formula+x.adduct for x in tmp if onsample[x.formula+x.adduct]]
+        tmp = np.array([x._images[0] for x in tmp if onsample[x.formula+x.adduct]])
+        training_images[k] = tmp
+        training_if[k] = formula
+
+    padding_images = size_adaption_symmetric(training_images)
+
+    training_data = []
+    training_datasets = [] 
+    training_ions = []
+
+    testing_data = []
+    testing_datasets = [] 
+    testing_ions = []
+
+
+    for dsid, imgs in padding_images.items():
+
+        if dsid in training_dsid:
+            training_data.append(imgs)
+            training_datasets += [dsid] * imgs.shape[0]
+            training_ions += training_if[dsid]
+
+        testing_data.append(imgs)
+        testing_datasets += [dsid] * imgs.shape[0]
+        testing_ions += training_if[dsid]
+
+
+    training_data = np.concatenate(training_data)
+    training_datasets = np.array(training_datasets)
+    training_ions = np.array(training_ions)
+
+    testing_data = np.concatenate(testing_data)
+    testing_datasets = np.array(testing_datasets)
+    testing_ions = np.array(testing_ions)
+    
+    return training_data, training_datasets, training_ions, testing_data, testing_datasets, testing_ions
+
+
+def load_data(cache=False, cache_folder='/scratch/model_testing'):
+    evaluation_datasets = [
+    '2022-12-07_02h13m50s',
+    '2022-12-07_02h13m20s',
+    '2022-12-07_02h10m45s',
+    '2022-12-07_02h09m41s',
+    '2022-12-07_02h08m52s',
+    '2022-12-07_01h02m53s',
+    '2022-12-07_01h01m06s',
+    '2022-11-28_22h24m25s',
+    '2022-11-28_22h23m30s'
+                  ]
+    
+    training_dsid = evaluation_datasets[:len(evaluation_datasets)-1]
+    testing_dsid = evaluation_datasets[len(evaluation_datasets)-1]
+    
+    if cache:
+        # make hash of datasets
+        cache_file = 'clr_{}.pickle'.format(''.join(evaluation_datasets))
+        
+        # Check if cache folder exists
+        if not os.path.isdir(cache_folder):
+            os.mkdir(cache_folder)
+        
+        # Download data if it does not exist
+        if cache_file not in os.listdir(cache_folder):
+            data = download_data(evaluation_datasets, testing_dsid, training_dsid)
+            pickle.dump(data, open(os.path.join(cache_folder, cache_file), "wb"))
+            print('Saved file: {}'.format(os.path.join(cache_folder, cache_file)))
+            return data        
+        # Load cached data
+        else:
+            print('Loading cached data from: {}'.format(os.path.join(cache_folder, cache_file)))
+            return pickle.load(open(os.path.join(cache_folder, cache_file), "rb" ) )
+    
+    else:
+        return download_data(evaluation_datasets, testing_dsid, training_dsid)

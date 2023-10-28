@@ -6,7 +6,7 @@ long_description = (here / 'README.md').read_text(encoding='utf-8')
 
 setup(
     name='ionimage_embedding',
-    version='0.2.0',
+    version='0.3.0',
 
     description='Deep learning-based clustering approach to cluster ion images from mass spectrometry imaging data '
                 'across datasets. Optimized to work with datasets from the METASPACE database.',
@@ -29,6 +29,7 @@ setup(
         'pandas',
         'numpy',
         'torch',
+        'lightning',
         'torchvision',
         'metaspace2020',
         'scikit-learn'

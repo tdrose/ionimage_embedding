@@ -51,7 +51,8 @@ def get_clr_dataloader(images: np.ndarray,
                        index,
                        # Rotate images
                        transform=T.RandomRotation(degrees=(0, 360)),
-                       batch_size=128
+                       batch_size=128,
+                       val=False
                       ):
     
     dataset = mzImageDataset(images=images, 
@@ -61,5 +62,7 @@ def get_clr_dataloader(images: np.ndarray,
                              width=width,
                              index=index,
                              transform=T.RandomRotation(degrees=(0, 360)))
-
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    if val:
+        return DataLoader(dataset, batch_size=len(images), shuffle=False)
+    else:
+        return DataLoader(dataset, batch_size=batch_size, shuffle=True)

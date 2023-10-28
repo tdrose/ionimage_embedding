@@ -1,5 +1,8 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as functional
+import lightning.pytorch as pl
+
 import math
 
 
@@ -22,8 +25,8 @@ def conv2d_hwout(height, width, padding, dilation, kernel_size, stride):
     return h, w
 
 
-class CAE(nn.Module):
-    def __init__(self, height, width, encoder_dim=7):
+class CAE(pl.LightningModule):
+    def __init__(self, height, width, encoder_dim=7, lr=0.01):
         super(CAE, self).__init__()
         self.encoder_dim = encoder_dim
         self.k1, self.k2 = (3, 3), (3, 3)
@@ -31,6 +34,9 @@ class CAE(nn.Module):
         self.height = height
         self.width = width
         self.d1, self.d2 = 8, 16
+        
+        self.mse_loss = torch.nn.MSELoss()
+        self.lr = lr
 
         # encoder
         self.conv1 = nn.Sequential(nn.Conv2d(1, self.d1, kernel_size=self.k1, stride=self.s1, padding=(0, 0),
@@ -102,3 +108,31 @@ class CAE(nn.Module):
         z = self.encode(x)
         xp = self.decode(z)
         return xp
+
+    def training_step(self, batch, batch_idx):
+        
+        train_x, index, train_datasets, train_ions = batch
+
+        x_p = self.forward(train_x)
+
+        loss = self.mse_loss(x_p, train_x)
+
+        self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        
+        val_x, index, val_datasets, val_ions = batch
+
+        x_p = self.forward(val_x)
+
+        loss = self.mse_loss(x_p, val_x)
+
+        self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+
+        return loss
+        
+    def configure_optimizers(self):
+        
+        return torch.optim.RMSprop(params=self.parameters(), lr=self.lr)
