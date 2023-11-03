@@ -181,9 +181,12 @@ class CLR:
         self.cae = cae
         
         # Training of full model
-        self.clr = CLRmodel(height=self.height, width=self.width, num_cluster=self.num_cluster, ion_label_mat=self.ion_label_mat, activation=self.activation, encoder_dim=self.cae_encoder_dim, 
-                            initial_upper=self.initial_upper, initial_lower=self.initial_lower, upper_iteration=self.upper_iteration, lower_iteration=self.lower_iteration,
-                            dataset_specific_percentiles=self.dataset_specific_percentiles, lr=self.lr, cae_pretrained_model=cae, knn=self.KNN, knn_adj = self.knn_adj, 
+        self.clr = CLRmodel(height=self.height, width=self.width, num_cluster=self.num_cluster, 
+                            ion_label_mat=self.ion_label_mat, activation=self.activation, encoder_dim=self.cae_encoder_dim, 
+                            initial_upper=self.initial_upper, initial_lower=self.initial_lower, 
+                            upper_iteration=self.upper_iteration, lower_iteration=self.lower_iteration,
+                            dataset_specific_percentiles=self.dataset_specific_percentiles, lr=self.lr, 
+                            cae_pretrained_model=cae, knn=self.KNN, knn_adj = self.knn_adj, 
                             cnn_dropout=self.cnn_dropout, weight_decay=self.weight_decay, clip_gradients=self.clip_gradients)
         
         trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.training_epochs, logger=logger)
