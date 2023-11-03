@@ -1,8 +1,9 @@
 import unittest
 import math
 import numpy as np
+import torch
 
-from ionimage_embedding.dataloader.clr_data import CLRdata
+from ionimage_embedding.dataloader.clr_data import CLRdata, CLRlods
 
 ds_list = evaluation_datasets = [
     '2022-12-07_02h13m50s',
@@ -13,6 +14,7 @@ ds_list = evaluation_datasets = [
                   ]
 
 dat2 = CLRdata(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
+dat3 = CLRlods(ds_list, test=2, val=0.1, cache=True, cache_folder='/scratch/model_testing')
 
               
 class TestCLR(unittest.TestCase):
@@ -41,16 +43,19 @@ class TestCLR(unittest.TestCase):
         self.assertEqual(len(dat2.test_dataset.index), test_check)
 
     def test_indices(self):
-        # Test indices
         self.assertEqual(sorted(list(dat2.train_dataset.index)+list(dat2.val_dataset.index)), 
                          list(range(len(dat2.train_dataset.index)+len(dat2.val_dataset.index))))
         
     def test_shapes(self):
-        # Test image shapes
         self.assertEqual(dat2.train_dataset.images.shape[1], dat2.train_dataset.images.shape[2])
         
     def test_knn(self):
-        # Test knn
         self.assertTrue((np.array(dat2.knn_adj.sum(axis=1))>=np.repeat(dat2.k, dat2.knn_adj.shape[0])).all())
         
+    def test_lods_ds(self):
+        self.assertEqual(len(torch.unique(dat3.test_dataset.dataset_labels)), 2)
         
+        for x in torch.unique(dat3.test_dataset.dataset_labels):
+            self.assertFalse(x in dat3.train_dataset.dataset_labels)
+            self.assertFalse(x in dat3.val_dataset.dataset_labels)
+ 

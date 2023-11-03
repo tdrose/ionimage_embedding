@@ -15,7 +15,7 @@ from .clr_dataloader import mzImageDataset
 
 class CLRdata:
     
-    def __init__(self, dataset_ids, test=0.3, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)), maindata_class = True,
+    def __init__(self, dataset_ids, test=0.3, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)), maindata_class=True,
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', hotspot_clipping=False,
                  k=10, batch_size=128,
@@ -163,6 +163,8 @@ class CLRdata:
     
     # Will be overwritten by inheriting classes
     def check_val_test_proportions(self, val, test, min_images=5):
+        if not self._maindata_class:
+            raise AttributeError('Method cannot be executed if inherited data class is used')
         
         test_check = math.floor(len(self.data) * self.test)
         val_check = math.floor((len(self.data)-test_check) * self.val)
@@ -175,3 +177,76 @@ class CLRdata:
     def check_dataexists(self):
         if self.train_dataset is None or self.test_dataset is None or self.val_dataset is None:
             raise AttributeError('Datasets not defined, DO NOT mess with the data classes!')
+            
+            
+class CLRlods(CLRdata):
+    
+    def __init__(self, dataset_ids, test=1, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)),
+                 # Download parameters:
+                 db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', hotspot_clipping=False,
+                 k=10, batch_size=128,
+                 cache=False, cache_folder='/scratch/model_testing'
+                ):
+        
+        if test < 1:
+            raise ValueError('CLRlods (leave datasets out) class requires value for test larger than 1 (number of datasets excluded from training)')
+            
+        super().__init__(dataset_ids=dataset_ids, test=.1, val=val, transformations=transformations, maindata_class=False,
+                 db=db, fdr=fdr, scale_intensity=scale_intensity, hotspot_clipping=hotspot_clipping,
+                 k=k, batch_size=batch_size,
+                 cache=cache, cache_folder=cache_folder)
+        
+        # Creating datasets
+        
+        # Train test split
+        if len(self.dataset_ids) <= test:
+            raise ValueError('Cannot assing more datasets for testing that loaded datasets')
+        
+        torch.unique(self.dsl_int).numpy().shape[0]
+        
+        test_dsid = np.random.choice(torch.unique(self.dsl_int).numpy(), size=test, replace=False)
+        tmp_mask = np.ones(len(self.data), bool)
+        for ds in test_dsid:
+            tmp_mask[self.dsl_int==ds] = 0
+        tmp = self.split_data(mask=tmp_mask, data=self.data, dsl=self.dsl_int, ill=self.ill_int)
+        tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
+    
+        
+        # Train val split
+        val_mask = np.random.choice(tmp_data.shape[0], size=math.floor(tmp_data.shape[0] * self.val), replace=False)
+        train_mask = np.ones(len(tmp_data), bool)
+        train_mask[val_mask] = 0
+        tmp = self.split_data(mask=train_mask, data=tmp_data, dsl=tmp_dls, ill=tmp_ill)
+        train_data, train_dls, train_ill, train_index, val_data, val_dls, val_ill, val_index = tmp
+
+        # compute KNN and ion_label_mat (For combined train/val data)
+        self.knn_adj = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), k=self.k))
+
+        self.ion_label_mat = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
+
+        # Make datasets
+        self.train_dataset = mzImageDataset(images=train_data, 
+                                            dataset_labels=train_dls,
+                                            ion_labels=train_ill,
+                                            height=self.height,
+                                            width=self.width,
+                                            index=train_index,
+                                            transform=self.transformations)
+
+        self.val_dataset = mzImageDataset(images=val_data, 
+                                          dataset_labels=val_dls,
+                                          ion_labels=val_ill,
+                                          height=self.height,
+                                          width=self.width,
+                                          index=val_index,
+                                          transform=self.transformations)
+
+        self.test_dataset = mzImageDataset(images=test_data, 
+                                           dataset_labels=test_dls,
+                                           ion_labels=test_ill,
+                                           height=self.height,
+                                           width=self.width,
+                                           index=test_index,
+                                           transform=self.transformations)
+        
+        self.check_dataexists()

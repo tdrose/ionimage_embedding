@@ -1,6 +1,5 @@
 import unittest
 
-#from tests import test_lightningCLR, test_clr
 from tests import test_dataloader, test_clr, test_lightningCLR
 
 test_suite = unittest.TestSuite()
