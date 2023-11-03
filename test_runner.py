@@ -1,10 +1,14 @@
 import unittest
 
-from tests import test_lightningCLR, test_clr
+#from tests import test_lightningCLR, test_clr
+from tests import test_dataloader, test_clr, test_lightningCLR
 
 test_suite = unittest.TestSuite()
 loader = unittest.TestLoader()
 
+
+
+test_suite.addTests(loader.loadTestsFromModule(test_dataloader))
 test_suite.addTests(loader.loadTestsFromModule(test_clr))
 test_suite.addTests(loader.loadTestsFromModule(test_lightningCLR))
 

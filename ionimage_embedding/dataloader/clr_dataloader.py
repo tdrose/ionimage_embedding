@@ -61,7 +61,7 @@ def get_clr_dataloader(images: np.ndarray,
                              height=height,
                              width=width,
                              index=index,
-                             transform=T.RandomRotation(degrees=(0, 360)))
+                             transform=transform)
     if val:
         return DataLoader(dataset, batch_size=len(images), shuffle=False)
     else:

@@ -1,21 +1,9 @@
 import torch
 import torch.nn as nn
 from typing import Tuple
-from sklearn.neighbors import NearestNeighbors
 import numpy as np
-from .utils import make_symmetric
 
 
-def run_knn(features: np.ndarray, k: int = 10):
-    # Todo: Make a better solution for excluding self neighborhood
-    nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm='ball_tree').fit(features)
-    _, indices = nbrs.kneighbors(features)
-    # Excluding self neighborhood here
-    idx = indices[:, 1:]
-    adj = np.zeros((features.shape[0], features.shape[0]))
-    for i in range(len(idx)):
-        adj[i, idx[i]] = 1
-    return make_symmetric(adj)
 
 
 def string_similarity_matrix(string_list):

@@ -6,9 +6,9 @@ import pandas as pd
 import os
 import pickle
 
-from ionimage_embedding.models.clr.utils import size_adaption, size_adaption_symmetric
+from ionimage_embedding.dataloader.utils import size_adaption, size_adaption_symmetric
 
-def original_ublb(model, features, uu, ll, train_datasets, index):
+def original_ublb(batch_size, features, uu, ll, train_datasets, index):
     features = functional.normalize(features, p=2, dim=-1)
     features = features / features.norm(dim=1)[:, None]
 
@@ -17,8 +17,8 @@ def original_ublb(model, features, uu, ll, train_datasets, index):
     sim_numpy = sim_mat.cpu().detach().numpy()
 
     # Get all sim values from the batch excluding the diagonal
-    tmp2 = [sim_numpy[i][j] for i in range(0, model.batch_size)
-            for j in range(model.batch_size) if i != j]
+    tmp2 = [sim_numpy[i][j] for i in range(0, batch_size)
+            for j in range(batch_size) if i != j]
 
     ub = np.percentile(tmp2, uu)
     lb = np.percentile(tmp2, ll)
