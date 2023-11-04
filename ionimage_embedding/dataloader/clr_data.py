@@ -19,7 +19,7 @@ class CLRdata:
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', hotspot_clipping=False,
                  k=10, batch_size=128,
-                 cache=False, cache_folder='/scratch/model_testing'
+                 cache=False, cache_folder='/scratch/model_testing', min_images=5
                 ):
         
         self.dataset_ids = dataset_ids
@@ -29,6 +29,7 @@ class CLRdata:
         self.test = test
         self.k=k
         self.batch_size=batch_size
+        self.min_images=min_images
         
         # Download data
         if cache:
@@ -78,7 +79,7 @@ class CLRdata:
         
         if maindata_class:
             # check if val and test data proportions contain at least a few images
-            self.check_val_test_proportions(val=self.val, test=self.test)
+            self.check_val_test_proportions(val=self.val, test=self.test, min_images=self.min_images)
             
             # Train test split
             test_mask = np.random.choice(self.data.shape[0], size=math.floor(self.data.shape[0] * self.test), replace=False)
@@ -185,7 +186,7 @@ class CLRlods(CLRdata):
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', hotspot_clipping=False,
                  k=10, batch_size=128,
-                 cache=False, cache_folder='/scratch/model_testing'
+                 cache=False, cache_folder='/scratch/model_testing', min_images=5
                 ):
         
         if test < 1:
@@ -194,15 +195,11 @@ class CLRlods(CLRdata):
         super().__init__(dataset_ids=dataset_ids, test=.1, val=val, transformations=transformations, maindata_class=False,
                  db=db, fdr=fdr, scale_intensity=scale_intensity, hotspot_clipping=hotspot_clipping,
                  k=k, batch_size=batch_size,
-                 cache=cache, cache_folder=cache_folder)
-        
-        # Creating datasets
+                 cache=cache, cache_folder=cache_folder, min_images=min_images)
         
         # Train test split
         if len(self.dataset_ids) <= test:
             raise ValueError('Cannot assing more datasets for testing that loaded datasets')
-        
-        torch.unique(self.dsl_int).numpy().shape[0]
         
         test_dsid = np.random.choice(torch.unique(self.dsl_int).numpy(), size=test, replace=False)
         tmp_mask = np.ones(len(self.data), bool)
@@ -250,3 +247,120 @@ class CLRlods(CLRdata):
                                            transform=self.transformations)
         
         self.check_dataexists()
+        
+        
+class CLRtransitivity(CLRdata):
+    
+    def __init__(self, dataset_ids, test=.3, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)),
+                 # Download parameters:
+                 db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', hotspot_clipping=False,
+                 k=10, batch_size=128,
+                 cache=False, cache_folder='/scratch/model_testing', min_images=5, min_codetection=2
+                ):
+            
+        super().__init__(dataset_ids=dataset_ids, test=.3, val=val, transformations=transformations, maindata_class=False,
+                 db=db, fdr=fdr, scale_intensity=scale_intensity, hotspot_clipping=hotspot_clipping,
+                 k=k, batch_size=batch_size,
+                 cache=cache, cache_folder=cache_folder, min_images=min_images)
+        
+        self.min_codetection=min_codetection
+        
+        # Train test split
+        index_dict = self.codetection_index(ill=self.ill_int, dsl=self.dsl_int, min_codetection=self.min_codetection)
+        tmp_mask = self.codetection_mask(idx_dict=index_dict, test_fraction=test, ill=self.ill_int, dsl=self.dsl_int)
+        tmp = self.split_data(mask=tmp_mask, data=self.data, dsl=self.dsl_int, ill=self.ill_int)
+        tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
+    
+        
+        # Train val split
+        val_mask = np.random.choice(tmp_data.shape[0], size=math.floor(tmp_data.shape[0] * self.val), replace=False)
+        train_mask = np.ones(len(tmp_data), bool)
+        train_mask[val_mask] = 0
+        tmp = self.split_data(mask=train_mask, data=tmp_data, dsl=tmp_dls, ill=tmp_ill)
+        train_data, train_dls, train_ill, train_index, val_data, val_dls, val_ill, val_index = tmp
+
+        # compute KNN and ion_label_mat (For combined train/val data)
+        self.knn_adj = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), k=self.k))
+
+        self.ion_label_mat = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
+
+        # Make datasets
+        self.train_dataset = mzImageDataset(images=train_data, 
+                                            dataset_labels=train_dls,
+                                            ion_labels=train_ill,
+                                            height=self.height,
+                                            width=self.width,
+                                            index=train_index,
+                                            transform=self.transformations)
+
+        self.val_dataset = mzImageDataset(images=val_data, 
+                                          dataset_labels=val_dls,
+                                          ion_labels=val_ill,
+                                          height=self.height,
+                                          width=self.width,
+                                          index=val_index,
+                                          transform=self.transformations)
+
+        self.test_dataset = mzImageDataset(images=test_data, 
+                                           dataset_labels=test_dls,
+                                           ion_labels=test_ill,
+                                           height=self.height,
+                                           width=self.width,
+                                           index=test_index,
+                                           transform=self.transformations)
+        
+        self.check_dataexists()
+    
+    @staticmethod
+    def codetection_index(ill, dsl, min_codetection=2):
+        
+        index_dict = {}
+        
+        for dsid in torch.unique(dsl):
+            mask = dsl==dsid
+            
+            masked_ill = ill[mask]
+            
+            for x in range(len(masked_ill)):
+                for y in range(x+1, len(masked_ill)):
+                    tmp = tuple(sorted([int(masked_ill[x]),int(masked_ill[y])]))
+                    
+                    if tmp not in index_dict.keys():
+                        index_dict[tmp] = [int(dsid)]
+                    else:
+                        if int(dsid) not in index_dict[tmp]:
+                            index_dict[tmp].append(int(dsid))
+        
+        # Return ion pairs that are co-detected in at least 2 datasets
+        return {k: v for k, v in index_dict.items() if len(v)>=min_codetection}
+
+    @staticmethod
+    def codetection_mask(idx_dict, test_fraction, ill, dsl):
+        
+        # Because numpy.choice is not possible on list of tuples
+        idx_keys = list(idx_dict.keys())
+        idx_int = np.arange(len(idx_keys))
+        
+        tmp = np.random.choice(idx_int, size=math.floor(len(idx_int) * test_fraction), replace=False)
+        tmp = [idx_keys[x] for x in tmp]
+        
+        
+        out_mask = np.ones(len(ill), bool)
+        
+        # For each ion pair
+        for ip in tmp:
+            
+            ds = idx_dict[ip]
+            # Make random selection of which ion to remove for all datasets
+            ids = np.random.choice(list(ip), size=len(ds), replace=True)
+            
+            # For each dataset where ions co-occur, Search for array position
+            for x in range(len(ds)):
+                a = (ill==ids[x])&(dsl==ds[x])
+                pos = int(torch.arange(len(a))[a][0])
+                
+                out_mask[pos] = False
+                
+        return out_mask
+                
+                
