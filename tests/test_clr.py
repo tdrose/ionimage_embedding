@@ -6,7 +6,8 @@ import torch
 
 from ionimage_embedding.models import CLR
 from ionimage_embedding.models.clr.pseudo_labeling import compute_dataset_ublb, pseudo_labeling
-from ionimage_embedding.models.clr.utils import size_adaption, size_adaption_symmetric
+from ionimage_embedding.dataloader.utils import size_adaption, size_adaption_symmetric
+from ionimage_embedding.dataloader.clr_data import CLRdata
 
 from .test_clr_utils import original_ublb, original_dataset_ublb, original_ps, load_data
 
@@ -15,27 +16,27 @@ import unittest
 # ############################
 # Preprocessing - Loading data
 # ############################
-print('##############')
-print('Starting download of data and preprocessing')
-print('##############')
+ds_list = evaluation_datasets = [
+    '2022-12-07_02h13m50s',
+    '2022-12-07_02h13m20s',
+    '2022-12-07_02h10m45s',
+    '2022-12-07_02h09m41s',
+    '2022-12-07_02h08m52s'
+                  ]
 
-training_data, training_datasets, training_ions, testing_data, testing_datasets, testing_ions = load_data(cache=True, cache_folder='/scratch/model_testing')
+dat = CLRdata(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
 
-model = CLR(
-            images=training_data,
-            dataset_labels=training_datasets,
-            ion_labels=training_ions,
+model = CLR(dat,
             num_cluster=8,
             initial_upper=93,
             initial_lower=37,
             upper_iteration=1.5,
             lower_iteration=1.5,
             dataset_specific_percentiles=True,
-            random_flip=True,
-            knn=True, k=5,
-            lr=0.0001, batch_size=128,
-            pretraining_epochs=1,
-            training_epochs=2,
+            knn=True, 
+            lr=0.0001,
+            pretraining_epochs=5,
+            training_epochs=5,
             cae_encoder_dim=2,
             lightning_device='gpu',
             random_seed=1225
@@ -63,16 +64,10 @@ features, x_p = clust(train_x)
 uu = 85
 ll=55
 
-
-
-print('##############')
-print('Preprocessing done')
-print('##############')
-
 class TestCLR(unittest.TestCase):
     
     def setUp(self):
-        self.oub, self.olb, self.sim_numpy, self.smn = original_ublb(model, features=features, uu=uu, ll=ll, train_datasets=train_datasets, index=index)
+        self.oub, self.olb, self.sim_numpy, self.smn = original_ublb(dat.batch_size, features=features, uu=uu, ll=ll, train_datasets=train_datasets, index=index)
         self.tub, self.tlb, self.sim_mat = clust.compute_ublb(features=features, uu=uu, ll=ll, train_datasets=train_datasets, index=index)
         
         self.ods_ub, self.ods_lb = original_dataset_ublb(self.sim_numpy, ds_labels=train_datasets, lower_bound=ll, upper_bound=uu)
@@ -141,7 +136,7 @@ class TestCLR(unittest.TestCase):
     def test_4(self):
         # Original
         optimizer.zero_grad()
-        oub, olb, sim_numpy, smn = original_ublb(model, features=features, uu=uu, ll=ll, train_datasets=train_datasets, index=index)
+        oub, olb, sim_numpy, smn = original_ublb(dat.batch_size, features=features, uu=uu, ll=ll, train_datasets=train_datasets, index=index)
         ods_ub, ods_lb = original_dataset_ublb(sim_numpy, ds_labels=train_datasets, lower_bound=ll, upper_bound=uu)
         opl, onl = original_ps(ub=oub, lb=olb, sim=self.sim_numpy, index=index, knn=True, knn_adj=model.knn_adj.cpu().numpy(), ion_label_mat=model.ion_label_mat.cpu().numpy(),
                                dataset_specific_percentiles=True, dataset_ub=ods_ub, dataset_lb=ods_lb, ds_labels=train_datasets)
