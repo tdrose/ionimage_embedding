@@ -135,3 +135,6 @@ dmypy.json
 # Lightning
 lightning_logs/
 checkpoints/
+
+# vscode
+.vscode/

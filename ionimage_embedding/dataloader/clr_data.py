@@ -63,29 +63,32 @@ class CLRdata:
         
         # Encoding for ds_labels and ion_labels
         self.ds_encoder = preprocessing.LabelEncoder()
-        self.dsl_int = torch.tensor(self.ds_encoder.fit_transform(dataset_labels))
+        dsl_int = torch.tensor(self.ds_encoder.fit_transform(dataset_labels))
         self.il_encoder = preprocessing.LabelEncoder()
-        self.ill_int = torch.tensor(self.il_encoder.fit_transform(ion_labels))
+        ill_int = torch.tensor(self.il_encoder.fit_transform(ion_labels))
         
-        self.data = data
-        
-        # dataloader variables
-        self.train_dataset = None
-        self.val_dataset = None
-        self.test_dataset = None
+        # self.data = data
         
         self.height = data.shape[1]
         self.width = data.shape[2]
+
+        self.full_dataset = mzImageDataset(images=data, 
+                                           dataset_labels=dsl_int,
+                                           ion_labels=ill_int,
+                                           height=self.height,
+                                           width=self.width,
+                                           index=np.arange(len(data)),
+                                           transform=None)
         
         if maindata_class:
             # check if val and test data proportions contain at least a few images
             self.check_val_test_proportions(val=self.val, test=self.test, min_images=self.min_images)
             
             # Train test split
-            test_mask = np.random.choice(self.data.shape[0], size=math.floor(self.data.shape[0] * self.test), replace=False)
-            tmp_mask = np.ones(len(self.data), bool)
+            test_mask = np.random.choice(self.full_dataset.images.shape[0], size=math.floor(self.full_dataset.images.shape[0] * self.test), replace=False)
+            tmp_mask = np.ones(len(self.full_dataset.images), bool)
             tmp_mask[test_mask] = 0
-            tmp = self.split_data(mask=tmp_mask, data=self.data, dsl=self.dsl_int, ill=self.ill_int)
+            tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, dsl=self.full_dataset.dataset_labels, ill=self.full_dataset.ion_labels)
             tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
             
             # Train val split
@@ -153,7 +156,7 @@ class CLRdata:
     def get_test_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=len(self.test_dataset.images), shuffle=False)
     
-    # simple min-max scaling, no data leakage
+    # simple min-max scaling per image, no data leakage
     def image_normalization(self, new_data: np.ndarray):
                 nd = new_data.copy()
                 for i in range(0, nd.shape[0]):
@@ -167,9 +170,9 @@ class CLRdata:
         if not self._maindata_class:
             raise AttributeError('Method cannot be executed if inherited data class is used')
         
-        test_check = math.floor(len(self.data) * self.test)
-        val_check = math.floor((len(self.data)-test_check) * self.val)
-        train_check = len(self.data)-test_check - val_check
+        test_check = math.floor(len(self.full_dataset.images) * self.test)
+        val_check = math.floor((len(self.full_dataset.images)-test_check) * self.val)
+        train_check = len(self.full_dataset.images)-test_check - val_check
         
         if test_check < min_images or val_check < min_images or train_check < min_images:
             raise ValueError(f'Test/Validation/Training data must contain at least {min_images}\n'
@@ -201,11 +204,11 @@ class CLRlods(CLRdata):
         if len(self.dataset_ids) <= test:
             raise ValueError('Cannot assing more datasets for testing that loaded datasets')
         
-        test_dsid = np.random.choice(torch.unique(self.dsl_int).numpy(), size=test, replace=False)
-        tmp_mask = np.ones(len(self.data), bool)
+        test_dsid = np.random.choice(torch.unique(self.full_dataset.dataset_labels).numpy(), size=test, replace=False)
+        tmp_mask = np.ones(len(self.full_dataset.images), bool)
         for ds in test_dsid:
-            tmp_mask[self.dsl_int==ds] = 0
-        tmp = self.split_data(mask=tmp_mask, data=self.data, dsl=self.dsl_int, ill=self.ill_int)
+            tmp_mask[self.full_dataset.dataset_labels==ds] = 0
+        tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, dsl=self.full_dataset.dataset_labels, ill=self.full_dataset.ion_labels)
         tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
     
         
@@ -266,9 +269,9 @@ class CLRtransitivity(CLRdata):
         self.min_codetection=min_codetection
         
         # Train test split
-        index_dict = self.codetection_index(ill=self.ill_int, dsl=self.dsl_int, min_codetection=self.min_codetection)
-        tmp_mask = self.codetection_mask(idx_dict=index_dict, test_fraction=test, ill=self.ill_int, dsl=self.dsl_int)
-        tmp = self.split_data(mask=tmp_mask, data=self.data, dsl=self.dsl_int, ill=self.ill_int)
+        index_dict = self.codetection_index(ill=self.full_dataset.ion_labels, dsl=self.full_dataset.dataset_labels, min_codetection=self.min_codetection)
+        tmp_mask = self.codetection_mask(idx_dict=index_dict, test_fraction=test, ill=self.full_dataset.ion_labels, dsl=self.full_dataset.dataset_labels)
+        tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, dsl=self.full_dataset.dataset_labels, ill=self.full_dataset.ion_labels)
         tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
     
         

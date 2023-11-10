@@ -24,11 +24,11 @@ class TestCLR(unittest.TestCase):
     
     def test_lengths(self):
         
-        test_check = math.floor(len(dat2.data) * dat2.test)
-        val_check = math.floor((len(dat2.data)-test_check) * dat2.val)
-        train_check = len(dat2.data) - test_check - val_check
+        test_check = math.floor(len(dat2.full_dataset.images) * dat2.test)
+        val_check = math.floor((len(dat2.full_dataset.images)-test_check) * dat2.val)
+        train_check = len(dat2.full_dataset.images) - test_check - val_check
         # test lengths
-        self.assertEqual(len(dat2.data), len(dat2.train_dataset.images)+len(dat2.val_dataset.images)+len(dat2.test_dataset.images))
+        self.assertEqual(len(dat2.full_dataset.images), len(dat2.train_dataset.images)+len(dat2.val_dataset.images)+len(dat2.test_dataset.images))
         
         self.assertEqual(len(dat2.train_dataset.images), train_check)
         self.assertEqual(len(dat2.train_dataset.dataset_labels), train_check)
@@ -53,12 +53,12 @@ class TestCLR(unittest.TestCase):
         self.assertEqual(dat2.train_dataset.images.shape[1], dat2.train_dataset.images.shape[2])
         
     def test_knn(self):
-        self.assertTrue((np.array(dat2.knn_adj.sum(axis=1))>=np.repeat(dat2.k, dat2.knn_adj.shape[0])).all())
+        self.assertTrue((torch.sum(dat2.knn_adj, dim=1).numpy()>=np.repeat(dat2.k, dat2.knn_adj.shape[0])).all())
         
     def test_lods_ds(self):
         self.assertEqual(len(torch.unique(dat3.test_dataset.dataset_labels)), lods_ntestds)
         self.assertEqual(len(torch.unique(torch.concat((dat3.train_dataset.dataset_labels, 
-                                                    dat3.val_dataset.dataset_labels)))), 
+                                                        dat3.val_dataset.dataset_labels)))), 
                          len(dat3.dataset_ids)-lods_ntestds)
         
         for x in torch.unique(dat3.test_dataset.dataset_labels):
@@ -88,12 +88,18 @@ class TestCLR(unittest.TestCase):
         self.assertNotEqual(len(mask), mask.sum())
         
         idx_dict2 = dat4.codetection_index(ill=ill[mask], dsl=dsl[mask], min_codetection=1)
-        self.assertEqual(len(idx_dict2), math.floor(len(idx_dict)*test_fraction))
+        # Since we wandomly remove ions per dataset, more co-detections might be removed
+        # At least as many as math.floor(len(idx_dict)*test_fraction)
+        self.assertTrue(len(idx_dict2)<=len(idx_dict)-math.floor(len(idx_dict)*test_fraction))
         
     def test_transitivity(self):
         
-        self.assertNotEqual(len(dat4.test_dataset.images), len(dat4.data))
-        self.assertNotEqual(len(dat4.val_dataset.images), len(dat4.data))
-        self.assertNotEqual(len(dat4.train_dataset.images), len(dat4.data))
+        self.assertNotEqual(len(dat4.test_dataset.images), len(dat4.full_dataset.images))
+        self.assertNotEqual(len(dat4.val_dataset.images), len(dat4.full_dataset.images))
+        self.assertNotEqual(len(dat4.train_dataset.images), len(dat4.full_dataset.images))
+
+    def test_fulldataloader(self):
+        self.assertEqual(len(dat2.full_dataset.images), len(dat2.full_dataset.images))
+
         
         
