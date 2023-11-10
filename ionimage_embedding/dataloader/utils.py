@@ -113,6 +113,7 @@ def make_symmetric(matrix):
 def run_knn(features: np.ndarray, k: int = 10):
     # Todo: Make a better solution for excluding self neighborhood
     nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm='ball_tree').fit(features)
+    # TODO: This takes way too long... Implement faster version
     _, indices = nbrs.kneighbors(features)
     # Excluding self neighborhood here
     idx = indices[:, 1:]
