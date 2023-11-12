@@ -123,22 +123,22 @@ class CLR:
         
         if cae is None:
             cae = self.cae   
-        if clust is None:
-            clust = self.clr
+        if clr is None:
+            clr = self.clr
         
         with torch.no_grad():
             
             if normalize:
                 new_data = self.image_normalization(new_data=new_data)
             
-            test_x = torch.Tensor(nd, device=device)
+            test_x = torch.tensor(new_data, device=device)
             
             test_x = test_x.reshape((-1, 1, self._height, self._width))
             
             cae = cae.to(device)
-            clust = clust.to(device)
+            clr = clr.to(device)
             
-            pseudo_label, x_p = clust(x_p)
+            pseudo_label, x_p = clr(test_x)
 
             pseudo_label = torch.argmax(pseudo_label, dim=1)
             prediction_label.extend(pseudo_label.cpu().detach().numpy())
@@ -146,25 +146,25 @@ class CLR:
 
             return prediction_label
 
-    def inference_embeddings(self, new_data, cae=None, clust=None, normalize_images=True, normalize_embeddings=True, device='cpu'):
+    def inference_embeddings(self, new_data, cae=None, clr=None, normalize_images=True, normalize_embeddings=True, device='cpu'):
         
         if cae is None:
             cae = self.cae   
-        if clust is None:
-            clust = self.clust
+        if clr is None:
+            clr = self.clr
             
         with torch.no_grad():
             if normalize_images:
                 new_data = self.image_normalization(new_data=new_data)
             
-            test_x = torch.Tensor(nd, device=device)
+            test_x = torch.tensor(new_data, device=device)
             
             test_x = test_x.reshape((-1, 1, self._height, self._width))
             
             cae = cae.to(device)
-            clust = clust.to(device)
+            clr = clr.to(device)
 
-            embeddings, x_p = clust(x_p)
+            embeddings, x_p = clr(test_x)
             
             if normalize_embeddings:
                 embeddings = functional.normalize(embeddings, p=2, dim=-1)

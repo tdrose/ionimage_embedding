@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as T
 from torch.utils.data import DataLoader
 import numpy as np
+from typing import Any
 
 
 class mzImageDataset(Dataset):
@@ -10,13 +11,13 @@ class mzImageDataset(Dataset):
     Images small enough, can be loaded into memory directly
     """
     def __init__(self, 
-                 images: np.ndarray,
-                 dataset_labels: np.ndarray,
-                 ion_labels: np.ndarray,
+                 images,
+                 dataset_labels,
+                 ion_labels,
                  height, width,
                  index,
                  # Rotate images
-                 transform=T.RandomRotation(degrees=(0, 360)),
+                 transform=None,
                 ):
         
         self.images = images
@@ -37,7 +38,7 @@ class mzImageDataset(Dataset):
         ion_label = np.array([self.ion_labels[idx]])
         sample_id = np.array(self.index[idx])
         
-        if self.transform:
+        if self.transform is not None:
             image = self.transform(image)
 
         return image, sample_id, dataset_label, ion_label

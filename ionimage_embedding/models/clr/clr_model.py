@@ -76,7 +76,8 @@ class CLRmodel(pl.LightningModule):
     
     def compute_ublb(self, features, uu, ll, train_datasets, index):
         features = functional.normalize(features, p=2, dim=-1)
-        features = features / features.norm(dim=1)[:, None]
+        # Second normalization not necessary. Keeping it here for reference, will be removed in the future.
+        # features = features / features.norm(dim=1)[:, None]
 
         sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
 
