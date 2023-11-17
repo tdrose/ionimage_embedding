@@ -5,6 +5,7 @@ import lightning.pytorch as pl
 
 import math
 from .cnnClust import CNNClust
+from .cae import CAE
 from .pseudo_labeling import pseudo_labeling, compute_dataset_ublb
 
 
