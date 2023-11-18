@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from pyparsing import col
 import seaborn as sns
 
 import torch
@@ -39,7 +40,12 @@ ds_list = [
                   ]
 
 clrdat = CLRdata(ds_list, test=0.3, val=0.1, 
-                 cache=True, cache_folder='/scratch/model_testing')
+                 cache=False, cache_folder='/scratch/model_testing',
+                 colocml_preprocessing=True)
+
+print(np.isnan(clrdat.full_dataset.images).any())
+plt.imshow(clrdat.full_dataset.images[10])
+plt.show()
 
 
 # %%
@@ -60,7 +66,7 @@ model = CLR(clrdat,
             training_epochs=15,
             cae_encoder_dim=2,
             lightning_device='gpu',
-            random_seed=1225
+            cae=False
             )
 
 device='cuda'

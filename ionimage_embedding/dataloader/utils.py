@@ -1,6 +1,7 @@
 from metaspace import SMInstance
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+from scipy import ndimage
 
 def size_adaption(image_dict: dict):
     maxh = np.max([x.shape[1] for x in image_dict.values()])
@@ -53,7 +54,7 @@ def size_adaption_symmetric(image_dict: dict):
 
     return out_dict
 
-def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', hotspot_clipping=False):
+def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False):
     
     sm = SMInstance()
     
@@ -67,11 +68,19 @@ def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', hot
         results = ds.results(database=db, fdr=fdr).reset_index()
         training_results[k] = results
         tmp = ds.all_annotation_images(fdr=fdr, database=db, only_first_isotope=True, 
-                                       scale_intensity=scale_intensity, hotspot_clipping=hotspot_clipping)
+                                       scale_intensity=scale_intensity, hotspot_clipping=False)
         
         onsample = dict(zip(results['formula'].str.cat(results['adduct']), ~results['offSample']))
         formula = [x.formula+x.adduct for x in tmp if onsample[x.formula+x.adduct]]
         tmp = np.array([x._images[0] for x in tmp if onsample[x.formula+x.adduct]])
+
+        if colocml_preprocessing:
+            a = ndimage.median_filter(tmp, size=(1,3,3))
+            b = a.reshape((a.shape[0], -1))
+            mask = b < np.percentile(b, q=50, axis=1)[:, np.newaxis]
+            b[mask] = 0.
+            tmp = b.reshape(a.shape)
+
         training_images[k] = tmp
         training_if[k] = formula
     
@@ -92,7 +101,10 @@ def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', hot
     training_datasets = np.array(training_datasets)
     training_ions = np.array(training_ions)
 
-    return training_data, training_datasets, training_ions
+    # Filter out full 0 vectors
+    zero_mask = (training_data == 0).reshape((training_data.shape[0], -1)).all(axis=1)
+
+    return training_data[~zero_mask], training_datasets[~zero_mask], training_ions[~zero_mask]
 
 def pairwise_same_elements(int_list):
     # Convert the list to a NumPy array
