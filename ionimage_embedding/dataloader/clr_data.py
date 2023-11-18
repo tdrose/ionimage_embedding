@@ -17,7 +17,8 @@ class CLRdata:
     
     def __init__(self, dataset_ids, test=0.3, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)), maindata_class=True,
                  # Download parameters:
-                 db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', hotspot_clipping=False,
+                 db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', 
+                 colocml_preprocessing=False,
                  k=10, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', min_images=5
                 ):
@@ -34,7 +35,8 @@ class CLRdata:
         # Download data
         if cache:
             # make hash of datasets
-            cache_file = 'CLRdata_{}.pickle'.format(''.join(dataset_ids))
+            cache_file = 'CLRdata_{}_colocML{}_{}-{}_{}_{}.pickle'.format(''.join(dataset_ids), colocml_preprocessing, 
+                                                                          str(db[0]), str(db[1]), str(fdr), str(scale_intensity))
 
             # Check if cache folder exists
             if not os.path.isdir(cache_folder):
@@ -43,7 +45,7 @@ class CLRdata:
             # Download data if it does not exist
             if cache_file not in os.listdir(cache_folder):
                 data, dataset_labels, ion_labels = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
-                                                                 hotspot_clipping=hotspot_clipping)
+                                                                 colocml_preprocessing=colocml_preprocessing)
 
                 pickle.dump((data, dataset_labels, ion_labels), open(os.path.join(cache_folder, cache_file), "wb"))
                 print('Saved file: {}'.format(os.path.join(cache_folder, cache_file)))      
@@ -55,7 +57,7 @@ class CLRdata:
 
         else:
             data, dataset_labels, ion_labels = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
-                                                             hotspot_clipping=hotspot_clipping)
+                                                             colocml_preprocessing=colocml_preprocessing)
             
         
         
@@ -163,7 +165,8 @@ class CLRdata:
                 for i in range(0, nd.shape[0]):
                     current_min = np.min(nd[i, ::])
                     current_max = np.max(nd[i, ::])
-                    nd[i, ::] = (nd[i, ::] - current_min) / (current_max - current_min)
+                    if current_min != 0 or current_max != 0:
+                        nd[i, ::] = (nd[i, ::] - current_min) / (current_max - current_min)
                 return nd
     
     # Will be overwritten by inheriting classes
@@ -188,7 +191,7 @@ class CLRlods(CLRdata):
     
     def __init__(self, dataset_ids, test=1, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:
-                 db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', hotspot_clipping=False,
+                 db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', min_images=5
                 ):
@@ -197,7 +200,7 @@ class CLRlods(CLRdata):
             raise ValueError('CLRlods (leave datasets out) class requires value for test larger than 1 (number of datasets excluded from training)')
             
         super().__init__(dataset_ids=dataset_ids, test=.1, val=val, transformations=transformations, maindata_class=False,
-                 db=db, fdr=fdr, scale_intensity=scale_intensity, hotspot_clipping=hotspot_clipping,
+                 db=db, fdr=fdr, scale_intensity=scale_intensity, colocml_preprocessing=colocml_preprocessing,
                  k=k, batch_size=batch_size,
                  cache=cache, cache_folder=cache_folder, min_images=min_images)
         
@@ -257,13 +260,13 @@ class CLRtransitivity(CLRdata):
     
     def __init__(self, dataset_ids, test=.3, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:
-                 db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', hotspot_clipping=False,
+                 db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', min_images=5, min_codetection=2
                 ):
             
         super().__init__(dataset_ids=dataset_ids, test=.3, val=val, transformations=transformations, maindata_class=False,
-                 db=db, fdr=fdr, scale_intensity=scale_intensity, hotspot_clipping=hotspot_clipping,
+                 db=db, fdr=fdr, scale_intensity=scale_intensity, colocml_preprocessing=colocml_preprocessing,
                  k=k, batch_size=batch_size,
                  cache=cache, cache_folder=cache_folder, min_images=min_images)
         
