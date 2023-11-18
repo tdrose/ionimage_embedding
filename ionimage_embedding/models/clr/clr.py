@@ -35,7 +35,7 @@ class CLR:
                  overweight_cae: float = 1000,
                  cnn_dropout: float = 0.1,
                  weight_decay: float = 1e-4,
-                 random_seed: int = 1234):
+                 cae: bool = True):
 
         # Image data
         self.data = data
@@ -59,7 +59,6 @@ class CLR:
         self.mse_loss = torch.nn.MSELoss()
         self.cae_encoder_dim = cae_encoder_dim
         self.lightning_device = lightning_device
-        self.random_seed = random_seed
         self.clip_gradients = clip_gradients
         self.overweight_cae = overweight_cae
         self.cnn_dropout = cnn_dropout
@@ -80,13 +79,11 @@ class CLR:
         self.knn_adj = data.knn_adj            
         self.ion_label_mat = data.ion_label_mat
 
-        # Models
-        self.cae = None
-        self.clust = None
-
         self.train_dataloader = data.get_train_dataloader()
         
         self.val_dataloader = data.get_val_dataloader()
+
+        self.use_cae = cae
 
         # Placeholders for models
         self.cae = None
@@ -97,13 +94,16 @@ class CLR:
 
     def train(self, logger=False):
         
-        # Pretraining of CAE model
-        cae = CAE(self._height, self._width, encoder_dim=self.cae_encoder_dim, lr=self.lr)
-        
-        trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.pretraining_epochs, logger=logger)
-        trainer.fit(cae, self.train_dataloader, self.val_dataloader)
-        
-        self.cae = cae
+        if self.use_cae:
+            # Pretraining of CAE model
+            cae = CAE(self._height, self._width, encoder_dim=self.cae_encoder_dim, lr=self.lr)
+            
+            trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.pretraining_epochs, logger=logger)
+            trainer.fit(cae, self.train_dataloader, self.val_dataloader)
+            
+            self.cae = cae
+        else:
+            cae = False
         
         # Training of full model
         self.clr = CLRmodel(height=self._height, width=self._width, num_cluster=self.num_cluster, 
@@ -119,10 +119,8 @@ class CLR:
         
         return 0
 
-    def inference_clusterlabels(self, new_data, cae=None, clr=None, normalize=True, device='cpu'):
+    def inference_clusterlabels(self, new_data, clr=None, normalize=True, device='cpu'):
         
-        if cae is None:
-            cae = self.cae   
         if clr is None:
             clr = self.clr
         
@@ -135,7 +133,6 @@ class CLR:
             
             test_x = test_x.reshape((-1, 1, self._height, self._width))
             
-            cae = cae.to(device)
             clr = clr.to(device)
             
             pseudo_label, x_p = clr(test_x)
@@ -146,10 +143,8 @@ class CLR:
 
             return prediction_label
 
-    def inference_embeddings(self, new_data, cae=None, clr=None, normalize_images=True, normalize_embeddings=True, device='cpu'):
-        
-        if cae is None:
-            cae = self.cae   
+    def inference_embeddings(self, new_data, clr=None, normalize_images=True, normalize_embeddings=True, device='cpu'):
+          
         if clr is None:
             clr = self.clr
             
@@ -161,7 +156,6 @@ class CLR:
             
             test_x = test_x.reshape((-1, 1, self._height, self._width))
             
-            cae = cae.to(device)
             clr = clr.to(device)
 
             embeddings, x_p = clr(test_x)

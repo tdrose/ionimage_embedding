@@ -61,6 +61,8 @@ class CLRmodel(pl.LightningModule):
         
         if cae_pretrained_model is None:
             self.cae = CAE(height=self.height, width=self.width, encoder_dim=self.cae_encoder_dim)
+        elif cae_pretrained_model is False:
+            self.cae = None
         else:
             self.cae = cae_pretrained_model
         self.clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, activation=activation, dropout=cnn_dropout)
@@ -110,9 +112,13 @@ class CLRmodel(pl.LightningModule):
         return self.cl(neg_loc, pos_loc, sim_mat)
     
     def forward(self, x):
-        x_p = self.cae(x)
-        features = self.clust(x_p)
-        return features, x_p
+        if self.cae is None:
+            features = self.clust(x)
+            return features, x
+        else:
+            x_p = self.cae(x)
+            features = self.clust(x_p)
+            return features, x_p
     
     def training_step(self, batch, batch_idx):
         
@@ -124,17 +130,22 @@ class CLRmodel(pl.LightningModule):
         train_datasets = train_datasets.reshape(-1)
         train_ions = train_ions.reshape(-1)
         
-        features, x_p = self.forward(train_x)
+        if self.cae is None:
+            features, x_p = self.forward(train_x)
+            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, index=index)
+            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            return loss
         
-        loss_cae = self.mse_loss(x_p, train_x)
-        loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, index=index)
-        
-        loss = loss_cae + loss_clust
-        self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-        self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-        self.log('Training CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-        
-        return loss
+        else:
+            features, x_p = self.forward(train_x)
+            loss_cae = self.mse_loss(x_p, train_x)
+            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, index=index)
+            loss = loss_cae + loss_clust
+            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Training CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            
+            return loss
     
     def validation_step(self, batch, batch_idx):
         val_x, index, val_datasets, val_ions = batch
@@ -144,23 +155,32 @@ class CLRmodel(pl.LightningModule):
         
         val_datasets = val_datasets.reshape(-1)
         val_ions = val_ions.reshape(-1)
+
+        if self.cae is None:
+            features, x_p = self.forward(val_x)
+            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, index=index)
+            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+
+            return loss
         
-        features, x_p = self.forward(val_x)
-        
-        loss_cae = self.mse_loss(x_p, val_x)
-        loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, index=index)
-        
-        loss = loss_cae + loss_clust
-        self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-        self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-        self.log('Validation CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-        
-        return loss
+        else:
+            features, x_p = self.forward(val_x)
+            loss_cae = self.mse_loss(x_p, val_x)
+            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, index=index)
+            loss = loss_cae + loss_clust
+            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Validation CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            
+            return loss
     
     def on_train_epoch_end(self, *args, **kwargs):
         self.curr_upper -= self.upper_iteration
         self.curr_lower += self.lower_iteration
     
     def configure_optimizers(self):
-        model_params = list(self.cae.parameters()) + list(self.clust.parameters())
+        if self.cae is None:
+            model_params = self.clust.parameters()
+        else:
+            model_params = list(self.cae.parameters()) + list(self.clust.parameters())
         return torch.optim.RMSprop(params=model_params, lr=self.lr, weight_decay=self.weight_decay)
