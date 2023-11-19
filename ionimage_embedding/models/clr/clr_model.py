@@ -119,6 +119,15 @@ class CLRmodel(pl.LightningModule):
             x_p = self.cae(x)
             features = self.clust(x_p)
             return features, x_p
+        
+    def embed_layers(self, x):
+        if self.cae is None:
+            features = self.clust.embed_layers(x)
+            return features, x
+        else:
+            x_p = self.cae(x)
+            features = self.clust.embed_layers(x_p)
+            return features, x_p
     
     def training_step(self, batch, batch_idx):
         

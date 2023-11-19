@@ -20,7 +20,8 @@ from ionimage_embedding.models.coloc.utils import torch_cosine
 # %%
 
 # Check if we are connected to the GPU server
-torch.cuda.is_available()
+import os
+os.system('nvidia-smi')
 
 
 # %%
@@ -40,7 +41,7 @@ ds_list = [
                   ]
 
 clrdat = CLRdata(ds_list, test=0.3, val=0.1, 
-                 cache=False, cache_folder='/scratch/model_testing',
+                 cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True)
 
 print(np.isnan(clrdat.full_dataset.images).any())
@@ -73,7 +74,7 @@ device='cuda'
 model.train(logger=False)
 
 # %% CRL inference
-embds = model.inference_embeddings(new_data=model.data.test_dataset.images, normalize_images=False, device=device)
+embds = model.inference_embeddings(new_data=model.data.test_dataset.images, normalize_images=False, device=device, use_embed_layer=True)
 
 
 # %%
@@ -213,7 +214,10 @@ for quant in np.linspace(0.05, 0.45, 21):
 # %%
 df = pd.concat(df_list).groupby(['model', 'lq', 'uq']).agg('mean').reset_index()
 
-sns.scatterplot(data=df, x='precision', y='recall', hue='model', size='uq')
+ax = sns.scatterplot(data=df, x='precision', y='recall', hue='model', size='uq')
+ax.axline((1, 1), slope=1)
+ax.set_xlim((0,1))
+ax.set_ylim((0,1))
 plt.show()
 sns.scatterplot(data=df, x='accuracy', y='f1score', hue='model', size='uq')
 

@@ -80,18 +80,30 @@ class CNNClust(nn.Module):
                                 dilation=(1, 1), kernel_size=(3, 3), stride=(1, 1))
 
         self.final_conv_dim = l6h*l6w
+        
+        self.last_hidden_dim = self.final_conv_dim // 2
+        
+        if self.last_hidden_dim < num_clust:
+            self.last_hidden_dim = num_clust
+
+
         print(f'CNNClust final conv dim = {self.final_conv_dim}')
+        print(f'CNNClust last hidden dim = {self.last_hidden_dim}')
+
+        self.lh = nn.Sequential(nn.Linear(self.final_conv_dim, self.last_hidden_dim),
+                                nn.BatchNorm1d(self.last_hidden_dim, momentum=0.01),
+                                nn.ReLU())
         
         if activation == 'softmax':
-            self.fc = nn.Sequential(nn.Linear(self.final_conv_dim, num_clust),
+            self.final = nn.Sequential(nn.Linear(self.last_hidden_dim, num_clust),
                                     nn.BatchNorm1d(num_clust, momentum=0.01),
                                     nn.Softmax(dim=1))
         elif activation == 'sigmoid':
-            self.fc = nn.Sequential(nn.Linear(self.final_conv_dim, num_clust),
+            self.final = nn.Sequential(nn.Linear(self.last_hidden_dim, num_clust),
                                     nn.BatchNorm1d(num_clust, momentum=0.01),
                                     nn.Sigmoid())
         elif activation == 'relu':
-            self.fc = nn.Sequential(nn.Linear(self.final_conv_dim, num_clust),
+            self.final = nn.Sequential(nn.Linear(self.last_hidden_dim, num_clust),
                                     nn.BatchNorm1d(num_clust, momentum=0.01),
                                     nn.ReLU())
         else:
@@ -100,7 +112,7 @@ class CNNClust(nn.Module):
         # Init lower weights
         self.apply(init_weights)
 
-    def forward(self, x):
+    def embed_layers(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
@@ -108,6 +120,12 @@ class CNNClust(nn.Module):
         x = self.conv5(x)
         x = self.conv6(x)
         x = x.view(-1, self.final_conv_dim)
-        x = self.fc(x)
+        x = self.lh(x)
+
+        return x
+
+    def forward(self, x):
+        x = self.embed_layers(x)
+        x = self.final(x)
 
         return x
