@@ -143,7 +143,7 @@ class CLR:
 
             return prediction_label
 
-    def inference_embeddings(self, new_data, clr=None, normalize_images=True, normalize_embeddings=True, device='cpu'):
+    def inference_embeddings(self, new_data, clr=None, normalize_images=True, normalize_embeddings=True, device='cpu', use_embed_layer=False):
           
         if clr is None:
             clr = self.clr
@@ -158,7 +158,10 @@ class CLR:
             
             clr = clr.to(device)
 
-            embeddings, x_p = clr(test_x)
+            if use_embed_layer:
+                embeddings, _ = clr.embed_layers(test_x)
+            else:
+                embeddings, _ = clr(test_x)
             
             if normalize_embeddings:
                 embeddings = functional.normalize(embeddings, p=2, dim=-1)
