@@ -4,6 +4,7 @@ from sklearn import preprocessing
 import math
 import os
 import pickle
+import uuid
 
 from torch.utils.data import DataLoader
 import torchvision.transforms as T
@@ -35,8 +36,11 @@ class CLRdata:
         # Download data
         if cache:
             # make hash of datasets
-            cache_file = 'CLRdata_{}_colocML{}_{}-{}_{}_{}.pickle'.format(''.join(dataset_ids), colocml_preprocessing, 
+            cache_hex = '{}_colocML{}_{}-{}_{}_{}'.format(''.join(dataset_ids), colocml_preprocessing, 
                                                                           str(db[0]), str(db[1]), str(fdr), str(scale_intensity))
+            
+            cache_hex = uuid.uuid5(uuid.NAMESPACE_URL, cache_hex).hex
+            cache_file = 'CLRdata_{}.pickle'.format(cache_hex)
 
             # Check if cache folder exists
             if not os.path.isdir(cache_folder):
