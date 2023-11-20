@@ -28,6 +28,7 @@ os.system('nvidia-smi')
 class LoadingData:
     pass
 
+# Kidney datasets
 ds_list = [
     '2022-12-07_02h13m50s',
     '2022-12-07_02h13m20s',
@@ -40,9 +41,25 @@ ds_list = [
     '2022-11-28_22h23m30s'
                   ]
 
+# Brain datasets
+# ds_list = [
+#     '2016-09-21_16h06m55s',
+#     '2016-09-21_16h06m56s',
+#     '2017-02-17_14h41m43s',
+#     '2017-02-17_14h56m37s',
+#     '2017-02-24_13h22m14s',
+#     '2021-11-04_11h38m42s',
+#     '2021-11-04_14h12m55s',
+#     '2021-11-11_11h49m37s',
+#     '2022-05-30_20h44m19s',
+#     '2022-05-31_10h27m17s',
+#     '2022-05-31_10h46m34s',
+#     '2022-07-19_19h29m24s'
+#             ]
+
 clrdat = CLRdata(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
-                 colocml_preprocessing=True)
+                 colocml_preprocessing=True, fdr=.1)
 
 print(np.isnan(clrdat.full_dataset.images).any())
 plt.imshow(clrdat.full_dataset.images[10])
@@ -221,4 +238,8 @@ ax.set_ylim((0,1))
 plt.show()
 sns.scatterplot(data=df, x='accuracy', y='f1score', hue='model', size='uq')
 
+# %%
+colocs.test_mean_ni
+# %%
+colocs.test_median_ni
 # %%
