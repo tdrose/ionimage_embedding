@@ -12,9 +12,19 @@ from ionimage_embedding.models import ColocModel
 from ionimage_embedding.dataloader.clr_data import CLRdata
 from ionimage_embedding.models.coloc.utils import torch_cosine
 
-# Comment out if not running in interactive mode
-%load_ext autoreload
-%autoreload 2
+# Load autoreload framework when running in ipython interactive session
+try:
+    import IPython
+    # Check if running in IPython
+    if IPython.get_ipython(): # type: ignore 
+        ipython = IPython.get_ipython()  # type: ignore 
+
+        # Run IPython-specific commands
+        ipython.run_line_magic('load_ext','autoreload')  # type: ignore 
+        ipython.run_line_magic('autoreload','2')  # type: ignore 
+except ImportError:
+    # Not in IPython, continue with normal Python code
+    pass
 
 
 # %%

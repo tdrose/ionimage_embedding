@@ -35,7 +35,7 @@ class ColocModel:
                 masked_ill = test_il[mask].cpu().detach().numpy()
                 numpy_ion_labels = np.unique(masked_ill)
                 sorted_ion_labels = np.sort(numpy_ion_labels)
-                cdf = test_colocs.loc[sorted_ion_labels, sorted_ion_labels].copy()
+                cdf = test_colocs.loc[sorted_ion_labels, sorted_ion_labels].copy()  # type: ignore 
 
                 out_dict[dsid] = quantile_sets(cdf, lower_quantile=lower_quantile, upper_quantile=upper_quantile)
 
@@ -53,7 +53,7 @@ class ColocModel:
                 masked_ill = test_il[mask].cpu().detach().numpy()
                 numpy_ion_labels = np.unique(masked_ill)
                 sorted_ion_labels = np.sort(numpy_ion_labels)
-                cdf = full_colocs[dsid].loc[sorted_ion_labels, sorted_ion_labels].copy()
+                cdf = full_colocs[dsid].loc[sorted_ion_labels, sorted_ion_labels].copy()  # type: ignore 
 
                 cdf_numpy = np.array(cdf)
                 np.fill_diagonal(cdf_numpy, np.nan)
