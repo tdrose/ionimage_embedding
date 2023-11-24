@@ -11,10 +11,10 @@ import torchvision.transforms as T
 import torch
 
 from .utils import download_data, pairwise_same_elements, run_knn
-from .clr_dataloader import mzImageDataset
+from .crl_dataloader import mzImageDataset
 
 
-class CLRdata:
+class CRLdata:
     
     def __init__(self, dataset_ids, test=0.3, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)), maindata_class=True,
                  # Download parameters:
@@ -106,9 +106,9 @@ class CLRdata:
             train_data, train_dls, train_ill, train_index, val_data, val_dls, val_ill, val_index = tmp
             
             # compute KNN and ion_label_mat (For combined train/val data)
-            self.knn_adj = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), k=self.k))
+            self.knn_adj: torch.Tensor = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), k=self.k))
             
-            self.ion_label_mat = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
+            self.ion_label_mat: torch.tensor = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
 
             # Make datasets
             self.train_dataset = mzImageDataset(images=train_data, 
@@ -191,7 +191,7 @@ class CLRdata:
             raise AttributeError('Datasets not defined, DO NOT mess with the data classes!')
             
             
-class CLRlods(CLRdata):
+class CRLlods(CRLdata):
     
     def __init__(self, dataset_ids, test=1, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:
@@ -260,7 +260,7 @@ class CLRlods(CLRdata):
         self.check_dataexists()
         
         
-class CLRtransitivity(CLRdata):
+class CRLtransitivity(CRLdata):
     
     def __init__(self, dataset_ids, test=.3, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:

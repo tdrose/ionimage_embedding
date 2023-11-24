@@ -1,2 +1,2 @@
-from .clr.clr import CLR
+from .crl.crl import CRL
 from .coloc.coloc import ColocModel

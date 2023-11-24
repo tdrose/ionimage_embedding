@@ -7,11 +7,12 @@ import seaborn as sns
 
 import torch
 import torch.nn.functional as functional
-from ionimage_embedding.models import CLR
-from ionimage_embedding.models import ColocModel
-from ionimage_embedding.dataloader.clr_data import CLRdata
-from ionimage_embedding.models.coloc.utils import torch_cosine
 
+from ionimage_embedding.models import CRL
+from ionimage_embedding.models import ColocModel
+from ionimage_embedding.dataloader.crl_data import CRLdata
+from ionimage_embedding.models.coloc.utils import torch_cosine
+from ionimage_embedding.evaluation import evaluation_quantile_overlap, ds_coloc_convert
 # Load autoreload framework when running in ipython interactive session
 try:
     import IPython
@@ -32,6 +33,8 @@ except ImportError:
 # Check if we are connected to the GPU server
 import os
 os.system('nvidia-smi')
+
+# %%
 
 
 # %%
@@ -67,7 +70,7 @@ ds_list = [
 #     '2022-07-19_19h29m24s'
 #             ]
 
-clrdat = CLRdata(ds_list, test=0.3, val=0.1, 
+clrdat = CRLdata(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, fdr=.1)
 
@@ -81,7 +84,7 @@ colocs = ColocModel(clrdat)
 
 
 # %%
-model = CLR(clrdat,
+model = CRL(clrdat,
             num_cluster=8,
             initial_upper=93,
             initial_lower=37,
@@ -94,7 +97,9 @@ model = CLR(clrdat,
             training_epochs=15,
             cae_encoder_dim=2,
             lightning_device='gpu',
-            cae=False
+            cae=False,
+            activation='sigmoid',
+            clip_gradients=None
             )
 
 device='cuda'
@@ -105,86 +110,9 @@ embds = model.inference_embeddings(new_data=model.data.test_dataset.images, norm
 
 
 # %%
-def ds_embedding_coloc(colocs: torch.Tensor, ds_labels: torch.Tensor, ion_labels: torch.Tensor) -> dict[int, pd.DataFrame]:
-        out_dict = {}        
-
-        # loop over each dataset
-        for dsl in torch.unique(ds_labels):
-            dsid = int(dsl)
-            mask = ds_labels==dsid
-            if sum(mask) > 1:
-                # df for easier indexing
-                ions = ion_labels[mask]
-                ds_colocs = colocs[mask, :][:, mask].cpu().detach().numpy()
-
-                np.fill_diagonal(ds_colocs, np.nan)
-
-                df = pd.DataFrame(ds_colocs, 
-                                  columns=ions.cpu().detach().numpy(),
-                                  index=ions.cpu().detach().numpy()
-                                  )
-
-                out_dict[dsid] = df
-            else:
-                out_dict[dsid] = pd.DataFrame()
-
-        return out_dict
-
-embds_ds = ds_embedding_coloc(colocs=torch_cosine(torch.tensor(embds)),
-                              ds_labels=model.data.test_dataset.dataset_labels,
-                              ion_labels=model.data.test_dataset.ion_labels)
-
-
-
-# %%
-
-def sensitivity(x):
-    return x['tp'] / (x['tp'] + x['fn'])
-
-def specificity(x):
-    return x['tn'] / (x['tn'] + x['fp'])
-
-def accuracy(x):
-    return (x['tp'] + x['tn'])/(x['fn']+x['tn']+x['fp']+x['tp'])
-
-def f1score(x):
-    return (x['tp']*2)/(x['tp']*2 + x['fp'] + x['fn'])
-
-def precision(x):
-    return x['tp'] / (x['tp'] + x['fp'])
-
-def evaluation(evaluation_dict):
-     
-    lmodel = []
-    laccuracy = []
-    lf1score = []
-    lprecision = []
-    lrecall = []
-     
-    # Evaluate upper
-    
-
-    for mod, ds in evaluation_dict['predictions'].items():
-        for dsid, eval in ds.items():
-            lmodel.append(mod)
-            gt = evaluation_dict['ground_truth'][dsid]
-            tp = sum([1 for x in eval['upper'] if x in gt['upper']])
-            fp = sum([1 for x in eval['upper'] if x not in gt['upper']])
-            
-
-            tn = sum([1 for x in eval['lower'] if x in gt['lower']])
-            fn = sum([1 for x in eval['lower'] if x not in gt['lower']])
-            scores = {'tp': tp, 'fp': fp, 'tn': tn, 'fn': fn}
-
-            laccuracy.append(accuracy(scores))
-            lf1score.append(f1score(scores))
-            lprecision.append(precision(scores))
-            lrecall.append(sensitivity(scores))
-
-    return pd.DataFrame({'model': lmodel, 
-                         'accuracy': laccuracy, 'f1score': lf1score, 
-                         'precision': lprecision, 'recall': lrecall,
-                         'lq': evaluation_dict['lq'], 'uq': evaluation_dict['uq']})
+embds_ds = ds_coloc_convert(colocs=torch_cosine(torch.tensor(embds)),
+                            ds_labels=model.data.test_dataset.dataset_labels,
+                            ion_labels=model.data.test_dataset.ion_labels)
 
 # %%
 coloctesteval = colocs.quantile_eval(test_il = colocs.data.test_dataset.ion_labels, 
@@ -203,7 +131,7 @@ crltesteval = colocs.quantile_gt(full_colocs=embds_ds,
                                  upper_quantile=0.9, lower_quantile=0.1)
 
 evaluation_dict = {'ground_truth': colocgt, 'predictions': {'crl': crltesteval, 'colocmean': coloctesteval}, 'uq': .9, 'lq': .1}
-df = evaluation(evaluation_dict)
+df = evaluation_quantile_overlap(evaluation_dict)
 sns.scatterplot(data=df, x='precision', y='recall', hue='model')
 
 
@@ -235,7 +163,7 @@ for quant in np.linspace(0.05, 0.45, 21):
                                                                 'colocmedian': colocmed}, 
                        'uq': 1-quant, 'lq': quant}
     
-    df_list.append(evaluation(evaluation_dict))
+    df_list.append(evaluation_quantile_overlap(evaluation_dict))
     
 
 # %%

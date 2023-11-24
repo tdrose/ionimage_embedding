@@ -4,11 +4,11 @@ from typing import Tuple
 import torch
 import torch.nn.functional as f
 
-from ...dataloader.clr_data import CLRdata
+from ...dataloader.crl_data import CRLdata
 from .utils import torch_cosine, quantile_sets
 
 class ColocModel:
-    def __init__(self, data: CLRdata, device='cpu') -> None:
+    def __init__(self, data: CRLdata, device='cpu') -> None:
         self.data = data
         self.device = device
 

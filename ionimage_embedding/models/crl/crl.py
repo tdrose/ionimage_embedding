@@ -10,14 +10,14 @@ from sklearn import preprocessing
 import math
 
 from .cae import CAE
-from .clr_model import CLRmodel
+from .crl_model import CRLmodel
 from .pseudo_labeling import pseudo_labeling, compute_dataset_ublb
 from .utils import flip_images
-from ...dataloader.clr_data import CLRdata
+from ...dataloader.crl_data import CRLdata
 
-class CLR:
+class CRL:
     def __init__(self,
-                 data: CLRdata,
+                 data: CRLdata,
                  num_cluster: int = 7,
                  initial_upper: int = 98,
                  initial_lower: int = 46,
@@ -89,7 +89,7 @@ class CLR:
         self.cae = None
         self.clr = None
 
-    def image_normalization(self, new_data: np.ndarray = None):
+    def image_normalization(self, new_data: np.ndarray):
         return self.data.image_normalization(new_data)
 
     def train(self, logger=False):
@@ -106,7 +106,7 @@ class CLR:
             cae = False
         
         # Training of full model
-        self.clr = CLRmodel(height=self._height, width=self._width, num_cluster=self.num_cluster, 
+        self.clr = CRLmodel(height=self._height, width=self._width, num_cluster=self.num_cluster, 
                             ion_label_mat=self.ion_label_mat, activation=self.activation, encoder_dim=self.cae_encoder_dim, 
                             initial_upper=self.initial_upper, initial_lower=self.initial_lower, 
                             upper_iteration=self.upper_iteration, lower_iteration=self.lower_iteration,

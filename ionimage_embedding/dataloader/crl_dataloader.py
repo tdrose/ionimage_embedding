@@ -44,7 +44,7 @@ class mzImageDataset(Dataset):
         return image, sample_id, dataset_label, ion_label
 
 
-def get_clr_dataloader(images: np.ndarray,
+def get_crl_dataloader(images: np.ndarray,
                        dataset_labels: np.ndarray,
                        ion_labels: np.ndarray,
                        height,
