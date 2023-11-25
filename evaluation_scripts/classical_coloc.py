@@ -2,17 +2,18 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from pyparsing import col
 import seaborn as sns
+from typing import Tuple
 
 import torch
-import torch.nn.functional as functional
 
 from ionimage_embedding.models import CRL
 from ionimage_embedding.models import ColocModel
 from ionimage_embedding.dataloader.crl_data import CRLdata
 from ionimage_embedding.models.coloc.utils import torch_cosine
 from ionimage_embedding.evaluation import evaluation_quantile_overlap, ds_coloc_convert
+from ionimage_embedding.evaluation.crl_inference import crl_ds_coloc, crl_fulllatent_coloc, crl_latent_coloc, crl_latent_inference
+
 # Load autoreload framework when running in ipython interactive session
 try:
     import IPython
@@ -30,16 +31,11 @@ except ImportError:
 
 # %%
 
-# Check if we are connected to the GPU server
+# Check if session connected to the correct GPU server
 import os
 os.system('nvidia-smi')
 
 # %%
-
-
-# %%
-class LoadingData:
-    pass
 
 # Kidney datasets
 ds_list = [
@@ -91,48 +87,44 @@ model = CRL(clrdat,
             upper_iteration=.8,
             lower_iteration=.8,
             dataset_specific_percentiles=True,
-            knn=True, 
+            knn=False, 
             lr=0.0001,
             pretraining_epochs=10,
             training_epochs=15,
             cae_encoder_dim=2,
             lightning_device='gpu',
             cae=False,
-            activation='sigmoid',
+            activation='softmax',
             clip_gradients=None
             )
 
 device='cuda'
 model.train(logger=False)
 
-# %% CRL inference
-embds = model.inference_embeddings(new_data=model.data.test_dataset.images, normalize_images=False, device=device, use_embed_layer=True)
-
+# %% previous version
+# embds = model.inference_embeddings(new_data=model.data.test_dataset.images, normalize_images=False, device=device, use_embed_layer=True)
+# embds_ds = ds_coloc_convert(colocs=torch_cosine(torch.tensor(embds)),
+#                             ds_labels=model.data.test_dataset.dataset_labels,
+#                             ion_labels=model.data.test_dataset.ion_labels)
+# crltesteval = colocs.quantile_gt(full_colocs=embds_ds,
+#                                  test_dsl=model.data.test_dataset.dataset_labels,
+#                                  test_il=model.data.test_dataset.ion_labels,
+#                                  upper_quantile=0.9, lower_quantile=0.1)
 
 # %%
-embds_ds = ds_coloc_convert(colocs=torch_cosine(torch.tensor(embds)),
-                            ds_labels=model.data.test_dataset.dataset_labels,
-                            ion_labels=model.data.test_dataset.ion_labels)
+# Only taking DS latent similarities
+cdsc = crl_ds_coloc(model, model.data.train_dataset, device=device)
+crl_test_colocs, not_inferred = crl_latent_inference(cdsc, model.data.test_dataset.ion_labels, agg='mean')
 
-# %%
-coloctesteval = colocs.quantile_eval(test_il = colocs.data.test_dataset.ion_labels, 
-                                     test_dsl=colocs.data.test_dataset.dataset_labels,
-                                     test_colocs=colocs.test_mean_coloc, 
-                                     upper_quantile=0.9, lower_quantile=0.1)
+# Aggregating across all latent similarities
+# Currently performing much worse
+# cdsc = crl_latent_coloc(model, model.data.train_dataset, device=device)
+# crl_test_colocs, not_inferred = crl_fulllatent_coloc(cdsc, model.data.test_dataset.ion_labels, agg='median')
 
-colocgt = colocs.quantile_gt(test_il = colocs.data.full_dataset.ion_labels, 
-                             test_dsl=colocs.data.full_dataset.dataset_labels,
-                             full_colocs=colocs.full_coloc, 
-                             upper_quantile=0.9, lower_quantile=0.1)
 
-crltesteval = colocs.quantile_gt(full_colocs=embds_ds,
-                                 test_dsl=model.data.test_dataset.dataset_labels,
-                                 test_il=model.data.test_dataset.ion_labels,
-                                 upper_quantile=0.9, lower_quantile=0.1)
-
-evaluation_dict = {'ground_truth': colocgt, 'predictions': {'crl': crltesteval, 'colocmean': coloctesteval}, 'uq': .9, 'lq': .1}
-df = evaluation_quantile_overlap(evaluation_dict)
-sns.scatterplot(data=df, x='precision', y='recall', hue='model')
+print('Not inferred:')
+print(f'- Coloc: {round(colocs.test_mean_ni, 3)}')
+print(f'- CRL:   {round(not_inferred, 3)}')
 
 
 # %%
@@ -154,10 +146,10 @@ for quant in np.linspace(0.05, 0.45, 21):
                                  full_colocs=colocs.full_coloc, 
                                  upper_quantile=1.-quant, lower_quantile=quant)
     
-    crltesteval = colocs.quantile_gt(full_colocs=embds_ds,
-                                     test_dsl=model.data.test_dataset.dataset_labels,
-                                     test_il=model.data.test_dataset.ion_labels,
-                                     upper_quantile=1.-quant, lower_quantile=quant)
+    crltesteval = colocs.quantile_eval(test_il = colocs.data.test_dataset.ion_labels, 
+                                    test_dsl=colocs.data.test_dataset.dataset_labels,
+                                    test_colocs=crl_test_colocs,
+                                    upper_quantile=1.-quant, lower_quantile=quant)
 
     evaluation_dict = {'ground_truth': colocgt, 'predictions': {'crl': crltesteval, 'colocmean': coloctesteval, 
                                                                 'colocmedian': colocmed}, 
@@ -176,8 +168,5 @@ ax.set_ylim((0,1))
 plt.show()
 sns.scatterplot(data=df, x='accuracy', y='f1score', hue='model', size='uq')
 
-# %%
-colocs.test_mean_ni
-# %%
-colocs.test_median_ni
+
 # %%

@@ -169,11 +169,14 @@ class CRL:
 
             return embeddings.cpu().detach().numpy()
 
-    def inference_embeddings_train(self, device='cpu'):
-        return self.inference_embeddings(new_data=self.data.train_dataset.images, normalize_images=False, normalize_embeddings=True, device=device)
+    def inference_embeddings_train(self, device='cpu', use_embed_layer=False):
+        return self.inference_embeddings(new_data=self.data.train_dataset.images, normalize_images=False, 
+                                         normalize_embeddings=True, device=device, use_embed_layer=use_embed_layer)
     
-    def inference_embeddings_val(self, device='cpu'):
-        return self.inference_embeddings(new_data=self.data.val_dataset.images, normalize_images=False, normalize_embeddings=True, device=device)
+    def inference_embeddings_val(self, device='cpu', use_embed_layer=False):
+        return self.inference_embeddings(new_data=self.data.val_dataset.images, normalize_images=False, 
+                                         normalize_embeddings=True, device=device, use_embed_layer=use_embed_layer)
     
-    def inference_embeddings_test(self, device='cpu'):
-        return self.inference_embeddings(new_data=self.data.test_dataset.images, normalize_images=False, normalize_embeddings=True, device=device)
+    def inference_embeddings_test(self, device='cpu', use_embed_layer=False):
+        return self.inference_embeddings(new_data=self.data.test_dataset.images, normalize_images=False, 
+                                         normalize_embeddings=True, device=device, use_embed_layer=use_embed_layer)
