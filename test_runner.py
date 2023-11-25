@@ -5,7 +5,7 @@ parser = argparse.ArgumentParser(description='IonImage embedding testrunner')
 
 
 parser.add_argument('test_suite', type=str, const='all', nargs='?', default='all',
-                    help='Which tests to run: "all", "dataloader", "clr", "lightningCLR", (default: "all")',)
+                    help='Which tests to run: "all", "dataloader", "crl", "lightningCRL", (default: "all")',)
 
 args = parser.parse_args()
 scenario = args.test_suite
@@ -15,25 +15,25 @@ loader = unittest.TestLoader()
 
 if scenario == 'all':
     print('Running all tests')
-    from tests import test_dataloader, test_clr, test_lightningCLR
+    from tests import test_dataloader, test_crl, test_lightningCRL
     test_suite.addTests(loader.loadTestsFromModule(test_dataloader))
-    test_suite.addTests(loader.loadTestsFromModule(test_clr))
-    test_suite.addTests(loader.loadTestsFromModule(test_lightningCLR))
+    test_suite.addTests(loader.loadTestsFromModule(test_crl))
+    test_suite.addTests(loader.loadTestsFromModule(test_lightningCRL))
 
 elif scenario == 'dataloader':
     print('Running dataloader tests')
     from tests import test_dataloader
     test_suite.addTests(loader.loadTestsFromModule(test_dataloader))
 
-elif scenario == 'clr':
-    print('Running clr tests')
-    from tests import test_clr
-    test_suite.addTests(loader.loadTestsFromModule(test_clr))
+elif scenario == 'crl':
+    print('Running crl tests')
+    from tests import test_crl
+    test_suite.addTests(loader.loadTestsFromModule(test_crl))
 
-elif scenario == 'lightningCLR':
-    print('Running lightningCLR tests')
-    from tests import test_lightningCLR
-    test_suite.addTests(loader.loadTestsFromModule(test_lightningCLR))
+elif scenario == 'lightningCRL':
+    print('Running lightningCRL tests')
+    from tests import test_lightningCRL
+    test_suite.addTests(loader.loadTestsFromModule(test_lightningCRL))
 
 else:
     raise ValueError(f'ValueError: Testsuite "{scenario}" unknown. Please open the script help (python test_runner.py -h)')

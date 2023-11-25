@@ -1,13 +1,14 @@
 import numpy as np
 import pandas as pd
+from typing import Tuple
 import torch
 import torch.nn.functional as f
 
-from ...dataloader.clr_data import CLRdata
+from ...dataloader.crl_data import CRLdata
 from .utils import torch_cosine, quantile_sets
 
 class ColocModel:
-    def __init__(self, data: CLRdata, device='cpu') -> None:
+    def __init__(self, data: CRLdata, device='cpu') -> None:
         self.data = data
         self.device = device
 
@@ -15,11 +16,11 @@ class ColocModel:
         self.full_coloc = self.compute_ds_coloc(self.data.full_dataset)
 
         # Compute train data cosine
-        self.train_coloc = self.compute_ds_coloc(self.data.full_dataset)
+        self.train_coloc = self.compute_ds_coloc(self.data.train_dataset)
 
         # Compute test data mean/median cosine
-        self.test_mean_coloc = self.inference(self.data.test_dataset.ion_labels, agg='mean')
-        self.test_median_coloc = self.inference(self.data.test_dataset.ion_labels, agg='median')
+        self.test_mean_coloc, self.test_mean_ni = self.inference(self.data.test_dataset.ion_labels, agg='mean')
+        self.test_median_coloc, self.test_median_ni = self.inference(self.data.test_dataset.ion_labels, agg='median')
     
     @staticmethod
     def quantile_eval(test_il: torch.Tensor, test_dsl: torch.Tensor, 
@@ -34,7 +35,7 @@ class ColocModel:
                 masked_ill = test_il[mask].cpu().detach().numpy()
                 numpy_ion_labels = np.unique(masked_ill)
                 sorted_ion_labels = np.sort(numpy_ion_labels)
-                cdf = test_colocs.loc[sorted_ion_labels, sorted_ion_labels].copy()
+                cdf = test_colocs.loc[sorted_ion_labels, sorted_ion_labels].copy()  # type: ignore 
 
                 out_dict[dsid] = quantile_sets(cdf, lower_quantile=lower_quantile, upper_quantile=upper_quantile)
 
@@ -52,7 +53,7 @@ class ColocModel:
                 masked_ill = test_il[mask].cpu().detach().numpy()
                 numpy_ion_labels = np.unique(masked_ill)
                 sorted_ion_labels = np.sort(numpy_ion_labels)
-                cdf = full_colocs[dsid].loc[sorted_ion_labels, sorted_ion_labels].copy()
+                cdf = full_colocs[dsid].loc[sorted_ion_labels, sorted_ion_labels].copy()  # type: ignore 
 
                 cdf_numpy = np.array(cdf)
                 np.fill_diagonal(cdf_numpy, np.nan)
@@ -86,7 +87,7 @@ class ColocModel:
 
         return out_dict
     
-    def inference(self, ion_labels: torch.Tensor, agg: str='mean') -> pd.DataFrame:
+    def inference(self, ion_labels: torch.Tensor, agg: str='mean') -> Tuple[pd.DataFrame, float]:
 
         # Create torch matrix to fill
         numpy_ion_labels = ion_labels.cpu().detach().numpy()
@@ -104,8 +105,10 @@ class ColocModel:
         
         # Sorting the ion labels
         sorted_ion_labels = np.sort(numpy_ion_labels)
-
+        counter = 1e-9
+        not_possible = 0.
         for i1 in range(len(sorted_ion_labels)):
+            
             for i2 in range(i1, len(sorted_ion_labels)):
                 if i1 == i2:
                     out[i1, i2] = np.nan
@@ -117,9 +120,15 @@ class ColocModel:
                     aggs = []
                     ion1 = int(sorted_ion_labels[i1])
                     ion2 = int(sorted_ion_labels[i2])
+                    counter += 1.
+                    checker = True
                     for ds in self.train_coloc.keys():
+                        # Check if ion pair was co-detected in any of the training data
                         if ion1 in self.train_coloc[ds].columns and ion2 in self.train_coloc[ds].columns:
                             aggs.append(self.train_coloc[ds].loc[ion1, ion2])
+                            checker = False
+                    if checker:
+                        not_possible += 1.
                     
                     if len(aggs) > 0:
                         out[i1, i2] = agg_f(aggs)
@@ -128,7 +137,6 @@ class ColocModel:
                         out[i1, i2] = np.nan
                         out[i2, i1] = np.nan
 
-        return pd.DataFrame(out, 
-                            columns=sorted_ion_labels,
-                            index=sorted_ion_labels
-                            )
+        not_inferred_fraction = not_possible / counter
+
+        return pd.DataFrame(out, columns=sorted_ion_labels, index=sorted_ion_labels), not_inferred_fraction

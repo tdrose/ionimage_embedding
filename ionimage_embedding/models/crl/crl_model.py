@@ -9,7 +9,7 @@ from .cae import CAE
 from .pseudo_labeling import pseudo_labeling, compute_dataset_ublb
 
 
-class CLRmodel(pl.LightningModule):
+class CRLmodel(pl.LightningModule):
     def __init__(self, 
                  height, 
                  width,
@@ -29,7 +29,7 @@ class CLRmodel(pl.LightningModule):
                  clip_gradients: float = None
                 ):
         
-        super(CLRmodel, self).__init__()
+        super(CRLmodel, self).__init__()
         
         # Model sizes
         self.height = height
