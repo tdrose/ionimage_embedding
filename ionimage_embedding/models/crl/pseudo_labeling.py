@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Tuple
+from typing import Tuple, Optional
 import numpy as np
 
 
@@ -38,14 +38,14 @@ def compute_dataset_ublb(sim_mat, ds_labels,
 
 
 def pseudo_labeling(ub: float, lb: float,
-                    sim: torch.tensor,
+                    sim: torch.Tensor,
                     index: np.ndarray,
                     ion_label_mat: torch.Tensor,
-                    knn: bool, knn_adj: torch.Tensor = None,
+                    knn: bool, knn_adj: torch.Tensor,
                     dataset_specific_percentiles: bool = False,
-                    dataset_ub: dict = None,
-                    dataset_lb: dict = None,
-                    ds_labels: np.ndarray = None, device: str = None) -> Tuple[torch.tensor, torch.tensor]:
+                    dataset_ub: Optional[torch.Tensor] = None,
+                    dataset_lb: Optional[torch.Tensor] = None,
+                    ds_labels: Optional[np.ndarray] = None, device: Optional[str] = None) -> Tuple[torch.Tensor, torch.Tensor]:
 
     if dataset_specific_percentiles:
 

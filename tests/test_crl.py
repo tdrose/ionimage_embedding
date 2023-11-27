@@ -8,6 +8,7 @@ from ionimage_embedding.models import CRL
 from ionimage_embedding.models.crl.pseudo_labeling import compute_dataset_ublb, pseudo_labeling
 from ionimage_embedding.dataloader.utils import size_adaption, size_adaption_symmetric
 from ionimage_embedding.dataloader.crl_data import CRLdata
+from ionimage_embedding.dataloader.utils import pairwise_same_elements
 
 from .test_crl_utils import original_ublb, original_dataset_ublb, original_ps, load_data
 
@@ -61,7 +62,7 @@ train_ions = train_ions.reshape(-1)
 optimizer.zero_grad()
 features, x_p = clust(train_x)
 uu = 85
-ll=55
+ll = 55
 
 class TestCLR(unittest.TestCase):
     
@@ -79,8 +80,8 @@ class TestCLR(unittest.TestCase):
         self.assertTrue(self.tub > self.tlb)
         self.assertTrue(self.oub > self.olb)
 
-        self.assertEqual(np.round(self.oub, 2), np.round(self.tub.cpu().detach().numpy(), 2))
-        self.assertEqual(np.round(self.olb, 2), np.round(self.tlb.cpu().detach().numpy(), 2))
+        self.assertAlmostEqual(np.round(self.oub, 2), np.round(self.tub.cpu().detach().numpy(), 2))
+        self.assertAlmostEqual(np.round(self.olb, 2), np.round(self.tlb.cpu().detach().numpy(), 2))
 
     def test_2(self):
         self.assertTrue(all((self.tds_ub - self.tds_lb) >= 0))
@@ -157,14 +158,78 @@ class TestCLR(unittest.TestCase):
         l2 = clust.cl(tpl, tnl, sim_mat = sim_mat)
         l2.backward(retain_graph=True)
         g2 = torch.gradient(sim_mat)[0].cpu().detach().numpy()
-        
-        print('Comparing losses')
+
         print(l1)
         print(l2)
-
-        self.assertTrue(np.round(l1.cpu().detach().numpy(), 0) == np.round(l2.cpu().detach().numpy(), 0))
+        self.assertAlmostEqual(l1.cpu().detach().numpy(), l2.cpu().detach().numpy(), delta=1.)
         # self.assertTrue((g1 == g2).all())
 
+    def test_pseudo_labeling(self):
+        feats = torch.Tensor([
+            [1., 1., 0., 0.],
+            [1., .9, .0, .0],
+            [.1, .1, .1, .1],
+            [.5, .1, .9, .8],
+            [.6, .6, .6, .6],
+            [.1, .2, .3, .4],
+            [.4, .3, .2, .1],
+            [.5, .5, .5, .5],
+            [.8, .1, .2, .7],
+            [.9, .0, .3, .9],
+            ])
+        
+        index = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        ions = torch.tensor([0,1,0,3,4,5,6,7,8,9])
+        ion_label_mat = pairwise_same_elements(ions)
+        
+        ub, lb, sim_mat = clust.compute_ublb(feats, 90, 10, None, None)
+
+        # quantiles
+        self.assertGreater(ub.cpu().numpy(), 0.99)
+        self.assertLess(lb.cpu().numpy(), 0.5)
+
+        self.assertEqual(ion_label_mat.sum(), 12)
+        self.assertEqual(ion_label_mat[0, 2], True)
+
+        ion_label_mat = torch.tensor(ion_label_mat.astype(int))
+
+        pos, neg = pseudo_labeling(ub=ub, lb=lb, sim=sim_mat.to(device), 
+                                   index=index, knn=False, knn_adj=torch.tensor([]).to(device), 
+                                   ion_label_mat=ion_label_mat.to(device), 
+                                   dataset_specific_percentiles=False,
+                                   dataset_ub=torch.tensor([]), dataset_lb=torch.tensor([]), 
+                                   ds_labels=torch.Tensor([]), device=device)
+        
+        self.assertTrue((pos.to(device)[0] == torch.tensor([1., 1., 1., 0., 0., 0., 0., 0., 0., 0.], 
+                                                           device=device)).all())
+        
+        self.assertTrue((neg.to(device)[0] == torch.tensor([0., 0., 0., 1., 0., 1., 0., 0., 0., 1.], 
+                                                           device=device)).all())
+
+    def test_dataset_bounds(self):
+        feats = torch.Tensor([
+            [1., 1., 0., 0.],
+            [1., .9, .0, .0],
+            [.1, .1, .1, .1],
+            [.5, .1, .9, .8],
+            [.6, .6, .6, .6],
+            [.1, .2, .3, .4],
+            [.4, .3, .2, .1],
+            [.5, .5, .5, .5],
+            [.8, .1, .2, .7],
+            [.9, .0, .3, .9],
+            ])
+        
+        ions = torch.tensor([0,1,0,3,4,5,6,7,8,9])
+
+        ds_labels = torch.tensor([0,0,0,1,1,1,0,0,0,0])
+
+        _, _, sim_mat = clust.compute_ublb(feats, 90, 10, None, None)
+
+        dub, dlb = compute_dataset_ublb(sim_mat, ds_labels, 10, 90)
+
+        self.assertGreater(dub[0].cpu().numpy(), 0.99)
+        self.assertLess(dlb[0].cpu().numpy(), 0.59)
         
 if __name__ == '__main__':
     unittest.main()
