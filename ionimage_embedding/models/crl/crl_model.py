@@ -71,10 +71,13 @@ class CRLmodel(pl.LightningModule):
     def cl(self, neg_loc, pos_loc, sim_mat):
         pos_entropy = torch.mul(-torch.log(torch.clip(sim_mat, 1e-10, 1)), pos_loc)
         neg_entropy = torch.mul(-torch.log(torch.clip(1 - sim_mat, 1e-10, 1)), neg_loc)
-
+        # print('cl')
+        # print(pos_entropy)
+        # print(neg_entropy)
         # CNN loss
         contrastive_loss = pos_entropy.sum() / pos_loc.sum() + neg_entropy.sum() / neg_loc.sum()
-
+        # print(contrastive_loss)
+        # print()
         return contrastive_loss
     
     def compute_ublb(self, features, uu, ll, train_datasets, index):
@@ -95,6 +98,12 @@ class CRLmodel(pl.LightningModule):
     def contrastive_loss(self, features, uu, ll, train_datasets, index):
         ub, lb, sim_mat = self.compute_ublb(features, uu, ll, train_datasets, index)
         
+        # print('debugging step')
+        # print(ub)
+        # print(lb)
+        # print(sim_mat)
+
+
         dataset_ub = None
         dataset_lb = None
         if self.dataset_specific_percentiles:
@@ -102,12 +111,16 @@ class CRLmodel(pl.LightningModule):
             dataset_ub, dataset_lb = compute_dataset_ublb(sim_mat, ds_labels=train_datasets,
                                                           lower_bound=ll, upper_bound=uu, device=self.device)
 
+            # print(dataset_ub)
+            # print(dataset_lb)
+
         pos_loc, neg_loc = pseudo_labeling(ub=ub, lb=lb, sim=sim_mat, index=index, knn=self.KNN,
                                            knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
                                            dataset_specific_percentiles=self.dataset_specific_percentiles,
                                            dataset_ub=dataset_ub, dataset_lb=dataset_lb,
                                            ds_labels=train_datasets, device=self.device)
-
+        # print(pos_loc)
+        # print(neg_loc)
 
         return self.cl(neg_loc, pos_loc, sim_mat)
     

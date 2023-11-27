@@ -87,7 +87,7 @@ class CRL:
 
         # Placeholders for models
         self.cae = None
-        self.clr = None
+        self.crl = None
 
     def image_normalization(self, new_data: np.ndarray):
         return self.data.image_normalization(new_data)
@@ -98,7 +98,7 @@ class CRL:
             # Pretraining of CAE model
             cae = CAE(self._height, self._width, encoder_dim=self.cae_encoder_dim, lr=self.lr)
             
-            trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.pretraining_epochs, logger=logger)
+            trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.pretraining_epochs, logger=logger, checkpoint_callback=False)
             trainer.fit(cae, self.train_dataloader, self.val_dataloader)
             
             self.cae = cae
@@ -106,7 +106,7 @@ class CRL:
             cae = False
         
         # Training of full model
-        self.clr = CRLmodel(height=self._height, width=self._width, num_cluster=self.num_cluster, 
+        self.crl = CRLmodel(height=self._height, width=self._width, num_cluster=self.num_cluster, 
                             ion_label_mat=self.ion_label_mat, activation=self.activation, encoder_dim=self.cae_encoder_dim, 
                             initial_upper=self.initial_upper, initial_lower=self.initial_lower, 
                             upper_iteration=self.upper_iteration, lower_iteration=self.lower_iteration,
@@ -115,14 +115,14 @@ class CRL:
                             cnn_dropout=self.cnn_dropout, weight_decay=self.weight_decay, clip_gradients=self.clip_gradients)
         
         trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.training_epochs, logger=logger)
-        trainer.fit(self.clr, self.train_dataloader, self.val_dataloader)
+        trainer.fit(self.crl, self.train_dataloader, self.val_dataloader)
         
         return 0
 
-    def inference_clusterlabels(self, new_data, clr=None, normalize=True, device='cpu'):
+    def inference_clusterlabels(self, new_data, crl=None, normalize=True, device='cpu'):
         
-        if clr is None:
-            clr = self.clr
+        if crl is None:
+            crl = self.crl
         
         with torch.no_grad():
             
@@ -133,9 +133,9 @@ class CRL:
             
             test_x = test_x.reshape((-1, 1, self._height, self._width))
             
-            clr = clr.to(device)
+            crl = crl.to(device)
             
-            pseudo_label, x_p = clr(test_x)
+            pseudo_label, x_p = crl(test_x)
 
             pseudo_label = torch.argmax(pseudo_label, dim=1)
             prediction_label.extend(pseudo_label.cpu().detach().numpy())
@@ -143,10 +143,10 @@ class CRL:
 
             return prediction_label
 
-    def inference_embeddings(self, new_data, clr=None, normalize_images=True, normalize_embeddings=True, device='cpu', use_embed_layer=False):
+    def inference_embeddings(self, new_data, crl=None, normalize_images=True, normalize_embeddings=True, device='cpu', use_embed_layer=False):
           
-        if clr is None:
-            clr = self.clr
+        if crl is None:
+            crl = self.crl
             
         with torch.no_grad():
             if normalize_images:
@@ -156,12 +156,12 @@ class CRL:
             
             test_x = test_x.reshape((-1, 1, self._height, self._width))
             
-            clr = clr.to(device)
+            crl = crl.to(device)
 
             if use_embed_layer:
-                embeddings, _ = clr.embed_layers(test_x)
+                embeddings, _ = crl.embed_layers(test_x)
             else:
-                embeddings, _ = clr(test_x)
+                embeddings, _ = crl(test_x)
             
             if normalize_embeddings:
                 embeddings = functional.normalize(embeddings, p=2, dim=-1)

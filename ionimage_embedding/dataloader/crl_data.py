@@ -155,13 +155,13 @@ class CRLdata:
         return split1_data, split1_dls, split1_ill, split1_index, split2_data, split2_dls, split2_ill, split2_index
     
     def get_train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True)
     
     def get_val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=len(self.val_dataset.images), shuffle=False)
+        return DataLoader(self.val_dataset, batch_size=len(self.val_dataset.images), shuffle=False, drop_last=True)
     
     def get_test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=len(self.test_dataset.images), shuffle=False)
+        return DataLoader(self.test_dataset, batch_size=len(self.test_dataset.images), shuffle=False, drop_last=True)
     
     # simple min-max scaling per image, no data leakage
     def image_normalization(self, new_data: np.ndarray):

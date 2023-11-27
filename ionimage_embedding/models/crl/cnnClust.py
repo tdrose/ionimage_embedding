@@ -19,9 +19,9 @@ class CNNClust(nn.Module):
                  dropout: float=0.1
                 ):
         super(CNNClust, self).__init__()
-        self.num_clust = num_clust
-        self.height = height
-        self.width = width
+        self.num_clust: int = num_clust
+        self.height: int = height
+        self.width: int = width
 
         self.conv1 = nn.Sequential(nn.Conv2d(1, 1, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), bias=False),
                                    nn.BatchNorm2d(1),
@@ -81,29 +81,37 @@ class CNNClust(nn.Module):
 
         self.final_conv_dim = l6h*l6w
         
-        self.last_hidden_dim = self.final_conv_dim // 2
+        self.h1 = self.final_conv_dim // 2
+        # self.h2 = self.final_conv_dim // 4
         
-        if self.last_hidden_dim < num_clust:
-            self.last_hidden_dim = num_clust
-
+        if self.h1 < num_clust:
+            self.h1 = num_clust
+        # if self.h2 < num_clust:
+        #     self.h2 = num_clust
+        self.h2 = self.h1
 
         print(f'CNNClust final conv dim = {self.final_conv_dim}')
-        print(f'CNNClust last hidden dim = {self.last_hidden_dim}')
+        print(f'CNNClust h1 dim = {self.h1}')
 
-        self.lh = nn.Sequential(nn.Linear(self.final_conv_dim, self.last_hidden_dim),
-                                nn.BatchNorm1d(self.last_hidden_dim, momentum=0.01),
-                                nn.ReLU())
+        self.lh1 = nn.Sequential(nn.Linear(self.final_conv_dim, self.h1),
+                                 nn.BatchNorm1d(self.h1, momentum=0.01),
+                                 nn.ReLU())
+        
+        # Potentially add layer
+        # self.lh2 = nn.Sequential(nn.Linear(self.h1, self.h2),
+        #                          nn.BatchNorm1d(self.h2, momentum=0.01),
+        #                          nn.ReLU())
         
         if activation == 'softmax':
-            self.final = nn.Sequential(nn.Linear(self.last_hidden_dim, num_clust),
+            self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
                                     nn.BatchNorm1d(num_clust, momentum=0.01),
                                     nn.Softmax(dim=1))
         elif activation == 'sigmoid':
-            self.final = nn.Sequential(nn.Linear(self.last_hidden_dim, num_clust),
+            self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
                                     nn.BatchNorm1d(num_clust, momentum=0.01),
                                     nn.Sigmoid())
         elif activation == 'relu':
-            self.final = nn.Sequential(nn.Linear(self.last_hidden_dim, num_clust),
+            self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
                                     nn.BatchNorm1d(num_clust, momentum=0.01),
                                     nn.ReLU())
         else:
@@ -120,7 +128,8 @@ class CNNClust(nn.Module):
         x = self.conv5(x)
         x = self.conv6(x)
         x = x.view(-1, self.final_conv_dim)
-        x = self.lh(x)
+        x = self.lh1(x)
+        # x = self.lh2(x)
 
         return x
 

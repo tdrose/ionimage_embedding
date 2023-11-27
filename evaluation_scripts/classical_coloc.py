@@ -68,7 +68,8 @@ ds_list = [
 
 clrdat = CRLdata(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
-                 colocml_preprocessing=True, fdr=.1)
+                 colocml_preprocessing=True, 
+                 fdr=.1, batch_size=50)
 
 print(np.isnan(clrdat.full_dataset.images).any())
 plt.imshow(clrdat.full_dataset.images[10])
@@ -82,19 +83,19 @@ colocs = ColocModel(clrdat)
 # %%
 model = CRL(clrdat,
             num_cluster=8,
-            initial_upper=93,
-            initial_lower=37,
-            upper_iteration=.8,
-            lower_iteration=.8,
-            dataset_specific_percentiles=True,
-            knn=False, 
+            initial_upper=91, # 93
+            initial_lower=14, # 37
+            upper_iteration=0., # .8
+            lower_iteration=0., # .8
+            dataset_specific_percentiles=False, # True
+            knn=True, # False
             lr=0.0001,
             pretraining_epochs=10,
-            training_epochs=15,
+            training_epochs=20, # 30
             cae_encoder_dim=2,
             lightning_device='gpu',
             cae=False,
-            activation='softmax',
+            activation='softmax', # softmax
             clip_gradients=None
             )
 
