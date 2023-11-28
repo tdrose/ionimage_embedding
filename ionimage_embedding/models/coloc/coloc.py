@@ -48,15 +48,21 @@ class ColocModel:
         
         out_dict = {}
         for dsid in full_colocs.keys():
-                # Subsetting ground truth
+                # Subset to the correct datasets
                 mask = test_dsl==dsid
+                # Subset ions to the datasets
                 masked_ill = test_il[mask].cpu().detach().numpy()
+                # Convert to numpy
                 numpy_ion_labels = np.unique(masked_ill)
+                # Sort ion labels
                 sorted_ion_labels = np.sort(numpy_ion_labels)
+                # Get dataset colocs in correct sorting
                 cdf = full_colocs[dsid].loc[sorted_ion_labels, sorted_ion_labels].copy()  # type: ignore 
 
+                # Covert to numpy
                 cdf_numpy = np.array(cdf)
                 np.fill_diagonal(cdf_numpy, np.nan)
+                # Fill df after removing diagonal
                 cdf = pd.DataFrame(cdf_numpy, columns=cdf.columns, index=cdf.index)
 
                 out_dict[dsid] = quantile_sets(cdf, lower_quantile=lower_quantile, upper_quantile=upper_quantile)

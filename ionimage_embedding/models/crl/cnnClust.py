@@ -82,25 +82,26 @@ class CNNClust(nn.Module):
         self.final_conv_dim = l6h*l6w
         
         self.h1 = self.final_conv_dim // 2
-        # self.h2 = self.final_conv_dim // 4
+        self.h2 = self.final_conv_dim // 4
         
         if self.h1 < num_clust:
             self.h1 = num_clust
-        # if self.h2 < num_clust:
-        #     self.h2 = num_clust
-        self.h2 = self.h1
+        if self.h2 < num_clust:
+            self.h2 = num_clust
+        # self.h2 = self.h1
 
         print(f'CNNClust final conv dim = {self.final_conv_dim}')
         print(f'CNNClust h1 dim = {self.h1}')
+        print(f'CNNClust h2 dim = {self.h2}')
 
         self.lh1 = nn.Sequential(nn.Linear(self.final_conv_dim, self.h1),
                                  nn.BatchNorm1d(self.h1, momentum=0.01),
                                  nn.ReLU())
         
         # Potentially add layer
-        # self.lh2 = nn.Sequential(nn.Linear(self.h1, self.h2),
-        #                          nn.BatchNorm1d(self.h2, momentum=0.01),
-        #                          nn.ReLU())
+        self.lh2 = nn.Sequential(nn.Linear(self.h1, self.h2),
+                                 nn.BatchNorm1d(self.h2, momentum=0.01),
+                                 nn.ReLU())
         
         if activation == 'softmax':
             self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
@@ -129,7 +130,7 @@ class CNNClust(nn.Module):
         x = self.conv6(x)
         x = x.view(-1, self.final_conv_dim)
         x = self.lh1(x)
-        # x = self.lh2(x)
+        x = self.lh2(x)
 
         return x
 

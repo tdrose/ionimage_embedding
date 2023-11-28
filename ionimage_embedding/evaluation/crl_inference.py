@@ -8,7 +8,8 @@ from ..models.coloc.utils import torch_cosine
 def crl_latent_coloc(model, dat, device='cpu'):
     
     embds = model.inference_embeddings(new_data=dat.images, normalize_images=False, 
-                                                   device=device, use_embed_layer=True)
+                                                   device=device, use_embed_layer=False)
+    print('updated')
     cos = torch_cosine(torch.tensor(embds))
 
     return pd.DataFrame(cos.cpu().detach().numpy(), 

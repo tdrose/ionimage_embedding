@@ -17,8 +17,8 @@ def string_similarity_matrix(string_list):
 def compute_dataset_ublb(sim_mat, ds_labels,
                          lower_bound: int, upper_bound: int, device=None):
     
-    ds_ub = torch.zeros(torch.max(torch.unique(ds_labels))+1, device=device)
-    ds_lb = torch.zeros(torch.max(torch.unique(ds_labels))+1, device=device)
+    ds_ub = torch.zeros(int(torch.max(torch.unique(ds_labels)))+1, device=device)
+    ds_lb = torch.zeros(int(torch.max(torch.unique(ds_labels)))+1, device=device)
     for ds in torch.unique(ds_labels):
         
         labels = ds_labels==ds

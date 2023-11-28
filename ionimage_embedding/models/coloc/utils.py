@@ -14,13 +14,19 @@ def torch_cosine(mat: torch.Tensor, dim=1):
 
 def quantile_sets(cdf: pd.DataFrame, upper_quantile: float=0.9, lower_quantile: float=0.1):
     
+    # Gather df
     tmp = cdf.melt(var_name='ion2', value_name='val', ignore_index=False).reset_index().rename(columns={'index': 'ion1'})
+    # Remove NA values
     tmp = tmp[~np.isnan(tmp['val'])]
+    # Get upper quantile
     lq = np.quantile(tmp['val'], lower_quantile)
+    # Get lower quantile
     uq = np.quantile(tmp['val'], upper_quantile)
 
     upper = tmp[tmp['val'] >= uq]
     upper.loc[:, 'pair'] = upper[['ion1', 'ion2']].apply(lambda x: tuple(sorted(x)), axis=1)
     lower = tmp[tmp['val'] <= lq]
     lower.loc[:, 'pair'] = lower[['ion1', 'ion2']].apply(lambda x: tuple(sorted(x)), axis=1)
+
+    
     return {'upper': list(set(upper['pair'])), 'lower': list(set(lower['pair']))}

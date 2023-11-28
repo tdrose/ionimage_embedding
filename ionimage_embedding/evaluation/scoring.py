@@ -43,7 +43,7 @@ def evaluation_quantile_overlap(evaluation_dict):
 
     for mod, ds in evaluation_dict['predictions'].items():
         for dsid, eval in ds.items():
-            lmodel.append(mod)
+            
             gt = evaluation_dict['ground_truth'][dsid]
             tp = sum([1 for x in eval['upper'] if x in gt['upper']])
             fp = sum([1 for x in eval['upper'] if x not in gt['upper']])
@@ -53,6 +53,7 @@ def evaluation_quantile_overlap(evaluation_dict):
             fn = sum([1 for x in eval['lower'] if x not in gt['lower']])
             scores = {'tp': tp, 'fp': fp, 'tn': tn, 'fn': fn}
 
+            lmodel.append(mod)
             laccuracy.append(accuracy(scores))
             lf1score.append(f1score(scores))
             lprecision.append(precision(scores))
