@@ -13,6 +13,11 @@ import seaborn as sns
 os.system('nvidia-smi')
 
 
+
+# ###
+# TOY DATA
+# ###
+
 # %% Playing with SimCLR
 # Code from repo: https://github.com/sthalles/SimCLR/tree/master
 batch_size = 6
@@ -78,7 +83,9 @@ print(loss)
 
 
 
-
+# ####
+# REAL DATA
+# ####
 
 
 
@@ -156,9 +163,9 @@ colocs = colocs.to(device)
 
 # %%
 # Function to load model and optimizer
-def get_model_optimizer(height, width, activation='relu'):
+def get_model_optimizer(height, width, activation='relu', dims=100):
 
-    model = CNNClust(num_clust = 100, height=height, width=width, activation=activation, dropout=0)
+    model = CNNClust(num_clust = dims, height=height, width=width, activation=activation, dropout=0)
     optim = torch.optim.RMSprop(params=model.parameters(), lr=0.01)
 
     return model, optim
@@ -173,7 +180,9 @@ def get_model_optimizer(height, width, activation='relu'):
 
 
 
-
+# ###
+# CRL2 Loss
+# ###
 
 
 
@@ -183,7 +192,7 @@ class CRL2_version:
     pass
 
 # Batch specific quantiles are not consideres here
-model, optim = get_model_optimizer(height=dat.height, width=dat.width)
+model, optim = get_model_optimizer(height=dat.height, width=dat.width, dims=20)
 model = model.to(device)
 bceloss = torch.nn.BCELoss()
 
@@ -237,38 +246,45 @@ def crl2_loss(features, colocs, idx, ds_labels, ion_label_mat):
 
 
 
-# %%
-fig, (ax1, ax2, ax3) = plt.subplots(3)
-
-
+# %% Optimizer step
+fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2,3, figsize=(9, 6))
 
 # Print model coloc agreement before
 optim.zero_grad()
 features = model(images)
 sim_mat = torch_cosine(features)
 tmp1 = (sim_mat - colocs).detach().cpu().numpy()
-sns.heatmap((sim_mat - colocs).detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax1, cmap='RdBu')
+sns.heatmap((sim_mat - colocs).detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax2, cmap='RdBu')
 
 optim.zero_grad()
 
 # Compute loss
 features = model(images)
 loss, mask = crl2_loss(features, colocs, idx, ds_labels, ion_label_mat)
-ax1.set_title(f'Before (Loss: {loss})')
+fig.suptitle(f'(Loss: {loss})')
+ax2.set_title('Before')
 # Backpropagation
 loss.backward()
 optim.step()
-
-sns.heatmap(mask, vmin=-1, vmax=1, ax=ax3, cmap='RdBu')
 
 # Print model agreement after
 optim.zero_grad()
 features = model(images)
 sim_mat = torch_cosine(features)
 tmp2 = (sim_mat - colocs).detach().cpu().numpy()
-sns.heatmap((sim_mat - colocs).detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax2, cmap='RdBu')
-ax2.set_title('After')
+sns.heatmap((sim_mat - colocs).detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax3, cmap='RdBu')
+ax3.set_title('After')
 optim.zero_grad()
+
+sns.heatmap(mask, vmin=-1, vmax=1, ax=ax1, cmap='RdBu')
+ax1.set_title('Mask')
+sns.heatmap(mask, vmin=-1, vmax=1, ax=ax4, cmap='RdBu')
+ax4.set_title('Mask')
+sns.heatmap(sim_mat.detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax5, cmap='RdBu')
+ax5.set_title('Inference sim')
+sns.heatmap(colocs.detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax6, cmap='RdBu')
+ax6.set_title('Coloc')
+
 plt.show()
 # %%
 
@@ -277,10 +293,127 @@ plt.show()
 
 
 
+# ###
+# Contrastive Regression Loss
+# ###
+
+# %% SECOND LOSS: Contrastive Regression
+class CReg:
+    pass
+
+# Batch specific quantiles are not consideres here
+model, optim = get_model_optimizer(height=dat.height, width=dat.width, dims=10)
+model = model.to(device)
+mseloss = torch.nn.MSELoss()
+
+from ionimage_embedding.models.crl.pseudo_labeling import compute_dataset_ublb
+
+def creg_loss(features, colocs, idx, ds_labels, ion_label_mat):
+    
+    features = functional.normalize(features, p=2, dim=-1)
+    sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
+
+    gt_cosine = colocs.clone().detach()
+
+    ds_mask = torch.zeros(sim_mat.shape, device=device)
+
+    # Loop over all datasets
+    for ds in torch.unique(ds_labels):
+        ds_v = ds_labels == ds
+        
+        # Mask to subset similarities just to one dataset
+        mask = torch.outer(ds_v, ds_v)
+        mask2 = torch.eye(ds_mask.size(0), dtype=torch.bool)
+        mask[mask2] = 0.
+
+        # Set maskin with datasets to 1
+        ds_mask[mask] = 1
+
+    # Align the same ions
+    ion_submat = ion_label_mat # [index, :][:, index] Not necessary because of fixed images
+    
+    # Set same ions to 1 in target
+    ds_mask = torch.maximum(ds_mask, ion_submat)
+
+    print(ion_submat)
+
+    gt_cosine[ion_submat==1] = 1
+    
+    out = sim_mat[ds_mask==1.]
+    target = gt_cosine[ds_mask==1.]
+
+    return mseloss(out, target), ds_mask
 
 
 
 
+# %% Optimizer step
+fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2,3, figsize=(9, 6))
+
+# Print model coloc agreement before
+optim.zero_grad()
+features = model(images)
+sim_mat = torch_cosine(features)
+tmp1 = (sim_mat - colocs).detach().cpu().numpy()
+sns.heatmap((sim_mat - colocs).detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax2, cmap='RdBu')
+
+optim.zero_grad()
+
+# Compute loss
+features = model(images)
+loss, mask = creg_loss(features, colocs, idx, ds_labels, ion_label_mat)
+fig.suptitle(f'(Loss: {loss})')
+ax2.set_title('Before')
+# Backpropagation
+loss.backward()
+optim.step()
+
+# Print model agreement after
+optim.zero_grad()
+features = model(images)
+sim_mat = torch_cosine(features)
+tmp2 = (sim_mat - colocs).detach().cpu().numpy()
+sns.heatmap((sim_mat - colocs).detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax3, cmap='RdBu')
+ax3.set_title('After')
+optim.zero_grad()
+
+sns.heatmap(mask.detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax1, cmap='RdBu')
+ax1.set_title('Loss Mask')
+sns.heatmap(mask.detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax4, cmap='RdBu')
+ax4.set_title('Loss Mask')
+sns.heatmap(sim_mat.detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax5, cmap='RdBu')
+ax5.set_title('Inference sim')
+sns.heatmap(colocs.detach().cpu().numpy(), vmin=-1, vmax=1, ax=ax6, cmap='RdBu')
+ax6.set_title('Coloc')
+
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ###
+# SNN Loss
+# ###
 
 
 
