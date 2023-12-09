@@ -108,7 +108,7 @@ class CRLdata:
             # compute KNN and ion_label_mat (For combined train/val data)
             self.knn_adj: torch.Tensor = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), k=self.k))
             
-            self.ion_label_mat: torch.tensor = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
+            self.ion_label_mat: torch.Tensor = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
 
             # Make datasets
             self.train_dataset = mzImageDataset(images=train_data, 
