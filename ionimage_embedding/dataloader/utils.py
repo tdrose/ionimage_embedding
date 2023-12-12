@@ -54,7 +54,7 @@ def size_adaption_symmetric(image_dict: dict):
 
     return out_dict
 
-def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False):
+def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False, maxzero=.95):
     
     sm = SMInstance()
     
@@ -101,8 +101,13 @@ def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', col
     training_datasets = np.array(training_datasets)
     training_ions = np.array(training_ions)
 
-    # Filter out full 0 vectors
-    zero_mask = (training_data == 0).reshape((training_data.shape[0], -1)).all(axis=1)
+    # Filter out images that are mainly zero
+    imgsize = training_data.shape[1]*training_data.shape[2]
+    zero_count = np.sum((training_data == 0).reshape((training_data.shape[0], -1)), axis=1)
+    zero_mask = zero_count >= (imgsize*maxzero)
+
+    # Old version: filter out only all zero images
+    # zero_mask = (training_data == 0).reshape((training_data.shape[0], -1)).all(axis=1)
 
     return training_data[~zero_mask], training_datasets[~zero_mask], training_ions[~zero_mask]
 

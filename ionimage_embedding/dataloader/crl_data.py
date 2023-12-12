@@ -21,7 +21,7 @@ class CRLdata:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', 
                  colocml_preprocessing=False,
                  k=10, batch_size=128,
-                 cache=False, cache_folder='/scratch/model_testing', min_images=5
+                 cache=False, cache_folder='/scratch/model_testing', min_images=5, maxzero=.95
                 ):
         
         self.dataset_ids = dataset_ids
@@ -40,7 +40,7 @@ class CRLdata:
                                                                           str(db[0]), str(db[1]), str(fdr), str(scale_intensity))
             
             cache_hex = uuid.uuid5(uuid.NAMESPACE_URL, cache_hex).hex
-            cache_file = 'CLRdata_{}.pickle'.format(cache_hex)
+            cache_file = 'CRLdata_{}.pickle'.format(cache_hex)
 
             # Check if cache folder exists
             if not os.path.isdir(cache_folder):
@@ -49,7 +49,7 @@ class CRLdata:
             # Download data if it does not exist
             if cache_file not in os.listdir(cache_folder):
                 data, dataset_labels, ion_labels = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
-                                                                 colocml_preprocessing=colocml_preprocessing)
+                                                                 colocml_preprocessing=colocml_preprocessing, maxzero=maxzero)
 
                 pickle.dump((data, dataset_labels, ion_labels), open(os.path.join(cache_folder, cache_file), "wb"))
                 print('Saved file: {}'.format(os.path.join(cache_folder, cache_file)))      
@@ -61,7 +61,7 @@ class CRLdata:
 
         else:
             data, dataset_labels, ion_labels = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
-                                                             colocml_preprocessing=colocml_preprocessing)
+                                                             colocml_preprocessing=colocml_preprocessing, maxzero=maxzero)
             
         
         
