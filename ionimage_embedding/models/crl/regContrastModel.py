@@ -1,3 +1,5 @@
+from typing import Optional, Literal
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as functional
@@ -8,13 +10,14 @@ from .cae import CAE
 from .pseudo_labeling import pseudo_labeling, compute_dataset_ublb
 from ..coloc.utils import torch_cosine
 
-class CRL3model(pl.LightningModule):
+class regContrastModel(pl.LightningModule):
     def __init__(self, 
                  height, 
                  width,
                  num_cluster,
-                 ion_label_mat,
-                 activation='softmax',
+                 ion_label_mat: torch.Tensor,
+                 knn_adj: torch.Tensor,
+                 activation: Literal['softmax', 'relu', 'sigmoid']='softmax',
                  encoder_dim=7,
                  initial_upper: float = 98.,
                  initial_lower: float = 46.,
@@ -23,12 +26,12 @@ class CRL3model(pl.LightningModule):
                  dataset_specific_percentiles: bool = False,
                  lr=0.01,
                  cae_pretrained_model=None,
-                 knn=False, knn_adj = None,
+                 knn=False,
                  cnn_dropout=0.1, weight_decay=1e-4,
-                 clip_gradients: float = None
+                 clip_gradients: Optional[float] = None
                 ):
         
-        super(CRL3model, self).__init__()
+        super(regContrastModel, self).__init__()
         
         # Model sizes
         self.height = height
@@ -99,9 +102,9 @@ class CRL3model(pl.LightningModule):
         # lb = torch.quantile(masked_matrix, ll/100).detach()
 
         return sim_mat
+    
+    def loss_mask(self, features, uu, ll, train_datasets, index, train_images):
 
-    def contrastive_loss(self, features, uu, ll, train_datasets, index, train_images):
-        
         # Model representation similarities
         sim_mat = self.compute_ublb(features)
         
@@ -131,6 +134,13 @@ class CRL3model(pl.LightningModule):
         ds_mask = torch.maximum(ds_mask, ion_submat)
 
         gt_cosine[ion_submat==1.] = 1
+        
+        return ds_mask, sim_mat, gt_cosine
+    
+
+    def contrastive_loss(self, features, uu, ll, train_datasets, index, train_images):
+        
+        ds_mask, sim_mat, gt_cosine = self.loss_mask(features, uu, ll, train_datasets, index, train_images)
 
         return self.cl(ds_mask, sim_mat, gt_cosine)
     

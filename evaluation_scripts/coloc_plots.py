@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as functional
 import torchvision.transforms as T
 
-from ionimage_embedding.models import CRL, CRL2, CRL3
+from ionimage_embedding.models import CRL
 from ionimage_embedding.models import ColocModel
 from ionimage_embedding.dataloader.crl_data import CRLdata
 from ionimage_embedding.models.coloc.utils import torch_cosine
@@ -67,7 +67,7 @@ colocs = ColocModel(crldat)
 
 
 # %%
-model = CRL3(crldat,
+model = CRL(crldat,
             num_cluster=30,
             initial_upper=90, # 93
             initial_lower=22, # 37
@@ -81,7 +81,8 @@ model = CRL3(crldat,
             cae_encoder_dim=2,
             lightning_device='gpu',
             cae=False,
-            activation='softmax', # softmax
+            activation='relu', # softmax
+            loss_type='regContrast',
             clip_gradients=None
             )
 
@@ -101,39 +102,6 @@ model.train(logger=False)
 # Visualizations
 # ##############
 
-# %% Need better access to loss function:
-def contrastive_loss(features, train_datasets, index, train_images, ion_label_mat, device='cuda'):
-    
-    features = functional.normalize(features, p=2, dim=-1)
-    sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
-    
-    # Compute cosine between all input images
-    gt_cosine = torch_cosine(train_images.reshape(train_images.shape[0], -1))
-    gt_cosine = gt_cosine.to(device)
-
-    # Only for those values the loss will be evaluated
-    ds_mask = torch.zeros(sim_mat.shape, device=device)
-
-    # Loop over all datasets
-    for ds in torch.unique(train_datasets):
-        ds_v = train_datasets == ds
-        
-        # Mask to subset similarities just to one dataset
-        mask = torch.outer(ds_v, ds_v)
-        mask2 = torch.eye(ds_mask.size(0), dtype=torch.bool)
-        mask[mask2] = 0.
-
-        # Set maskin with datasets to 1
-        ds_mask[mask] = 1
-
-    # Align the same ions
-    ion_submat = ion_label_mat[index, :][:, index]
-    
-    # Set same ions to 1 in target
-    ds_mask = torch.maximum(ds_mask, ion_submat)
-
-    return ds_mask
-
 # %%
 def plot_ColocHeatmap(ax, data, model, device='cuda'):
     
@@ -147,14 +115,16 @@ def plot_ColocHeatmap(ax, data, model, device='cuda'):
 def plot_LossMaskHeatmap(ax, data, model, device='cuda'):
     
     latent = model.inference_embeddings_train(device=device, use_embed_layer=False)
-    mask = contrastive_loss(features=torch.tensor(latent, device=device), 
-                            train_datasets=data.train_dataset.dataset_labels.to(device),
-                            index=torch.tensor(crldat.train_dataset.index, device=device),
-                            train_images = torch.tensor(data.train_dataset.images, device=device),
-                            ion_label_mat=data.ion_label_mat.to(device), device=device
-                            )
     
-    sns.heatmap(mask.detach().cpu().numpy(), vmin=0, vmax=1, ax=ax, cmap='viridis')
+    mask = model.get_loss_mask(latent=torch.tensor(latent, device=device), 
+                               index=torch.tensor(crldat.train_dataset.index, device=device), 
+                               train_datasets=data.train_dataset.dataset_labels.to(device), 
+                               train_images=torch.tensor(data.train_dataset.images, device=device), 
+                               uu=90, ll=10, device=device)
+    if np.min(mask < 0):
+        sns.heatmap(mask, vmin=-1, vmax=1, ax=ax, cmap='RdBu')
+    else:
+        sns.heatmap(mask, vmin=0, vmax=1, ax=ax, cmap='viridis')
     
     ax.axis('off')
     ax.set_title('Loss Mask')
@@ -215,4 +185,6 @@ centroids, centroid_labels = compute_centroids(embeddings, crldat.train_dataset.
 data = pd.DataFrame(reducer.fit_transform(centroids))
 
 sns.scatterplot(data, x=0, y=1).set(title='Training data')
+
+
 # %%

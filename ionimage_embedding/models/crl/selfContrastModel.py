@@ -1,20 +1,22 @@
+from typing import Optional, Literal
+
 import torch
-import torch.nn as nn
 import torch.nn.functional as functional
 import lightning.pytorch as pl
 
 from .cnnClust import CNNClust
 from .cae import CAE
 from .pseudo_labeling import pseudo_labeling, compute_dataset_ublb
-from ..coloc.utils import torch_cosine
 
-class CRL2model(pl.LightningModule):
+
+class selfContrastModel(pl.LightningModule):
     def __init__(self, 
                  height, 
                  width,
                  num_cluster,
-                 ion_label_mat,
-                 activation='softmax',
+                 ion_label_mat: torch.Tensor,
+                 knn_adj: torch.Tensor,
+                 activation: Literal['softmax', 'relu', 'sigmoid']='softmax',
                  encoder_dim=7,
                  initial_upper: float = 98.,
                  initial_lower: float = 46.,
@@ -23,12 +25,12 @@ class CRL2model(pl.LightningModule):
                  dataset_specific_percentiles: bool = False,
                  lr=0.01,
                  cae_pretrained_model=None,
-                 knn=False, knn_adj = None,
+                 knn=False,
                  cnn_dropout=0.1, weight_decay=1e-4,
-                 clip_gradients: float = None
+                 clip_gradients: Optional[float] = None
                 ):
         
-        super(CRL2model, self).__init__()
+        super(selfContrastModel, self).__init__()
         
         # Model sizes
         self.height = height
@@ -46,7 +48,6 @@ class CRL2model(pl.LightningModule):
         self.clip_grads = clip_gradients
         # self.overweight_cae = overweight_cae
         self.mse_loss = torch.nn.MSELoss()
-        self.bceloss = nn.BCELoss()
         
         # Pseudo labeling parameters
         self.initial_upper = initial_upper
@@ -67,87 +68,56 @@ class CRL2model(pl.LightningModule):
             self.cae = cae_pretrained_model
         self.clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, activation=activation, dropout=cnn_dropout)
         
+        
     def cl(self, neg_loc, pos_loc, sim_mat):
-        # pos_entropy = torch.mul(-torch.log(torch.clip(sim_mat, 1e-10, 1)), pos_loc)
-        # neg_entropy = torch.mul(-torch.log(torch.clip(1 - sim_mat, 1e-10, 1)), neg_loc)
-        #pos_entropy = -torch.log(sim_mat[pos_loc==1.])
-        #neg_entropy = -torch.log(sim_mat[neg_loc==1.])
+        pos_entropy = torch.mul(-torch.log(torch.clip(sim_mat, 1e-10, 1)), pos_loc)
+        neg_entropy = torch.mul(-torch.log(torch.clip(1 - sim_mat, 1e-10, 1)), neg_loc)
         # print('cl')
         # print(pos_entropy)
         # print(neg_entropy)
         # CNN loss
-        #contrastive_loss = pos_entropy.sum() / pos_loc.sum() + neg_entropy.sum() / neg_loc.sum()
+        contrastive_loss = pos_entropy.sum() / pos_loc.sum() + neg_entropy.sum() / neg_loc.sum()
         # print(contrastive_loss)
         # print()
-        #return contrastive_loss
-        pos = sim_mat[pos_loc==1.]
-        neg = sim_mat[neg_loc==1.]
-        out = torch.clip(torch.cat([pos, neg]), 0.0, 1.0)
-        
-        target = torch.cat([torch.ones(pos.shape[0], device=self.device), 
-                            torch.zeros(neg.shape[0], device=self.device)])
-
-        return self.bceloss(out, target)
+        return contrastive_loss
     
-    def compute_ublb(self, features):
-        
+    def compute_ublb(self, features, uu, ll, train_datasets, index):
         features = functional.normalize(features, p=2, dim=-1)
         # Second normalization not necessary. Keeping it here for reference, will be removed in the future.
         # features = features / features.norm(dim=1)[:, None]
 
         sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
 
-        # mask = torch.eye(sim_mat.size(0), dtype=torch.bool)
-        # asked_matrix = sim_mat[~mask]
-        # ub = torch.quantile(masked_matrix, uu/100).detach()
-        # lb = torch.quantile(masked_matrix, ll/100).detach()
+        mask = torch.eye(sim_mat.size(0), dtype=torch.bool)
+        masked_matrix = sim_mat[~mask]
 
-        return sim_mat
+        ub = torch.quantile(masked_matrix, uu/100).detach()
+        lb = torch.quantile(masked_matrix, ll/100).detach()
 
-    def contrastive_loss(self, features, uu, ll, train_datasets, index, train_images):
+        return ub, lb, sim_mat
+
+    def loss_mask(self, features, uu, ll, train_datasets, index):
+        ub, lb, sim_mat = self.compute_ublb(features, uu, ll, train_datasets, index)
+
+        dataset_ub = None
+        dataset_lb = None
+        if self.dataset_specific_percentiles:
+            
+            dataset_ub, dataset_lb = compute_dataset_ublb(sim_mat, ds_labels=train_datasets,
+                                                          lower_bound=ll, upper_bound=uu, device=self.device)
+
+
+        pos_loc, neg_loc = pseudo_labeling(ub=ub, lb=lb, sim=sim_mat, index=index, knn=self.KNN,
+                                           knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
+                                           dataset_specific_percentiles=self.dataset_specific_percentiles,
+                                           dataset_ub=dataset_ub, dataset_lb=dataset_lb,
+                                           ds_labels=train_datasets, device=self.device)
         
-        # Model representation similarities
-        sim_mat = self.compute_ublb(features)
+        return pos_loc, neg_loc, sim_mat
+
+    def contrastive_loss(self, features, uu, ll, train_datasets, index):
         
-        # Compute cosine between all input images
-        gt_cosine = torch_cosine(train_images.reshape(train_images.shape[0], -1))
-        gt_cosine = gt_cosine.to(self.device)
-
-        # Calculate dataset ub and lb, but on the GROUND TRUTH COSINE
-        dataset_ub, dataset_lb = compute_dataset_ublb(gt_cosine, ds_labels=train_datasets,
-                                                      lower_bound=ll, upper_bound=uu, device=self.device)
-
-        # print(dataset_ub)
-        # print(dataset_lb)
-
-        ub_m = torch.ones(sim_mat.shape, device=self.device)
-        lb_m = torch.zeros(sim_mat.shape, device=self.device)
-
-        # Loop over all datasets
-        for ds in torch.unique(train_datasets):
-            ds_v = train_datasets == ds
-            # Mask to subset similarities just to one dataset
-            mask = torch.outer(ds_v, ds_v)
-
-            # Create dataset specific threshold matrices
-            ub_m[mask] = dataset_ub[ds]
-            lb_m[mask] = dataset_lb[ds]
-        
-        # Apply thresholds to GROUND TRUGH COSINE 
-        pos_loc = (gt_cosine > ub_m).float()
-        neg_loc = (gt_cosine < lb_m).float()
-
-
-        # Align the same ions
-        ion_submat = self.ion_label_mat[index, :][:, index]
-        
-        pos_loc = torch.maximum(pos_loc, ion_submat)
-        neg_loc = torch.minimum(neg_loc, 1 - ion_submat)
-
-        # Remove diagonal
-        mask = torch.eye(pos_loc.size(0), dtype=torch.bool)
-        pos_loc[mask] = 0.
-        neg_loc[mask] = 0.
+        pos_los, neg_loc, sim_mat = self.loss_mask(features, uu, ll, train_datasets, index, train_images)
 
         return self.cl(neg_loc, pos_loc, sim_mat)
     
@@ -181,16 +151,14 @@ class CRL2model(pl.LightningModule):
         
         if self.cae is None:
             features, x_p = self.forward(train_x)
-            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, 
-                                         index=index, train_images=train_x)
+            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, index=index)
             self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
             return loss
         
         else:
             features, x_p = self.forward(train_x)
             loss_cae = self.mse_loss(x_p, train_x)
-            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, 
-                                               index=index, train_images=train_x)
+            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, index=index)
             loss = loss_cae + loss_clust
             self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
             self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
@@ -209,8 +177,7 @@ class CRL2model(pl.LightningModule):
 
         if self.cae is None:
             features, x_p = self.forward(val_x)
-            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, 
-                                         index=index, train_images=val_x)
+            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, index=index)
             self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
 
             return loss

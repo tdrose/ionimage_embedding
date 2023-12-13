@@ -10,7 +10,7 @@ import torchvision.transforms as transforms
 import lightning.pytorch as pl
 
 from ionimage_embedding.models.crl.cae import CAE
-from ionimage_embedding.models.crl.crl_model import CRLmodel
+from ionimage_embedding.models.crl.selfContrastModel import CRLmodel
 from ionimage_embedding.dataloader.crl_data import CRLdata
 
 
