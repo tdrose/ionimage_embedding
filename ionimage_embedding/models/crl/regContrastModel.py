@@ -211,7 +211,8 @@ class regContrastModel(pl.LightningModule):
         else:
             features, x_p = self.forward(val_x)
             loss_cae = self.mse_loss(x_p, val_x)
-            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, index=index)
+            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
+                                               train_datasets=val_datasets, index=index, train_images=val_x)
             loss = loss_cae + loss_clust
             self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
             self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)

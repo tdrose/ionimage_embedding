@@ -96,11 +96,11 @@ class selfContrastModel(pl.LightningModule):
 
         return ub, lb, sim_mat
 
-    def loss_mask(self, features, uu, ll, train_datasets, index):
+    def loss_mask(self, features, uu, ll, train_datasets, index, train_images):
         ub, lb, sim_mat = self.compute_ublb(features, uu, ll, train_datasets, index)
 
-        dataset_ub = None
-        dataset_lb = None
+        dataset_ub = torch.tensor(0)
+        dataset_lb = torch.tensor(0)
         if self.dataset_specific_percentiles:
             
             dataset_ub, dataset_lb = compute_dataset_ublb(sim_mat, ds_labels=train_datasets,
@@ -115,9 +115,9 @@ class selfContrastModel(pl.LightningModule):
         
         return pos_loc, neg_loc, sim_mat
 
-    def contrastive_loss(self, features, uu, ll, train_datasets, index):
+    def contrastive_loss(self, features, uu, ll, train_datasets, index, train_images):
         
-        pos_los, neg_loc, sim_mat = self.loss_mask(features, uu, ll, train_datasets, index, train_images)
+        pos_loc, neg_loc, sim_mat = self.loss_mask(features, uu, ll, train_datasets, index, train_images)
 
         return self.cl(neg_loc, pos_loc, sim_mat)
     
@@ -151,14 +151,16 @@ class selfContrastModel(pl.LightningModule):
         
         if self.cae is None:
             features, x_p = self.forward(train_x)
-            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, index=index)
+            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
+                                         train_datasets=train_datasets, index=index, train_images=train_x)
             self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
             return loss
         
         else:
             features, x_p = self.forward(train_x)
             loss_cae = self.mse_loss(x_p, train_x)
-            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, index=index)
+            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
+                                               train_datasets=train_datasets, index=index, train_images=train_x)
             loss = loss_cae + loss_clust
             self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
             self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
@@ -177,7 +179,8 @@ class selfContrastModel(pl.LightningModule):
 
         if self.cae is None:
             features, x_p = self.forward(val_x)
-            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, index=index)
+            loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
+                                         train_datasets=val_datasets, index=index, train_images=val_x)
             self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
 
             return loss
@@ -185,7 +188,8 @@ class selfContrastModel(pl.LightningModule):
         else:
             features, x_p = self.forward(val_x)
             loss_cae = self.mse_loss(x_p, val_x)
-            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, index=index)
+            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
+                                               train_datasets=val_datasets, index=index, train_images=val_x)
             loss = loss_cae + loss_clust
             self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
             self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)

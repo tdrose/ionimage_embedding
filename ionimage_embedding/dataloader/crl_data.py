@@ -109,7 +109,7 @@ class CRLdata:
             self.knn_adj: torch.Tensor = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), k=self.k))
             
             self.ion_label_mat: torch.Tensor = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
-
+            
             # Make datasets
             self.train_dataset = mzImageDataset(images=train_data, 
                                                 dataset_labels=train_dls,

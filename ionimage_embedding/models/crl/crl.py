@@ -54,7 +54,7 @@ class CRL:
         
         # Pytorch parameters
         self.num_cluster = num_cluster
-        self.activation = activation
+        self.activation: Literal['softmax', 'relu', 'sigmoid'] = activation
         self.lr = lr
         self.pretraining_epochs = pretraining_epochs
         self.training_epochs = training_epochs
@@ -107,7 +107,7 @@ class CRL:
             cae = CAE(self._height, self._width, encoder_dim=self.cae_encoder_dim, lr=self.lr)
             
             trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.pretraining_epochs, logger=logger, 
-                                 checkpoint_callback=False)
+                                 callbacks=[]) # checkpoint_callback=False)
             trainer.fit(cae, self.train_dataloader, self.val_dataloader)
             
             self.cae = cae
@@ -126,7 +126,7 @@ class CRL:
         trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.training_epochs, logger=logger)
         trainer.fit(self.crl, self.train_dataloader, self.val_dataloader)
         
-        return 0
+        return trainer.callback_metrics
 
     def inference_clusterlabels(self, new_data, crl=None, normalize=True, device='cpu'):
         
@@ -147,6 +147,7 @@ class CRL:
             pseudo_label, x_p = crl(test_x)
 
             pseudo_label = torch.argmax(pseudo_label, dim=1)
+            prediction_label = list()
             prediction_label.extend(pseudo_label.cpu().detach().numpy())
             prediction_label = np.array(prediction_label)
 

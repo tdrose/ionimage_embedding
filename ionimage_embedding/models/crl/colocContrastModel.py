@@ -143,7 +143,7 @@ class colocContrastModel(pl.LightningModule):
 
     def contrastive_loss(self, features, uu, ll, train_datasets, index, train_images):
         
-        pos_los, neg_loc, sim_mat = self.loss_mask(features, uu, ll, train_datasets, index, train_images)
+        pos_loc, neg_loc, sim_mat = self.loss_mask(features, uu, ll, train_datasets, index, train_images)
 
         return self.cl(neg_loc, pos_loc, sim_mat)
     
@@ -188,9 +188,9 @@ class colocContrastModel(pl.LightningModule):
             loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, 
                                                index=index, train_images=train_x)
             loss = loss_cae + loss_clust
-            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-            self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-            self.log('Training CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Training CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=True, prog_bar=True)
             
             return loss
     
@@ -214,11 +214,12 @@ class colocContrastModel(pl.LightningModule):
         else:
             features, x_p = self.forward(val_x)
             loss_cae = self.mse_loss(x_p, val_x)
-            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, index=index)
+            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
+                                               train_datasets=val_datasets, index=index, train_images=val_x)
             loss = loss_cae + loss_clust
-            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-            self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-            self.log('Validation CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Validation CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=True, prog_bar=True)
             
             return loss
     

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 import numpy as np
 
 
@@ -15,7 +15,7 @@ def string_similarity_matrix(string_list):
 
 
 def compute_dataset_ublb(sim_mat, ds_labels,
-                         lower_bound: int, upper_bound: int, device=None):
+                         lower_bound: int, upper_bound: int, device=None) -> Tuple[torch.Tensor, torch.Tensor]:
     
     ds_ub = torch.zeros(int(torch.max(torch.unique(ds_labels)))+1, device=device)
     ds_lb = torch.zeros(int(torch.max(torch.unique(ds_labels)))+1, device=device)
@@ -37,15 +37,15 @@ def compute_dataset_ublb(sim_mat, ds_labels,
     return ds_ub.detach(), ds_lb.detach()
 
 
-def pseudo_labeling(ub: float, lb: float,
+def pseudo_labeling(ub: Union[float, torch.Tensor], lb: Union[float, torch.Tensor],
                     sim: torch.Tensor,
                     index: np.ndarray,
                     ion_label_mat: torch.Tensor,
                     knn: bool, knn_adj: torch.Tensor,
+                    dataset_ub: torch.Tensor,
+                    dataset_lb: torch.Tensor,
                     dataset_specific_percentiles: bool = False,
-                    dataset_ub: Optional[torch.Tensor] = None,
-                    dataset_lb: Optional[torch.Tensor] = None,
-                    ds_labels: Optional[np.ndarray] = None, device: Optional[str] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+                    ds_labels: Optional[np.ndarray] = None, device = None) -> Tuple[torch.Tensor, torch.Tensor]:
 
     if dataset_specific_percentiles:
 
