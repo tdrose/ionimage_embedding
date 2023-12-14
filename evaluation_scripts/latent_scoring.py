@@ -260,6 +260,7 @@ def closest_meancoloc_accuracy(colocs: ColocModel, top: int=5,
         # create ds coloc df from mean colocs
         curr_cl = np.array(pred_df.loc[clc[ds].index, clc[ds].index]).copy() # type: ignore
         np.fill_diagonal(curr_cl, 0)
+        curr_cl[np.isnan(curr_cl)] = 0
 
         for i in range(len(curr_cl)):
 
@@ -280,7 +281,7 @@ def closest_meancoloc_accuracy(colocs: ColocModel, top: int=5,
 ds = 'test'
 top = 2
 dsc_dict = compute_ds_coloc(model, dataset=ds)
-agg='median'
+agg='mean'
 
 print('Model accuracy: ', closest_coloc_accuracy(dsc_dict, colocs, top=top, dataset=ds))
 print('Random accuracy: ', closest_coloc_accuracy_random(dsc_dict, colocs, top=top, dataset=ds))
