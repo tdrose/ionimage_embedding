@@ -1,4 +1,4 @@
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 import torch
 import torch.nn as nn
 import torch.nn.functional as functional
@@ -179,7 +179,7 @@ class colocContrastModel(pl.LightningModule):
             features, x_p = self.forward(train_x)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=train_datasets, 
                                          index=index, train_images=train_x)
-            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
             return loss
         
         else:
@@ -207,7 +207,7 @@ class colocContrastModel(pl.LightningModule):
             features, x_p = self.forward(val_x)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, train_datasets=val_datasets, 
                                          index=index, train_images=val_x)
-            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
 
             return loss
         

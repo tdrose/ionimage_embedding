@@ -55,12 +55,12 @@ crldat = CRLdata(ds_list, test=0.3, val=0.1,
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=100, 
-                 transformations=T.RandomRotation(degrees=(0, 360)), # T.RandomRotation(degrees=(0, 360)) 
+                 transformations=T.RandomRotation(degrees=(0, 360)) , # T.RandomRotation(degrees=(0, 360)) 
                  maxzero=.9)
 
-print(np.isnan(crldat.full_dataset.images).any())
-plt.imshow(crldat.full_dataset.images[10])
-plt.show()
+# print(np.isnan(crldat.full_dataset.images).any())
+# plt.imshow(crldat.full_dataset.images[10])
+# plt.show()
 
 
 
@@ -86,15 +86,19 @@ model = CRL(crldat,
             cae=False,
             cnn_dropout=0.01,
             activation='relu', # softmax
-            loss_type='regContrast', # 'selfContrast', 'colocContrast', 'regContrast'
+            loss_type='selfContrast', # 'selfContrast', 'colocContrast', 'regContrast'
             clip_gradients=None
             )
 
 # %%
 device='cuda'
-metrics = model.train(logger=True)
+mylogger = model.train(logger=True)
 
-
+# %%
+plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')
+plt.plot(mylogger.logged_metrics['Training loss'], label='Training loss', color='blue')
+plt.legend()
+plt.show()
 
 
 
@@ -200,4 +204,5 @@ dsc_dict = compute_ds_coloc(model)
 
 print(closest_coloc_accuracy(dsc_dict, colocs, top=2))
 print(closest_coloc_accuracy_random(dsc_dict, colocs, top=2))
+
 # %%

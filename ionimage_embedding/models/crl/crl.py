@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Union, List
 
 import torch.nn.functional as functional
 import lightning.pytorch as pl
@@ -11,6 +11,8 @@ from .colocContrastModel import colocContrastModel
 from .regContrastModel import regContrastModel
 
 from ...dataloader.crl_data import CRLdata
+from ...logger import DictLogger
+
 
 class CRL:
 
@@ -122,11 +124,11 @@ class CRL:
                                   dataset_specific_percentiles=self.dataset_specific_percentiles, lr=self.lr, 
                                   cae_pretrained_model=cae, knn=self.KNN, knn_adj = self.knn_adj, 
                                   cnn_dropout=self.cnn_dropout, weight_decay=self.weight_decay, clip_gradients=self.clip_gradients)
-        
-        trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.training_epochs, logger=logger)
+        dictlogger = DictLogger()
+        trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.training_epochs, logger=dictlogger)
         trainer.fit(self.crl, self.train_dataloader, self.val_dataloader)
         
-        return trainer.callback_metrics
+        return dictlogger
 
     def inference_clusterlabels(self, new_data, crl=None, normalize=True, device='cpu'):
         

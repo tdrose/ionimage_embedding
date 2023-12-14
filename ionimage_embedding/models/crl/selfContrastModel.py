@@ -1,4 +1,4 @@
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 
 import torch
 import torch.nn.functional as functional
@@ -59,7 +59,7 @@ class selfContrastModel(pl.LightningModule):
         self.curr_upper = initial_upper
         
         self.ion_label_mat = ion_label_mat
-        
+
         if cae_pretrained_model is None:
             self.cae = CAE(height=self.height, width=self.width, encoder_dim=self.cae_encoder_dim)
         elif cae_pretrained_model is False:
@@ -153,7 +153,7 @@ class selfContrastModel(pl.LightningModule):
             features, x_p = self.forward(train_x)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
                                          train_datasets=train_datasets, index=index, train_images=train_x)
-            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
             return loss
         
         else:
@@ -162,9 +162,9 @@ class selfContrastModel(pl.LightningModule):
             loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
                                                train_datasets=train_datasets, index=index, train_images=train_x)
             loss = loss_cae + loss_clust
-            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-            self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-            self.log('Training CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Training CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=True, prog_bar=True)
             
             return loss
     
@@ -181,7 +181,7 @@ class selfContrastModel(pl.LightningModule):
             features, x_p = self.forward(val_x)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
                                          train_datasets=val_datasets, index=index, train_images=val_x)
-            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
 
             return loss
         
@@ -191,9 +191,9 @@ class selfContrastModel(pl.LightningModule):
             loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
                                                train_datasets=val_datasets, index=index, train_images=val_x)
             loss = loss_cae + loss_clust
-            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-            self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=False, prog_bar=True)
-            self.log('Validation CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Validation CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=True, prog_bar=True)
             
             return loss
     
