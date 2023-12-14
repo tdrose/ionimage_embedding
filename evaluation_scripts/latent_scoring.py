@@ -279,14 +279,14 @@ def closest_meancoloc_accuracy(colocs: ColocModel, top: int=5,
     
 # %%
 ds = 'test'
-top = 2
+top = 5
 dsc_dict = compute_ds_coloc(model, dataset=ds)
 agg='mean'
 
 print('Model accuracy: ', closest_coloc_accuracy(dsc_dict, colocs, top=top, dataset=ds))
 print('Random accuracy: ', closest_coloc_accuracy_random(dsc_dict, colocs, top=top, dataset=ds))
 if ds == 'test':
-    print(f'{agg} accuracy: ', closest_meancoloc_accuracy(colocs, top=2))
+    print(f'{agg} accuracy: ', closest_meancoloc_accuracy(colocs, top=top))
 
 print('Silhouette: ', latent_dataset_silhouette(model, dataset=ds))
 
