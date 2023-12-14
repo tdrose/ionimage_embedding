@@ -7,7 +7,7 @@ from typing import Tuple
 
 import torch
 
-from ionimage_embedding.models import CRL, CRL2, CRL3
+from ionimage_embedding.models import CRL
 from ionimage_embedding.models import ColocModel
 from ionimage_embedding.dataloader.crl_data import CRLdata
 from ionimage_embedding.models.coloc.utils import torch_cosine
@@ -84,7 +84,7 @@ colocs = ColocModel(clrdat)
 
 
 # %%
-model = CRL3(clrdat,
+model = CRL(clrdat,
             num_cluster=36,
             initial_upper=90, # 93
             initial_lower=22, # 37

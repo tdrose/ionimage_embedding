@@ -1,15 +1,20 @@
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Union
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 import lightning.pytorch as pl
 
 from .cnnClust import CNNClust
+from .resnet_wrapper import ResNetWrapper
 from .cae import CAE
 from .pseudo_labeling import pseudo_labeling, compute_dataset_ublb
 from ..coloc.utils import torch_cosine
 
 class colocContrastModel(pl.LightningModule):
+
+    clust: Union[CNNClust, ResNetWrapper]
+
     def __init__(self, 
                  height, 
                  width,
@@ -26,6 +31,8 @@ class colocContrastModel(pl.LightningModule):
                  lr=0.01,
                  cae_pretrained_model=None,
                  knn=False,
+                 resnet: Optional[Literal['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']] = None,
+                 resnet_pretrained: bool = False,
                  cnn_dropout=0.1, weight_decay=1e-4,
                  clip_gradients: Optional[float] = None
                 ):
@@ -67,7 +74,13 @@ class colocContrastModel(pl.LightningModule):
             self.cae = None
         else:
             self.cae = cae_pretrained_model
-        self.clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, activation=activation, dropout=cnn_dropout)
+        
+        if resnet is None:
+            self.clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, 
+                                activation=activation, dropout=cnn_dropout)
+        else:
+            self.clust = ResNetWrapper(num_clust=self.num_cluster, activation=activation, resnet=resnet, 
+                                       pretrained=resnet_pretrained, height=self.height, width=self.width)
         
     def cl(self, neg_loc, pos_loc, sim_mat):
         pos = sim_mat[pos_loc==1.]

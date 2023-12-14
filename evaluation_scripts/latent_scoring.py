@@ -2,12 +2,10 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import umap
+from typing import Literal, Dict
 from sklearn.metrics import silhouette_score
 
 import torch
-import torch.nn.functional as functional
 import torchvision.transforms as T
 
 from ionimage_embedding.models import CRL
@@ -71,7 +69,7 @@ colocs = ColocModel(crldat)
 
 # %%
 model = CRL(crldat,
-            num_cluster=30,
+            num_cluster=50,
             initial_upper=90, # 93
             initial_lower=22, # 37
             upper_iteration=0.13, # .8
@@ -80,13 +78,15 @@ model = CRL(crldat,
             knn=True, # False
             lr=0.18,
             pretraining_epochs=10,
-            training_epochs=20, # 30
+            training_epochs=40, # 30
             cae_encoder_dim=2,
             lightning_device='gpu',
             cae=False,
             cnn_dropout=0.01,
             activation='relu', # softmax
-            loss_type='selfContrast', # 'selfContrast', 'colocContrast', 'regContrast'
+            loss_type='colocContrast', # 'selfContrast', 'colocContrast', 'regContrast',
+            resnet='resnet18',
+            resnet_pretrained=False,
             clip_gradients=None
             )
 
@@ -103,23 +103,47 @@ plt.show()
 
 
 # %%
-def latent_dataset_silhouette(latent: np.ndarray, ds_labels: np.ndarray, metric: str='cosine'):
-    return silhouette_score(X=latent, labels=ds_labels, metric=metric) 
+def latent_dataset_silhouette(model: CRL, metric: str='cosine', 
+                              dataset: Literal['train', 'val', 'test']='train'):
+    if dataset == 'train':
+        latent = model.inference_embeddings_train(device=device)
+        ds_labels = model.data.train_dataset.dataset_labels.detach().cpu().numpy()
+    elif dataset == 'test':
+        latent = model.inference_embeddings_test(device=device)
+        ds_labels = model.data.test_dataset.dataset_labels.detach().cpu().numpy()
+    elif dataset == 'val':
+        latent = model.inference_embeddings_val(device=device)
+        ds_labels = model.data.test_dataset.dataset_labels.detach().cpu().numpy()
+    else:
+        raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
     
+    return silhouette_score(X=latent, labels=ds_labels, metric=metric) 
 
-latent_dataset_silhouette(latent = model.inference_embeddings_train(),
-                          ds_labels = model.data.train_dataset.dataset_labels.detach().cpu().numpy()
-                          )
+def get_dataset(model: CRL, dataset: Literal['train', 'val', 'test']='train'):
+    if dataset == 'train':
+        return model.data.train_dataset
+    elif dataset == 'test':
+        return model.data.test_dataset
+    elif dataset == 'val':
+        return model.data.val_dataset
+    else:
+        raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
 
-
-# %%
-def compute_ds_coloc(model):
-
-    latent = model.inference_embeddings_train(device=device)
+def compute_ds_coloc(model: CRL, 
+                     dataset: Literal['train', 'val', 'test']='train'):
+    if dataset == 'train':
+        latent = model.inference_embeddings_train(device=device)
+    elif dataset == 'test':
+        latent = model.inference_embeddings_test(device=device)
+    elif dataset == 'val':
+        latent = model.inference_embeddings_val(device=device)
+    else:
+        raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
+    
     # lcos = torch_cosine(torch.tensor(latent))
     # Make DS specific dict
     out_dict = {}        
-    data = model.data.train_dataset
+    data = get_dataset(model, dataset=dataset)
     # loop over each dataset
     for dsl in torch.unique(data.dataset_labels):
         dsid = int(dsl)
@@ -141,17 +165,29 @@ def compute_ds_coloc(model):
 
     return out_dict
 
-def closest_coloc_accuracy_random(ds_coloc_dict, colocs, top=5, device='cpu'):
+def get_colocs(colocs: ColocModel, dataset: Literal['train', 'val', 'test']='train'):
+    if dataset == 'train':
+        return colocs.train_coloc
+    elif dataset == 'test':
+        return colocs.test_coloc
+    elif dataset == 'val':
+        return colocs.val_coloc
+    else:
+        raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
+    
+def closest_coloc_accuracy_random(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: ColocModel, top: int=5, 
+                                  dataset: Literal['train', 'val', 'test']='train'):
 
     total_predictions = 0
     correct_predictions = 0
+    clc = get_colocs(colocs, dataset=dataset)
     for ds, coloc_df in ds_coloc_dict.items():
         
         # Get most colocalized image per dataset
-        gt_coloc = np.array(colocs.train_coloc[ds]).copy()
+        gt_coloc = np.array(clc[ds]).copy()
         np.fill_diagonal(gt_coloc, 0)
         max_coloc = np.argmax(gt_coloc, axis=0)
-        max_coloc_id = colocs.train_coloc[ds].index[max_coloc]
+        max_coloc_id = clc[ds].index[max_coloc]
 
         # convert coloc_df to numpy array
         latent_coloc = np.array(coloc_df).copy()
@@ -169,17 +205,19 @@ def closest_coloc_accuracy_random(ds_coloc_dict, colocs, top=5, device='cpu'):
 
     return correct_predictions / total_predictions
 
-def closest_coloc_accuracy(ds_coloc_dict, colocs, top=5, device='cpu'):
+def closest_coloc_accuracy(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: ColocModel, top: int=5, 
+                           dataset: Literal['train', 'val', 'test']='train'):
 
     total_predictions = 0
     correct_predictions = 0
+    clc = get_colocs(colocs, dataset=dataset)
     for ds, coloc_df in ds_coloc_dict.items():
         
         # Get most colocalized image per dataset
-        gt_coloc = np.array(colocs.train_coloc[ds]).copy()
+        gt_coloc = np.array(clc[ds]).copy()
         np.fill_diagonal(gt_coloc, 0)
         max_coloc = np.argmax(gt_coloc, axis=0)
-        max_coloc_id = colocs.train_coloc[ds].index[max_coloc]
+        max_coloc_id = clc[ds].index[max_coloc]
 
         # convert coloc_df to numpy array
         latent_coloc = np.array(coloc_df).copy()
@@ -197,12 +235,58 @@ def closest_coloc_accuracy(ds_coloc_dict, colocs, top=5, device='cpu'):
 
     return correct_predictions / total_predictions
 
+def closest_meancoloc_accuracy(colocs: ColocModel, top: int=5,
+                               agg: Literal['mean', 'median']='mean'):
+
+    total_predictions = 0
+    correct_predictions = 0
+    clc = get_colocs(colocs, dataset='test')
+
+    if agg == 'mean':
+        pred_df = colocs.test_mean_coloc
+    elif agg == 'median':
+        pred_df = colocs.test_median_coloc
+    else:
+        raise ValueError("`agg` must be one of: ['mean', 'median']")
+
+    for ds, coloc_df in clc.items():
+        
+        # Get most colocalized image per image per dataset
+        gt_coloc = np.array(clc[ds]).copy()
+        np.fill_diagonal(gt_coloc, 0)
+        max_coloc = np.argmax(gt_coloc, axis=0)
+        max_coloc_id = clc[ds].index[max_coloc]
+
+        # create ds coloc df from mean colocs
+        curr_cl = np.array(pred_df.loc[clc[ds].index, clc[ds].index]).copy() # type: ignore
+        np.fill_diagonal(curr_cl, 0)
+
+        for i in range(len(curr_cl)):
+
+            # Descending sorted most colocalized
+            coloc_order = coloc_df.index[np.argsort(curr_cl[i])[::-1]]
+
+            if max_coloc_id[i] in coloc_order[:top]:
+                correct_predictions += 1
+
+            total_predictions += 1
+
+    return correct_predictions / total_predictions
+
+
 
     
 # %%
-dsc_dict = compute_ds_coloc(model)
+ds = 'test'
+top = 2
+dsc_dict = compute_ds_coloc(model, dataset=ds)
+agg='median'
 
-print(closest_coloc_accuracy(dsc_dict, colocs, top=2))
-print(closest_coloc_accuracy_random(dsc_dict, colocs, top=2))
+print('Model accuracy: ', closest_coloc_accuracy(dsc_dict, colocs, top=top, dataset=ds))
+print('Random accuracy: ', closest_coloc_accuracy_random(dsc_dict, colocs, top=top, dataset=ds))
+if ds == 'test':
+    print(f'{agg} accuracy: ', closest_meancoloc_accuracy(colocs, top=2))
+
+print('Silhouette: ', latent_dataset_silhouette(model, dataset=ds))
 
 # %%

@@ -35,6 +35,8 @@ class CRL:
                  lightning_device: str = 'gpu',
                  activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax',
                  loss_type: Literal['selfContrast', 'colocContrast', 'regContrast'] = 'selfContrast',
+                 resnet: Optional[Literal['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']] = None,
+                 resnet_pretrained: bool = False,
                  clip_gradients: Optional[float] = None,
                  overweight_cae: float = 1000,
                  cnn_dropout: float = 0.1,
@@ -98,6 +100,9 @@ class CRL:
         self.val_dataloader = data.get_val_dataloader()
 
         self.use_cae = cae
+    
+        self.resnet_type: Optional[Literal['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']] = resnet
+        self.resnet_pretrained = resnet_pretrained
 
     def image_normalization(self, new_data: np.ndarray):
         return self.data.image_normalization(new_data)
@@ -123,7 +128,9 @@ class CRL:
                                   upper_iteration=self.upper_iteration, lower_iteration=self.lower_iteration,
                                   dataset_specific_percentiles=self.dataset_specific_percentiles, lr=self.lr, 
                                   cae_pretrained_model=cae, knn=self.KNN, knn_adj = self.knn_adj, 
-                                  cnn_dropout=self.cnn_dropout, weight_decay=self.weight_decay, clip_gradients=self.clip_gradients)
+                                  cnn_dropout=self.cnn_dropout, weight_decay=self.weight_decay, 
+                                  clip_gradients=self.clip_gradients, 
+                                  resnet=self.resnet_type, resnet_pretrained=self.resnet_pretrained)
         dictlogger = DictLogger()
         trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.training_epochs, logger=dictlogger)
         trainer.fit(self.crl, self.train_dataloader, self.val_dataloader)

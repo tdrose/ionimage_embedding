@@ -18,6 +18,9 @@ class ColocModel:
         # Compute train data cosine
         self.train_coloc = self.compute_ds_coloc(self.data.train_dataset)
 
+        self.test_coloc = self.compute_ds_coloc(self.data.test_dataset)
+        self.val_coloc = self.compute_ds_coloc(self.data.val_dataset)
+
         # Compute test data mean/median cosine
         self.test_mean_coloc, self.test_mean_ni = self.inference(self.data.test_dataset.ion_labels, agg='mean')
         self.test_median_coloc, self.test_median_ni = self.inference(self.data.test_dataset.ion_labels, agg='median')
