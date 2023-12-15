@@ -2,9 +2,17 @@ import torch
 import pandas as pd
 import numpy as np
 from typing import Dict, Literal
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, pairwise_kernels
 
-from .utils import precision, sensitivity, accuracy, f1score
+from .utils import (
+    precision, 
+    sensitivity, 
+    accuracy, 
+    f1score,
+    get_ds_labels,
+    get_ion_labels,
+    get_latent,
+    get_mzimage_dataset)
 from ..dataloader.crl_dataloader import mzImageDataset
 from ..models.crl.crl import CRL
 from ..models.coloc.coloc import ColocModel
@@ -73,49 +81,30 @@ def evaluation_quantile_overlap(evaluation_dict):
 
 
 def latent_dataset_silhouette(model: CRL, metric: str='cosine', 
-                              dataset: Literal['train', 'val', 'test']='train', device: str='cpu'):
-    if dataset == 'train':
+                              origin: Literal['train', 'val', 'test']='train', device: str='cpu'):
+    if origin == 'train':
         latent = model.inference_embeddings_train(device=device)
         ds_labels = model.data.train_dataset.dataset_labels.detach().cpu().numpy()
-    elif dataset == 'test':
+    elif origin == 'test':
         latent = model.inference_embeddings_test(device=device)
         ds_labels = model.data.test_dataset.dataset_labels.detach().cpu().numpy()
-    elif dataset == 'val':
+    elif origin == 'val':
         latent = model.inference_embeddings_val(device=device)
         ds_labels = model.data.val_dataset.dataset_labels.detach().cpu().numpy()
     else:
-        raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
+        raise ValueError("`origin` must be one of: ['train', 'val', 'test']")
     
     return silhouette_score(X=latent, labels=ds_labels, metric=metric) 
 
 
-def get_mzimage_dataset(model: CRL, 
-                        dataset: Literal['train', 'val', 'test']='train') -> mzImageDataset:
-    if dataset == 'train':
-        return model.data.train_dataset
-    elif dataset == 'test':
-        return model.data.test_dataset
-    elif dataset == 'val':
-        return model.data.val_dataset
-    else:
-        raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
-
-
 def compute_ds_coloc(model: CRL, device: str='cpu',
-                     dataset: Literal['train', 'val', 'test']='train') -> Dict[int, pd.DataFrame]:
-    if dataset == 'train':
-        latent = model.inference_embeddings_train(device=device)
-    elif dataset == 'test':
-        latent = model.inference_embeddings_test(device=device)
-    elif dataset == 'val':
-        latent = model.inference_embeddings_val(device=device)
-    else:
-        raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
+                     origin: Literal['train', 'val', 'test']='train') -> Dict[int, pd.DataFrame]:
+    latent = get_latent(model=model, device=device, origin=origin)
     
     # lcos = torch_cosine(torch.tensor(latent))
     # Make DS specific dict
     out_dict = {}        
-    data = get_mzimage_dataset(model, dataset=dataset)
+    data = get_mzimage_dataset(model, origin=origin)
     # loop over each dataset
     for dsl in torch.unique(data.dataset_labels):
         dsid = int(dsl)
@@ -138,12 +127,12 @@ def compute_ds_coloc(model: CRL, device: str='cpu',
     return out_dict
 
 
-def get_colocs(colocs: ColocModel, dataset: Literal['train', 'val', 'test']='train'):
-    if dataset == 'train':
+def get_colocs(colocs: ColocModel, origin: Literal['train', 'val', 'test']='train'):
+    if origin == 'train':
         return colocs.train_coloc
-    elif dataset == 'test':
+    elif origin == 'test':
         return colocs.test_coloc
-    elif dataset == 'val':
+    elif origin == 'val':
         return colocs.val_coloc
     else:
         raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
@@ -158,11 +147,11 @@ def most_colocalized(clc: Dict[int, pd.DataFrame], ds: int) -> np.ndarray:
 
 
 def closest_accuracy_random(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: ColocModel, top: int=5, 
-                            dataset: Literal['train', 'val', 'test']='train') -> float:
+                            origin: Literal['train', 'val', 'test']='train') -> float:
 
     total_predictions = 0
     correct_predictions = 0
-    clc = get_colocs(colocs, dataset=dataset)
+    clc = get_colocs(colocs, origin=origin)
     for ds, coloc_df in ds_coloc_dict.items():
         if clc[ds].shape[0] > 0:
             # Get most colocalized image per dataset
@@ -187,11 +176,11 @@ def closest_accuracy_random(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: Colo
 
 
 def closest_accuracy_latent(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: ColocModel, top: int=5, 
-                            dataset: Literal['train', 'val', 'test']='train') -> float:
+                            origin: Literal['train', 'val', 'test']='train') -> float:
 
     total_predictions = 0
     correct_predictions = 0
-    clc = get_colocs(colocs, dataset=dataset)
+    clc = get_colocs(colocs, origin=origin)
     for ds, coloc_df in ds_coloc_dict.items():
         if clc[ds].shape[0] > 0:
             # Get most colocalized image per dataset
@@ -219,7 +208,7 @@ def closest_accuracy_aggcoloc(colocs: ColocModel, top: int=5,
 
     total_predictions = 0
     correct_predictions = 0
-    clc = get_colocs(colocs, dataset='test')
+    clc = get_colocs(colocs, origin='test')
 
     if agg == 'mean':
         pred_df = colocs.test_mean_coloc
@@ -249,3 +238,35 @@ def closest_accuracy_aggcoloc(colocs: ColocModel, top: int=5,
                 total_predictions += 1
 
     return correct_predictions / total_predictions
+
+def same_ion_similarity(model: CRL, device: str='cpu',
+                        origin: Literal['train', 'val', 'test']='train'):
+
+    latent = get_latent(model, origin=origin, device=device)
+    ion_labels = get_ion_labels(model, origin=origin) 
+    
+    # Same ion similarities
+    same_similarities = []
+    same_ion_counter = 0
+    for i in set(ion_labels):
+        if len(latent[ion_labels==i]) > 1:
+            # Compute cosine of latent reps of all same ions
+            a = pairwise_kernels(latent[ion_labels==i], metric='cosine')
+            mask = ~np.diag(np.ones(a.shape[0])).astype(bool)
+            same_similarities.append(np.mean(a[mask]))
+            same_ion_counter += 1
+            
+    print(f'{same_ion_counter} ions observed in multiple images')
+    
+    # Compute distance between all Sample N random similarities that are not the same ion
+    different_similarities = []
+    for i in range(5000):
+        samples = np.random.randint(0, high=latent.shape[0], size=2)
+        if ion_labels[samples[0]] != ion_labels[samples[1]]:
+            a = pairwise_kernels(latent[samples], metric='cosine')
+            different_similarities.append(a[1,0])
+
+    # Plot distances as violins
+    final_df = pd.concat([pd.DataFrame({'type': 'Same ion', 'similarity': same_similarities}), 
+                          pd.DataFrame({'type': 'Different ion', 'similarity': different_similarities})])
+    return final_df

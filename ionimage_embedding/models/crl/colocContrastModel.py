@@ -113,6 +113,7 @@ class colocContrastModel(pl.LightningModule):
         sim_mat = self.compute_ublb(features)
         
         # Compute cosine between all input images
+        # TODO: ERROR!! Provides the wrong colocs if rotation is enabled
         gt_cosine = torch_cosine(train_images.reshape(train_images.shape[0], -1))
         gt_cosine = gt_cosine.to(self.device)
 
