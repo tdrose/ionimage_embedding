@@ -89,7 +89,8 @@ class CRL:
                 (self.initial_upper - (self.training_epochs * self.upper_iteration)):
             raise ValueError(f'Lower percentile will be higher than upper percentile parameter '
                              f'after {self.training_epochs} epochs.\n'
-                             f'Change initial_upper, initial_lower, upper_iteration, lower_iteration, '
+                             f'Change initial_upper, initial_lower, '
+                             f'upper_iteration, lower_iteration, '
                              f'or training_epochs parameters.')
 
         self.knn_adj = data.knn_adj            
@@ -101,7 +102,8 @@ class CRL:
 
         self.use_cae = cae
     
-        self.resnet_type: Optional[Literal['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']] = resnet
+        self.resnet_type: Optional[Literal['resnet18', 'resnet34', 'resnet50', 
+                                           'resnet101', 'resnet152']] = resnet
         self.resnet_pretrained = resnet_pretrained
 
     def image_normalization(self, new_data: np.ndarray):
@@ -113,7 +115,8 @@ class CRL:
             # Pretraining of CAE model
             cae = CAE(self._height, self._width, encoder_dim=self.cae_encoder_dim, lr=self.lr)
             
-            trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.pretraining_epochs, logger=logger, 
+            trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, 
+                                 max_epochs=self.pretraining_epochs, logger=logger, 
                                  callbacks=[]) # checkpoint_callback=False)
             trainer.fit(cae, self.train_dataloader, self.val_dataloader)
             
@@ -122,17 +125,23 @@ class CRL:
             cae = False
         
         # Training of full model
-        self.crl = self.model_cls(height=self._height, width=self._width, num_cluster=self.num_cluster, 
-                                  ion_label_mat=self.ion_label_mat, activation=self.activation, encoder_dim=self.cae_encoder_dim, 
-                                  initial_upper=self.initial_upper, initial_lower=self.initial_lower, 
-                                  upper_iteration=self.upper_iteration, lower_iteration=self.lower_iteration,
-                                  dataset_specific_percentiles=self.dataset_specific_percentiles, lr=self.lr, 
+        self.crl = self.model_cls(height=self._height, width=self._width, 
+                                  num_cluster=self.num_cluster, 
+                                  ion_label_mat=self.ion_label_mat, activation=self.activation, 
+                                  encoder_dim=self.cae_encoder_dim, 
+                                  initial_upper=self.initial_upper, 
+                                  initial_lower=self.initial_lower, 
+                                  upper_iteration=self.upper_iteration, 
+                                  lower_iteration=self.lower_iteration,
+                                  dataset_specific_percentiles=self.dataset_specific_percentiles, 
+                                  lr=self.lr, 
                                   cae_pretrained_model=cae, knn=self.KNN, knn_adj = self.knn_adj, 
                                   cnn_dropout=self.cnn_dropout, weight_decay=self.weight_decay, 
                                   clip_gradients=self.clip_gradients, 
                                   resnet=self.resnet_type, resnet_pretrained=self.resnet_pretrained)
         dictlogger = DictLogger()
-        trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, max_epochs=self.training_epochs, logger=dictlogger)
+        trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, 
+                             max_epochs=self.training_epochs, logger=dictlogger)
         trainer.fit(self.crl, self.train_dataloader, self.val_dataloader)
         
         return dictlogger
@@ -162,7 +171,8 @@ class CRL:
 
             return prediction_label
 
-    def inference_embeddings(self, new_data, crl=None, normalize_images=True, normalize_embeddings=True, device='cpu', use_embed_layer=False):
+    def inference_embeddings(self, new_data, crl=None, normalize_images=True, 
+                             normalize_embeddings=True, device='cpu', use_embed_layer=False):
           
         if crl is None:
             crl = self.crl
@@ -189,31 +199,38 @@ class CRL:
             return embeddings.cpu().detach().numpy()
 
     def inference_embeddings_train(self, device='cpu', use_embed_layer=False):
-        return self.inference_embeddings(new_data=self.data.train_dataset.images, normalize_images=False, 
-                                         normalize_embeddings=True, device=device, use_embed_layer=use_embed_layer)
+        return self.inference_embeddings(new_data=self.data.train_dataset.images, 
+                                         normalize_images=False, 
+                                         normalize_embeddings=True, device=device, 
+                                         use_embed_layer=use_embed_layer)
     
     def inference_embeddings_val(self, device='cpu', use_embed_layer=False):
-        return self.inference_embeddings(new_data=self.data.val_dataset.images, normalize_images=False, 
-                                         normalize_embeddings=True, device=device, use_embed_layer=use_embed_layer)
+        return self.inference_embeddings(new_data=self.data.val_dataset.images, 
+                                         normalize_images=False, 
+                                         normalize_embeddings=True, device=device, 
+                                         use_embed_layer=use_embed_layer)
     
     def inference_embeddings_test(self, device='cpu', use_embed_layer=False):
-        return self.inference_embeddings(new_data=self.data.test_dataset.images, normalize_images=False, 
-                                         normalize_embeddings=True, device=device, use_embed_layer=use_embed_layer)
+        return self.inference_embeddings(new_data=self.data.test_dataset.images, 
+                                         normalize_images=False, 
+                                         normalize_embeddings=True, device=device, 
+                                         use_embed_layer=use_embed_layer)
     
-    def get_loss_mask(self, latent: torch.Tensor, index, train_datasets, train_images , uu=90, ll=10, device: str ='cpu'):
+    def get_loss_mask(self, latent: torch.Tensor, index, train_datasets, train_images , 
+                      uu=90, ll=10, device: str ='cpu'):
         
         tmp = self.crl.loss_mask(latent, uu, ll, train_datasets, index, train_images)
 
         if self.loss_type == 'selfContrast':
-            pos_loc, neg_loc, sim_mat = tmp
+            pos_loc, neg_loc, _ = tmp
             return (pos_loc - neg_loc).detach().cpu().numpy()
         
         elif self.loss_type == 'colocContrast':
-            pos_loc, neg_loc, sim_mat = tmp
+            pos_loc, neg_loc, _ = tmp
             return (pos_loc - neg_loc).detach().cpu().numpy()
         
         elif self.loss_type == 'regContrast':
-            ds_mask, sim_mat, gt_cosine = tmp
+            ds_mask, _, _ = tmp
 
             return ds_mask.detach().cpu().numpy()
         

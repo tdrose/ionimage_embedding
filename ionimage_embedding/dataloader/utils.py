@@ -2,35 +2,37 @@ from metaspace import SMInstance
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from scipy import ndimage
+from typing import Dict, Tuple
 
-def size_adaption(image_dict: dict):
-    maxh = np.max([x.shape[1] for x in image_dict.values()])
-    maxw = np.max([x.shape[2] for x in image_dict.values()])
+def size_adaption(image_dict: Dict[str, np.ndarray]):
+    maxh = np.max(np.array([x.shape[1] for x in image_dict.values()]))
+    maxw = np.max(np.array([x.shape[2] for x in image_dict.values()]))
     
     out_dict = {}
     for dsid, imgs in image_dict.items():
         # Height
         if imgs.shape[1] == maxh:
-            pad1 = (0, 0)
+            pad1: Tuple[int, int] = (0, 0)
         else:
             hdiff = maxh - imgs.shape[1]
-            pad1 = (hdiff//2, hdiff//2 + hdiff%2)
+            pad1: Tuple[int, int] = (hdiff//2, hdiff//2 + hdiff%2)
         
         # Width
         if imgs.shape[2] == maxw:
-            pad2 = (0, 0)
+            pad2: Tuple[int, int] = (0, 0)
         else:
             wdiff = maxw - imgs.shape[2]
-            pad2 = (wdiff//2, wdiff//2 + wdiff%2)
+            pad2: Tuple[int, int] = (wdiff//2, wdiff//2 + wdiff%2)
 
-        out_dict[dsid] = np.pad(imgs, ((0, 0), pad1, pad2), constant_values=0)
+        out_dict[dsid] = np.pad(imgs, ((0, 0), pad1, pad2), 
+                                constant_values=0) # type: ignore
     
     return out_dict
 
 
-def size_adaption_symmetric(image_dict: dict):
-    maxh = np.max([x.shape[1] for x in image_dict.values()])
-    maxw = np.max([x.shape[2] for x in image_dict.values()])
+def size_adaption_symmetric(image_dict: Dict[str, np.ndarray]):
+    maxh = np.max(np.array([x.shape[1] for x in image_dict.values()]))
+    maxw = np.max(np.array([x.shape[2] for x in image_dict.values()]))
 
     absmax = max(maxh, maxw)
 
@@ -38,23 +40,24 @@ def size_adaption_symmetric(image_dict: dict):
     for dsid, imgs in image_dict.items():
         # Height
         if imgs.shape[1] == absmax:
-            pad1 = (0, 0)
+            pad1: Tuple[int, int] = (0, 0)
         else:
             hdiff = absmax - imgs.shape[1]
-            pad1 = (hdiff // 2, hdiff // 2 + hdiff % 2)
+            pad1: Tuple[int, int] = (hdiff // 2, hdiff // 2 + hdiff % 2)
 
         # Width
         if imgs.shape[2] == absmax:
-            pad2 = (0, 0)
+            pad2: Tuple[int, int] = (0, 0)
         else:
             wdiff = absmax - imgs.shape[2]
-            pad2 = (wdiff // 2, wdiff // 2 + wdiff % 2)
+            pad2: Tuple[int, int] = (wdiff // 2, wdiff // 2 + wdiff % 2)
 
-        out_dict[dsid] = np.pad(imgs, ((0, 0), pad1, pad2), constant_values=0)
+        out_dict[dsid] = np.pad(imgs, ((0, 0), pad1, pad2), constant_values=0) # type: ignore
 
     return out_dict
 
-def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False, maxzero=.95):
+def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', 
+                  colocml_preprocessing=False, maxzero=.95):
     
     sm = SMInstance()
     
@@ -76,7 +79,7 @@ def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', col
 
         if colocml_preprocessing:
             a = ndimage.median_filter(tmp, size=(1,3,3))
-            b = a.reshape((a.shape[0], -1))
+            b: np.ndarray = a.reshape((a.shape[0], -1))
             mask = b < np.percentile(b, q=50, axis=1)[:, np.newaxis]
             b[mask] = 0.
             tmp = b.reshape(a.shape)

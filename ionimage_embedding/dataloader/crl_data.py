@@ -16,7 +16,8 @@ from .crl_dataloader import mzImageDataset
 
 class CRLdata:
     
-    def __init__(self, dataset_ids, test=0.3, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)), maindata_class=True,
+    def __init__(self, dataset_ids, test=0.3, val=0.1, 
+                 transformations=T.RandomRotation(degrees=(0, 360)), maindata_class=True,
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', 
                  colocml_preprocessing=False,
@@ -36,8 +37,10 @@ class CRLdata:
         # Download data
         if cache:
             # make hash of datasets
-            cache_hex = '{}_colocML{}_{}-{}_{}_{}'.format(''.join(dataset_ids), colocml_preprocessing, 
-                                                                          str(db[0]), str(db[1]), str(fdr), str(scale_intensity))
+            cache_hex = '{}_colocML{}_{}-{}_{}_{}'.format(''.join(dataset_ids), 
+                                                          colocml_preprocessing, 
+                                                          str(db[0]), str(db[1]), 
+                                                          str(fdr), str(scale_intensity))
             
             cache_hex = uuid.uuid5(uuid.NAMESPACE_URL, cache_hex).hex
             cache_file = 'CRLdata_{}.pickle'.format(cache_hex)
@@ -48,20 +51,26 @@ class CRLdata:
 
             # Download data if it does not exist
             if cache_file not in os.listdir(cache_folder):
-                data, dataset_labels, ion_labels = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
-                                                                 colocml_preprocessing=colocml_preprocessing, maxzero=maxzero)
+                tmp = download_data(dataset_ids, db=db, 
+                                    fdr=fdr, 
+                                    scale_intensity=scale_intensity, 
+                                    colocml_preprocessing=colocml_preprocessing, 
+                                    maxzero=maxzero)
+                data, dataset_labels, ion_labels = tmp
 
-                pickle.dump((data, dataset_labels, ion_labels), open(os.path.join(cache_folder, cache_file), "wb"))
+                pickle.dump((data, dataset_labels, ion_labels), 
+                            open(os.path.join(cache_folder, cache_file), "wb"))
                 print('Saved file: {}'.format(os.path.join(cache_folder, cache_file)))      
             
             # Load cached data
             else:
                 print('Loading cached data from: {}'.format(os.path.join(cache_folder, cache_file)))
-                data, dataset_labels, ion_labels = pickle.load(open(os.path.join(cache_folder, cache_file), "rb" ) )
-
+                tmp = pickle.load(open(os.path.join(cache_folder, cache_file), "rb" ) )
+                data, dataset_labels, ion_labels = tmp
         else:
-            data, dataset_labels, ion_labels = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
-                                                             colocml_preprocessing=colocml_preprocessing, maxzero=maxzero)
+            tmp = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
+                                colocml_preprocessing=colocml_preprocessing, maxzero=maxzero)
+            data, dataset_labels, ion_labels = tmp
             
         
         
@@ -89,26 +98,36 @@ class CRLdata:
         
         if maindata_class:
             # check if val and test data proportions contain at least a few images
-            self.check_val_test_proportions(val=self.val, test=self.test, min_images=self.min_images)
+            self.check_val_test_proportions(val=self.val, test=self.test, 
+                                            min_images=self.min_images)
             
             # Train test split
-            test_mask = np.random.choice(self.full_dataset.images.shape[0], size=math.floor(self.full_dataset.images.shape[0] * self.test), replace=False)
+            test_mask = np.random.choice(self.full_dataset.images.shape[0], 
+                                         size=math.floor(self.full_dataset.images.shape[0] * \
+                                                         self.test), 
+                                         replace=False)
             tmp_mask = np.ones(len(self.full_dataset.images), bool)
             tmp_mask[test_mask] = 0
-            tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, dsl=self.full_dataset.dataset_labels, ill=self.full_dataset.ion_labels)
+            tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, 
+                                  dsl=self.full_dataset.dataset_labels, 
+                                  ill=self.full_dataset.ion_labels)
             tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
             
             # Train val split
-            val_mask = np.random.choice(tmp_data.shape[0], size=math.floor(tmp_data.shape[0] * self.val), replace=False)
+            val_mask = np.random.choice(tmp_data.shape[0], 
+                                        size=math.floor(tmp_data.shape[0] * self.val), 
+                                        replace=False)
             train_mask = np.ones(len(tmp_data), bool)
             train_mask[val_mask] = 0
             tmp = self.split_data(mask=train_mask, data=tmp_data, dsl=tmp_dls, ill=tmp_ill)
-            train_data, train_dls, train_ill, train_index, val_data, val_dls, val_ill, val_index = tmp
+            train_data, train_dls, train_ill, train_idx, val_data, val_dls, val_ill, val_idx = tmp
             
             # compute KNN and ion_label_mat (For combined train/val data)
-            self.knn_adj: torch.Tensor = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), k=self.k))
+            self.knn_adj: torch.Tensor = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], 
+                                                                                -1)), k=self.k))
             
-            self.ion_label_mat: torch.Tensor = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
+            self.ion_label_mat: torch.Tensor = torch.tensor(pairwise_same_elements(tmp_ill
+                                                                                   ).astype(int))
             
             # Make datasets
             self.train_dataset = mzImageDataset(images=train_data, 
@@ -116,7 +135,7 @@ class CRLdata:
                                                 ion_labels=train_ill,
                                                 height=self.height,
                                                 width=self.width,
-                                                index=train_index,
+                                                index=train_idx,
                                                 transform=self.transformations)
             
             self.val_dataset = mzImageDataset(images=val_data, 
@@ -124,7 +143,7 @@ class CRLdata:
                                               ion_labels=val_ill,
                                               height=self.height,
                                               width=self.width,
-                                              index=val_index,
+                                              index=val_idx,
                                               transform=self.transformations)
             
             self.test_dataset = mzImageDataset(images=test_data, 
@@ -152,16 +171,20 @@ class CRLdata:
         split2_ill = ill[reverse_mask]
         split2_index = np.arange(n_samples)[reverse_mask]
         
-        return split1_data, split1_dls, split1_ill, split1_index, split2_data, split2_dls, split2_ill, split2_index
+        return (split1_data, split1_dls, split1_ill, split1_index, split2_data, 
+                split2_dls, split2_ill, split2_index)
     
     def get_train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, 
+                          shuffle=True, drop_last=True)
     
     def get_val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=len(self.val_dataset.images), shuffle=False, drop_last=True)
+        return DataLoader(self.val_dataset, batch_size=len(self.val_dataset.images), 
+                          shuffle=False, drop_last=True)
     
     def get_test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=len(self.test_dataset.images), shuffle=False, drop_last=True)
+        return DataLoader(self.test_dataset, batch_size=len(self.test_dataset.images), 
+                          shuffle=False, drop_last=True)
     
     # simple min-max scaling per image, no data leakage
     def image_normalization(self, new_data: np.ndarray):
@@ -184,7 +207,8 @@ class CRLdata:
         
         if test_check < min_images or val_check < min_images or train_check < min_images:
             raise ValueError(f'Test/Validation/Training data must contain at least {min_images}\n'
-                             f'Train contains: {train_check}, Val contains: {val_check}, Test contains: {test_check}')
+                             f'Train contains: {train_check}, Val contains: {val_check},'
+                             f'Test contains: {test_check}')
             
     def check_dataexists(self):
         if self.train_dataset is None or self.test_dataset is None or self.val_dataset is None:
@@ -193,7 +217,8 @@ class CRLdata:
             
 class CRLlods(CRLdata):
     
-    def __init__(self, dataset_ids, test=1, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)),
+    def __init__(self, dataset_ids, test=1, val=0.1, 
+                 transformations=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,
@@ -201,27 +226,34 @@ class CRLlods(CRLdata):
                 ):
         
         if test < 1:
-            raise ValueError('CLRlods (leave datasets out) class requires value for test larger than 1 (number of datasets excluded from training)')
+            raise ValueError('CLRlods (leave datasets out) class requires value for test larger '
+                             'than 1 (number of datasets excluded from training)')
             
-        super().__init__(dataset_ids=dataset_ids, test=.1, val=val, transformations=transformations, maindata_class=False,
-                 db=db, fdr=fdr, scale_intensity=scale_intensity, colocml_preprocessing=colocml_preprocessing,
-                 k=k, batch_size=batch_size,
-                 cache=cache, cache_folder=cache_folder, min_images=min_images)
+        super().__init__(dataset_ids=dataset_ids, test=.1, val=val, transformations=transformations, 
+                         maindata_class=False,
+                         db=db, fdr=fdr, scale_intensity=scale_intensity, 
+                         colocml_preprocessing=colocml_preprocessing,
+                         k=k, batch_size=batch_size,
+                         cache=cache, cache_folder=cache_folder, min_images=min_images)
         
         # Train test split
         if len(self.dataset_ids) <= test:
             raise ValueError('Cannot assing more datasets for testing that loaded datasets')
         
-        test_dsid = np.random.choice(torch.unique(self.full_dataset.dataset_labels).numpy(), size=test, replace=False)
+        test_dsid = np.random.choice(torch.unique(self.full_dataset.dataset_labels).numpy(), 
+                                     size=test, replace=False)
         tmp_mask = np.ones(len(self.full_dataset.images), bool)
         for ds in test_dsid:
             tmp_mask[self.full_dataset.dataset_labels==ds] = 0
-        tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, dsl=self.full_dataset.dataset_labels, ill=self.full_dataset.ion_labels)
+        tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, 
+                              dsl=self.full_dataset.dataset_labels, 
+                              ill=self.full_dataset.ion_labels)
         tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
     
         
         # Train val split
-        val_mask = np.random.choice(tmp_data.shape[0], size=math.floor(tmp_data.shape[0] * self.val), replace=False)
+        val_mask = np.random.choice(tmp_data.shape[0], size=math.floor(tmp_data.shape[0] * \
+                                                                       self.val), replace=False)
         train_mask = np.ones(len(tmp_data), bool)
         train_mask[val_mask] = 0
         tmp = self.split_data(mask=train_mask, data=tmp_data, dsl=tmp_dls, ill=tmp_ill)
@@ -262,29 +294,40 @@ class CRLlods(CRLdata):
         
 class CRLtransitivity(CRLdata):
     
-    def __init__(self, dataset_ids, test=.3, val=0.1, transformations=T.RandomRotation(degrees=(0, 360)),
+    def __init__(self, dataset_ids, test=.3, val=0.1, 
+                 transformations=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,
-                 cache=False, cache_folder='/scratch/model_testing', min_images=5, min_codetection=2
+                 cache=False, cache_folder='/scratch/model_testing', 
+                 min_images=5, min_codetection=2
                 ):
             
-        super().__init__(dataset_ids=dataset_ids, test=.3, val=val, transformations=transformations, maindata_class=False,
-                 db=db, fdr=fdr, scale_intensity=scale_intensity, colocml_preprocessing=colocml_preprocessing,
-                 k=k, batch_size=batch_size,
-                 cache=cache, cache_folder=cache_folder, min_images=min_images)
+        super().__init__(dataset_ids=dataset_ids, test=.3, val=val, 
+                         transformations=transformations, maindata_class=False,
+                         db=db, fdr=fdr, scale_intensity=scale_intensity, 
+                         colocml_preprocessing=colocml_preprocessing,
+                         k=k, batch_size=batch_size,
+                         cache=cache, cache_folder=cache_folder, min_images=min_images)
         
         self.min_codetection=min_codetection
         
         # Train test split
-        index_dict = self.codetection_index(ill=self.full_dataset.ion_labels, dsl=self.full_dataset.dataset_labels, min_codetection=self.min_codetection)
-        tmp_mask = self.codetection_mask(idx_dict=index_dict, test_fraction=test, ill=self.full_dataset.ion_labels, dsl=self.full_dataset.dataset_labels)
-        tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, dsl=self.full_dataset.dataset_labels, ill=self.full_dataset.ion_labels)
+        index_dict = self.codetection_index(ill=self.full_dataset.ion_labels, 
+                                            dsl=self.full_dataset.dataset_labels, 
+                                            min_codetection=self.min_codetection)
+        tmp_mask = self.codetection_mask(idx_dict=index_dict, test_fraction=test, 
+                                         ill=self.full_dataset.ion_labels, 
+                                         dsl=self.full_dataset.dataset_labels)
+        tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, 
+                              dsl=self.full_dataset.dataset_labels, 
+                              ill=self.full_dataset.ion_labels)
         tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
     
         
         # Train val split
-        val_mask = np.random.choice(tmp_data.shape[0], size=math.floor(tmp_data.shape[0] * self.val), replace=False)
+        val_mask = np.random.choice(tmp_data.shape[0], size=math.floor(tmp_data.shape[0] * \
+                                                                       self.val), replace=False)
         train_mask = np.ones(len(tmp_data), bool)
         train_mask[val_mask] = 0
         tmp = self.split_data(mask=train_mask, data=tmp_data, dsl=tmp_dls, ill=tmp_ill)
@@ -352,7 +395,8 @@ class CRLtransitivity(CRLdata):
         idx_keys = list(idx_dict.keys())
         idx_int = np.arange(len(idx_keys))
         
-        tmp = np.random.choice(idx_int, size=math.floor(len(idx_int) * test_fraction), replace=False)
+        tmp = np.random.choice(idx_int, size=math.floor(len(idx_int) * test_fraction), 
+                               replace=False)
         tmp = [idx_keys[x] for x in tmp]
         
         
@@ -373,5 +417,3 @@ class CRLtransitivity(CRLdata):
                 out_mask[pos] = False
                 
         return out_mask
-                
-                

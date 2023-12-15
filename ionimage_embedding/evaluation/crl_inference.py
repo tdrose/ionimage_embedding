@@ -18,12 +18,14 @@ def crl_latent_coloc(model, dat, device='cpu'):
                         )
 
 
-def crl_fulllatent_coloc(train_latent_coloc, ion_labels: torch.Tensor, agg: str='mean') -> Tuple[pd.DataFrame, float]:
+def crl_fulllatent_coloc(train_latent_coloc, ion_labels: torch.Tensor, 
+                         agg: str='mean') -> Tuple[pd.DataFrame, float]:
     # Create torch matrix to fill
     numpy_ion_labels = ion_labels.cpu().detach().numpy()
     numpy_ion_labels = np.unique(numpy_ion_labels)
 
-    out = np.zeros(numpy_ion_labels.shape[0]*numpy_ion_labels.shape[0]).reshape((numpy_ion_labels.shape[0], -1))
+    out = np.zeros(numpy_ion_labels.shape[0]*\
+                   numpy_ion_labels.shape[0]).reshape((numpy_ion_labels.shape[0], -1))
 
     agg_f = np.mean
     if agg == 'median':
@@ -62,7 +64,9 @@ def crl_fulllatent_coloc(train_latent_coloc, ion_labels: torch.Tensor, agg: str=
 
     not_inferred_fraction = not_possible / counter
 
-    return pd.DataFrame(out, columns=sorted_ion_labels, index=sorted_ion_labels), not_inferred_fraction
+    return pd.DataFrame(out, 
+                        columns=sorted_ion_labels, 
+                        index=sorted_ion_labels), not_inferred_fraction
 
 
 
@@ -92,13 +96,15 @@ def crl_ds_coloc(model, dat, device='cpu') -> dict[int, pd.DataFrame]:
 
         return out_dict
 
-def crl_latent_inference(train_latent_coloc, ion_labels: torch.Tensor, agg: str='mean') -> Tuple[pd.DataFrame, float]:
+def crl_latent_inference(train_latent_coloc, ion_labels: torch.Tensor, 
+                         agg: str='mean') -> Tuple[pd.DataFrame, float]:
 
         # Create torch matrix to fill
         numpy_ion_labels = ion_labels.cpu().detach().numpy()
         numpy_ion_labels = np.unique(numpy_ion_labels)
 
-        out = np.zeros(numpy_ion_labels.shape[0]*numpy_ion_labels.shape[0]).reshape((numpy_ion_labels.shape[0], -1))
+        out = np.zeros(numpy_ion_labels.shape[0]*\
+                       numpy_ion_labels.shape[0]).reshape((numpy_ion_labels.shape[0], -1))
 
         agg_f = np.mean
         if agg == 'median':
@@ -129,7 +135,8 @@ def crl_latent_inference(train_latent_coloc, ion_labels: torch.Tensor, agg: str=
                     checker = True
                     for ds in train_latent_coloc.keys():
                         # Check if ion pair was co-detected in any of the training data
-                        if ion1 in train_latent_coloc[ds].columns and ion2 in train_latent_coloc[ds].columns:
+                        if ion1 in train_latent_coloc[ds].columns and \
+                            ion2 in train_latent_coloc[ds].columns:
                             aggs.append(train_latent_coloc[ds].loc[ion1, ion2])
                             checker = False
                     if checker:
@@ -144,4 +151,6 @@ def crl_latent_inference(train_latent_coloc, ion_labels: torch.Tensor, agg: str=
 
         not_inferred_fraction = not_possible / counter
 
-        return pd.DataFrame(out, columns=sorted_ion_labels, index=sorted_ion_labels), not_inferred_fraction
+        return pd.DataFrame(out, 
+                            columns=sorted_ion_labels, 
+                            index=sorted_ion_labels), not_inferred_fraction

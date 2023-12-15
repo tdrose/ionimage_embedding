@@ -39,12 +39,14 @@ class CAE(pl.LightningModule):
         self.lr = lr
 
         # encoder
-        self.conv1 = nn.Sequential(nn.Conv2d(1, self.d1, kernel_size=self.k1, stride=self.s1, padding=(0, 0),
+        self.conv1 = nn.Sequential(nn.Conv2d(1, self.d1, kernel_size=self.k1, 
+                                             stride=self.s1, padding=(0, 0),
                                              dilation=(1, 1),
                                              bias=False),
                                    nn.BatchNorm2d(self.d1, momentum=0.01),
                                    nn.ReLU())
-        self.conv2 = nn.Sequential(nn.Conv2d(self.d1, self.d2, kernel_size=self.k2, stride=self.s2, padding=(0, 0),
+        self.conv2 = nn.Sequential(nn.Conv2d(self.d1, self.d2, kernel_size=self.k2, 
+                                             stride=self.s2, padding=(0, 0),
                                              bias=False),
                                    nn.BatchNorm2d(self.d2, momentum=0.01),
                                    nn.ReLU())
@@ -65,7 +67,8 @@ class CAE(pl.LightningModule):
 
         # decoder
         self.fc3 = nn.Linear(self.encoder_dim, self.l2height*self.l2width*self.d2)
-        self.ct1 = nn.ConvTranspose2d(in_channels=self.d2, out_channels=self.d1, kernel_size=self.k2,
+        self.ct1 = nn.ConvTranspose2d(in_channels=self.d2, out_channels=self.d1, 
+                                      kernel_size=self.k2,
                                       stride=self.s2, padding=(0, 0), dilation=(1, 1),
                                       output_padding=(1, 1))
         self.tbn1 = nn.BatchNorm2d(self.d1, momentum=0.01)
@@ -117,7 +120,8 @@ class CAE(pl.LightningModule):
 
         loss = self.mse_loss(x_p, train_x)
 
-        self.log('Training loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+        self.log('Training loss', loss, on_step=False, on_epoch=True, 
+                 logger=False, prog_bar=True)
 
         return loss
     
@@ -129,7 +133,8 @@ class CAE(pl.LightningModule):
 
         loss = self.mse_loss(x_p, val_x)
 
-        self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=False, prog_bar=True)
+        self.log('Validation loss', loss, on_step=False, on_epoch=True, 
+                 logger=False, prog_bar=True)
 
         return loss
         

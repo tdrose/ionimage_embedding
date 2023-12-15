@@ -10,7 +10,8 @@ from ..models.crl.crl import CRL
 from ..models.coloc.coloc import ColocModel
 from ..models.coloc.utils import torch_cosine
 
-def ds_coloc_convert(colocs: torch.Tensor, ds_labels: torch.Tensor, ion_labels: torch.Tensor) -> dict[int, pd.DataFrame]:
+def ds_coloc_convert(colocs: torch.Tensor, 
+                     ds_labels: torch.Tensor, ion_labels: torch.Tensor) -> dict[int, pd.DataFrame]:
         out_dict = {}        
 
         # loop over each dataset
@@ -81,14 +82,15 @@ def latent_dataset_silhouette(model: CRL, metric: str='cosine',
         ds_labels = model.data.test_dataset.dataset_labels.detach().cpu().numpy()
     elif dataset == 'val':
         latent = model.inference_embeddings_val(device=device)
-        ds_labels = model.data.test_dataset.dataset_labels.detach().cpu().numpy()
+        ds_labels = model.data.val_dataset.dataset_labels.detach().cpu().numpy()
     else:
         raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
     
     return silhouette_score(X=latent, labels=ds_labels, metric=metric) 
 
 
-def get_mzimage_dataset(model: CRL, dataset: Literal['train', 'val', 'test']='train') -> mzImageDataset:
+def get_mzimage_dataset(model: CRL, 
+                        dataset: Literal['train', 'val', 'test']='train') -> mzImageDataset:
     if dataset == 'train':
         return model.data.train_dataset
     elif dataset == 'test':
@@ -146,6 +148,14 @@ def get_colocs(colocs: ColocModel, dataset: Literal['train', 'val', 'test']='tra
     else:
         raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
 
+def most_colocalized(clc: Dict[int, pd.DataFrame], ds: int) -> np.ndarray:
+    gt_coloc = np.array(clc[ds]).copy()
+    np.fill_diagonal(gt_coloc, 0)
+    max_coloc = np.argmax(gt_coloc, axis=0)
+    max_coloc_id = np.array(clc[ds].index[max_coloc])
+
+    return max_coloc_id
+
 
 def closest_accuracy_random(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: ColocModel, top: int=5, 
                             dataset: Literal['train', 'val', 'test']='train') -> float:
@@ -154,26 +164,24 @@ def closest_accuracy_random(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: Colo
     correct_predictions = 0
     clc = get_colocs(colocs, dataset=dataset)
     for ds, coloc_df in ds_coloc_dict.items():
-        
-        # Get most colocalized image per dataset
-        gt_coloc = np.array(clc[ds]).copy()
-        np.fill_diagonal(gt_coloc, 0)
-        max_coloc = np.argmax(gt_coloc, axis=0)
-        max_coloc_id = clc[ds].index[max_coloc]
+        if clc[ds].shape[0] > 0:
+            # Get most colocalized image per dataset
+            max_coloc_id = most_colocalized(clc=clc, ds=ds)
 
-        # convert coloc_df to numpy array
-        latent_coloc = np.array(coloc_df).copy()
-        np.fill_diagonal(latent_coloc, 0)
+            # convert coloc_df to numpy array
+            latent_coloc = np.array(coloc_df).copy()
+            np.fill_diagonal(latent_coloc, 0)
 
-        for i in range(len(latent_coloc)):
+            for i in range(len(latent_coloc)):
 
-            # Descending sorted most colocalized
-            coloc_order = np.random.choice(coloc_df.index, top, replace=False)
+                # Descending sorted most colocalized
+                size = np.min([coloc_df.shape[0], top])
+                coloc_order = np.random.choice(coloc_df.index, size, replace=False)
 
-            if max_coloc_id[i] in coloc_order:
-                correct_predictions += 1
+                if max_coloc_id[i] in coloc_order:
+                    correct_predictions += 1
 
-            total_predictions += 1
+                total_predictions += 1
 
     return correct_predictions / total_predictions
 
@@ -185,26 +193,23 @@ def closest_accuracy_latent(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: Colo
     correct_predictions = 0
     clc = get_colocs(colocs, dataset=dataset)
     for ds, coloc_df in ds_coloc_dict.items():
-        
-        # Get most colocalized image per dataset
-        gt_coloc = np.array(clc[ds]).copy()
-        np.fill_diagonal(gt_coloc, 0)
-        max_coloc = np.argmax(gt_coloc, axis=0)
-        max_coloc_id = clc[ds].index[max_coloc]
+        if clc[ds].shape[0] > 0:
+            # Get most colocalized image per dataset
+            max_coloc_id = most_colocalized(clc=clc, ds=ds)
 
-        # convert coloc_df to numpy array
-        latent_coloc = np.array(coloc_df).copy()
-        np.fill_diagonal(latent_coloc, 0)
+            # convert coloc_df to numpy array
+            latent_coloc = np.array(coloc_df).copy()
+            np.fill_diagonal(latent_coloc, 0)
 
-        for i in range(len(latent_coloc)):
+            for i in range(len(latent_coloc)):
 
-            # Descending sorted most colocalized
-            coloc_order = coloc_df.index[np.argsort(latent_coloc[i])[::-1]]
+                # Descending sorted most colocalized
+                coloc_order = coloc_df.index[np.argsort(latent_coloc[i])[::-1]]
 
-            if max_coloc_id[i] in coloc_order[:top]:
-                correct_predictions += 1
+                if max_coloc_id[i] in coloc_order[:top]:
+                    correct_predictions += 1
 
-            total_predictions += 1
+                total_predictions += 1
 
     return correct_predictions / total_predictions
 
@@ -224,26 +229,23 @@ def closest_accuracy_aggcoloc(colocs: ColocModel, top: int=5,
         raise ValueError("`agg` must be one of: ['mean', 'median']")
 
     for ds, coloc_df in clc.items():
-        
-        # Get most colocalized image per image per dataset
-        gt_coloc = np.array(clc[ds]).copy()
-        np.fill_diagonal(gt_coloc, 0)
-        max_coloc = np.argmax(gt_coloc, axis=0)
-        max_coloc_id = clc[ds].index[max_coloc]
+        if clc[ds].shape[0] > 0:
+            # Get most colocalized image per image per dataset
+            max_coloc_id = most_colocalized(clc=clc, ds=ds)
 
-        # create ds coloc df from mean colocs
-        curr_cl = np.array(pred_df.loc[clc[ds].index, clc[ds].index]).copy() # type: ignore
-        np.fill_diagonal(curr_cl, 0)
-        curr_cl[np.isnan(curr_cl)] = 0
+            # create ds coloc df from mean colocs
+            curr_cl = np.array(pred_df.loc[clc[ds].index, clc[ds].index]).copy() # type: ignore
+            np.fill_diagonal(curr_cl, 0)
+            curr_cl[np.isnan(curr_cl)] = 0
 
-        for i in range(len(curr_cl)):
+            for i in range(len(curr_cl)):
 
-            # Descending sorted most colocalized
-            coloc_order = coloc_df.index[np.argsort(curr_cl[i])[::-1]]
+                # Descending sorted most colocalized
+                coloc_order = coloc_df.index[np.argsort(curr_cl[i])[::-1]]
 
-            if max_coloc_id[i] in coloc_order[:top]:
-                correct_predictions += 1
+                if max_coloc_id[i] in coloc_order[:top]:
+                    correct_predictions += 1
 
-            total_predictions += 1
+                total_predictions += 1
 
     return correct_predictions / total_predictions

@@ -8,14 +8,16 @@ import numpy as np
 
 def string_similarity_matrix(string_list):
     n = len(string_list)
-    similarity_matrix = [[1 if string_list[i] == string_list[j] else 0 for j in range(n)] for i in range(n)]
+    similarity_matrix = [[1 if string_list[i] == string_list[j] else 0 
+                          for j in range(n)] for i in range(n)]
     tmp = np.array(similarity_matrix)
     np.fill_diagonal(tmp, 0)
     return tmp
 
 
 def compute_dataset_ublb(sim_mat, ds_labels,
-                         lower_bound: int, upper_bound: int, device=None) -> Tuple[torch.Tensor, torch.Tensor]:
+                         lower_bound: int, 
+                         upper_bound: int, device=None) -> Tuple[torch.Tensor, torch.Tensor]:
     
     ds_ub = torch.zeros(int(torch.max(torch.unique(ds_labels)))+1, device=device)
     ds_lb = torch.zeros(int(torch.max(torch.unique(ds_labels)))+1, device=device)
@@ -45,7 +47,8 @@ def pseudo_labeling(ub: Union[float, torch.Tensor], lb: Union[float, torch.Tenso
                     dataset_ub: torch.Tensor,
                     dataset_lb: torch.Tensor,
                     dataset_specific_percentiles: bool = False,
-                    ds_labels: Optional[np.ndarray] = None, device = None) -> Tuple[torch.Tensor, torch.Tensor]:
+                    ds_labels: Optional[np.ndarray] = None, 
+                    device = None) -> Tuple[torch.Tensor, torch.Tensor]:
 
     if dataset_specific_percentiles:
 

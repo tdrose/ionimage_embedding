@@ -30,7 +30,8 @@ class selfContrastModel(pl.LightningModule):
                  lr=0.01,
                  cae_pretrained_model=None,
                  knn=False,
-                 resnet: Optional[Literal['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']] = None,
+                 resnet: Optional[Literal['resnet18', 'resnet34', 'resnet50', 
+                                          'resnet101', 'resnet152']] = None,
                  resnet_pretrained: bool = False,
                  cnn_dropout=0.1, weight_decay=1e-4,
                  clip_gradients: Optional[float] = None
@@ -77,8 +78,10 @@ class selfContrastModel(pl.LightningModule):
             self.clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, 
                                 activation=activation, dropout=cnn_dropout)
         else:
-            self.clust = ResNetWrapper(num_clust=self.num_cluster, activation=activation, resnet=resnet, 
-                                       pretrained=resnet_pretrained, height=self.height, width=self.width)
+            self.clust = ResNetWrapper(num_clust=self.num_cluster, activation=activation, 
+                                       resnet=resnet, 
+                                       pretrained=resnet_pretrained, 
+                                       height=self.height, width=self.width)
         
     def cl(self, neg_loc, pos_loc, sim_mat):
         pos_entropy = torch.mul(-torch.log(torch.clip(sim_mat, 1e-10, 1)), pos_loc)
@@ -94,8 +97,6 @@ class selfContrastModel(pl.LightningModule):
     
     def compute_ublb(self, features, uu, ll, train_datasets, index):
         features = functional.normalize(features, p=2, dim=-1)
-        # Second normalization not necessary. Keeping it here for reference, will be removed in the future.
-        # features = features / features.norm(dim=1)[:, None]
 
         sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
 
@@ -115,20 +116,22 @@ class selfContrastModel(pl.LightningModule):
         if self.dataset_specific_percentiles:
             
             dataset_ub, dataset_lb = compute_dataset_ublb(sim_mat, ds_labels=train_datasets,
-                                                          lower_bound=ll, upper_bound=uu, device=self.device)
+                                                          lower_bound=ll, upper_bound=uu, 
+                                                          device=self.device)
 
 
-        pos_loc, neg_loc = pseudo_labeling(ub=ub, lb=lb, sim=sim_mat, index=index, knn=self.KNN,
-                                           knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
-                                           dataset_specific_percentiles=self.dataset_specific_percentiles,
-                                           dataset_ub=dataset_ub, dataset_lb=dataset_lb,
-                                           ds_labels=train_datasets, device=self.device)
-        
+        tmp = pseudo_labeling(ub=ub, lb=lb, sim=sim_mat, index=index, knn=self.KNN,
+                              knn_adj=self.knn_adj, ion_label_mat=self.ion_label_mat,
+                              dataset_specific_percentiles=self.dataset_specific_percentiles,
+                              dataset_ub=dataset_ub, dataset_lb=dataset_lb,
+                              ds_labels=train_datasets, device=self.device)
+        pos_loc, neg_loc = tmp
         return pos_loc, neg_loc, sim_mat
 
     def contrastive_loss(self, features, uu, ll, train_datasets, index, train_images):
         
-        pos_loc, neg_loc, sim_mat = self.loss_mask(features, uu, ll, train_datasets, index, train_images)
+        pos_loc, neg_loc, sim_mat = self.loss_mask(features, uu, ll, train_datasets, 
+                                                   index, train_images)
 
         return self.cl(neg_loc, pos_loc, sim_mat)
     
@@ -163,19 +166,26 @@ class selfContrastModel(pl.LightningModule):
         if self.cae is None:
             features, x_p = self.forward(train_x)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
-                                         train_datasets=train_datasets, index=index, train_images=train_x)
-            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+                                         train_datasets=train_datasets, index=index, 
+                                         train_images=train_x)
+            self.log('Training loss', loss, on_step=False, on_epoch=True, 
+                     logger=True, prog_bar=True)
             return loss
         
         else:
             features, x_p = self.forward(train_x)
             loss_cae = self.mse_loss(x_p, train_x)
-            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
-                                               train_datasets=train_datasets, index=index, train_images=train_x)
+            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, 
+                                               ll=self.curr_lower, 
+                                               train_datasets=train_datasets, index=index, 
+                                               train_images=train_x)
             loss = loss_cae + loss_clust
-            self.log('Training loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
-            self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=True, prog_bar=True)
-            self.log('Training CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Training loss', loss, on_step=False, on_epoch=True, 
+                     logger=True, prog_bar=True)
+            self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, 
+                     logger=True, prog_bar=True)
+            self.log('Training CLR-loss', loss_clust, on_step=False, on_epoch=True, 
+                     logger=True, prog_bar=True)
             
             return loss
     
@@ -191,20 +201,27 @@ class selfContrastModel(pl.LightningModule):
         if self.cae is None:
             features, x_p = self.forward(val_x)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
-                                         train_datasets=val_datasets, index=index, train_images=val_x)
-            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+                                         train_datasets=val_datasets, index=index, 
+                                         train_images=val_x)
+            self.log('Validation loss', loss, on_step=False, on_epoch=True, 
+                     logger=True, prog_bar=True)
 
             return loss
         
         else:
             features, x_p = self.forward(val_x)
             loss_cae = self.mse_loss(x_p, val_x)
-            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
-                                               train_datasets=val_datasets, index=index, train_images=val_x)
+            loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, 
+                                               ll=self.curr_lower, 
+                                               train_datasets=val_datasets, index=index, 
+                                               train_images=val_x)
             loss = loss_cae + loss_clust
-            self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
-            self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, logger=True, prog_bar=True)
-            self.log('Validation CLR-loss', loss_clust, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+            self.log('Validation loss', loss, on_step=False, on_epoch=True, 
+                     logger=True, prog_bar=True)
+            self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, 
+                     logger=True, prog_bar=True)
+            self.log('Validation CLR-loss', loss_clust, on_step=False, on_epoch=True, 
+                     logger=True, prog_bar=True)
             
             return loss
     

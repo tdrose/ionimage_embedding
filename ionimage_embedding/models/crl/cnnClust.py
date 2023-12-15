@@ -23,7 +23,8 @@ class CNNClust(nn.Module):
         self.height: int = height
         self.width: int = width
 
-        self.conv1 = nn.Sequential(nn.Conv2d(1, 1, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), bias=False),
+        self.conv1 = nn.Sequential(nn.Conv2d(1, 1, kernel_size=(7, 7), stride=(1, 1), 
+                                             padding=(3, 3), bias=False),
                                    nn.BatchNorm2d(1),
                                    nn.ReLU()
                                    )

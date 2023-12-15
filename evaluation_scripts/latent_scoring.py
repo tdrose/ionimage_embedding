@@ -102,7 +102,7 @@ plt.show()
 
 # %%
 ds = 'test'
-top = 5
+top = 3
 coloc_agg='mean'
 dsc_dict = compute_ds_coloc(model, dataset=ds)
 

@@ -11,7 +11,8 @@ class ResNetWrapper(torch.nn.Module):
                  num_clust: int,
                  height: int, width: int,
                  activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax',
-                 resnet: Literal['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152'] = 'resnet18',
+                 resnet: Literal['resnet18', 'resnet34', 'resnet50', 
+                                 'resnet101', 'resnet152'] = 'resnet18',
                  pretrained: bool = False
                  ):
 
@@ -41,24 +42,22 @@ class ResNetWrapper(torch.nn.Module):
         in_features = tmp2.shape[1]
 
         if activation == 'softmax':
-            self.fc = nn.Sequential(nn.Linear(in_features, num_clust), nn.Softmax(dim=1)) # type: ignore
+            self.fc = nn.Sequential(nn.Linear(in_features, num_clust), 
+                                    nn.Softmax(dim=1)) # type: ignore
         elif activation == 'sigmoid':
-            self.fc = nn.Sequential(nn.Linear(in_features, num_clust), nn.Sigmoid()) # type: ignore
+            self.fc = nn.Sequential(nn.Linear(in_features, num_clust), 
+                                    nn.Sigmoid()) # type: ignore
         elif activation == 'relu':
-            self.fc = nn.Sequential(nn.Linear(in_features, num_clust), nn.ReLU()) # type: ignore
+            self.fc = nn.Sequential(nn.Linear(in_features, num_clust), 
+                                    nn.ReLU()) # type: ignore
         else:
             raise ValueError('Activation function not available. Use softmax, relu, or sigmoid.')
-        
-        # replacing the first Resnet layer to handle one-channel images
-        # self.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        # self.features = nn.Sequential(*list(rn.children())[1:])
-        
+
         self.resnet = rn
 
     def forward(self, x):
         # Expanding to 3 channel image
         x = x.expand(-1, 3, -1, -1)
-        # x = self.conv1(x)
         x = self.features(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
