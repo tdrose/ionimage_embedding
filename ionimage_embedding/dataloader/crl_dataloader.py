@@ -33,15 +33,17 @@ class mzImageDataset(Dataset):
 
     def __getitem__(self, idx):
         
-        image = torch.Tensor(self.images[idx]).reshape((1, self.height, self.width))
+        transformed_image = torch.Tensor(self.images[idx]).reshape((1, self.height, self.width))
         dataset_label = np.array([self.dataset_labels[idx]])
         ion_label = np.array([self.ion_labels[idx]])
         sample_id = np.array(self.index[idx])
         
         if self.transform is not None:
-            image = self.transform(image)
+            transformed_image = self.transform(transformed_image)
 
-        return image, sample_id, dataset_label, ion_label
+        untransformed_images = torch.Tensor(self.images[idx]).reshape((1, self.height, self.width))
+        
+        return transformed_image, sample_id, dataset_label, ion_label, untransformed_images
 
 
 def get_crl_dataloader(images: np.ndarray,

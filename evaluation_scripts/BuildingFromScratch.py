@@ -7,7 +7,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-
+from typing import Literal
 # %%
 # Check if connected to correct server
 os.system('nvidia-smi')
@@ -163,7 +163,8 @@ colocs = colocs.to(device)
 
 # %%
 # Function to load model and optimizer
-def get_model_optimizer(height, width, activation='relu', dims=100):
+def get_model_optimizer(height, width, activation: Literal['softmax', 'relu', 'sigmoid']='relu', 
+                        dims=100):
 
     model = CNNClust(num_clust = dims, height=height, width=width, activation=activation, dropout=0)
     optim = torch.optim.RMSprop(params=model.parameters(), lr=0.01)

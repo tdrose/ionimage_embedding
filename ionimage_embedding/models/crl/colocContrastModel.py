@@ -107,14 +107,13 @@ class colocContrastModel(pl.LightningModule):
 
         return sim_mat
 
-    def loss_mask(self, features, uu, ll, train_datasets, index, train_images):
+    def loss_mask(self, features, uu, ll, train_datasets, index, train_images, raw_images):
 
         # Model representation similarities
         sim_mat = self.compute_ublb(features)
         
-        # Compute cosine between all input images
-        # TODO: ERROR!! Provides the wrong colocs if rotation is enabled
-        gt_cosine = torch_cosine(train_images.reshape(train_images.shape[0], -1))
+        # Compute cosine between all input images (Using un-transformed images)
+        gt_cosine = torch_cosine(raw_images.reshape(raw_images.shape[0], -1))
         gt_cosine = gt_cosine.to(self.device)
 
         # Calculate dataset ub and lb, but on the GROUND TRUTH COSINE
@@ -156,10 +155,11 @@ class colocContrastModel(pl.LightningModule):
 
         return pos_loc, neg_loc, sim_mat
 
-    def contrastive_loss(self, features, uu, ll, train_datasets, index, train_images):
+    def contrastive_loss(self, features, uu, ll, train_datasets, index, train_images, raw_images):
         
         pos_loc, neg_loc, sim_mat = self.loss_mask(features, uu, ll, train_datasets, 
-                                                   index, train_images)
+                                                   index, train_images, 
+                                                   raw_images=raw_images)
 
         return self.cl(neg_loc, pos_loc, sim_mat)
     
@@ -183,7 +183,7 @@ class colocContrastModel(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         
-        train_x, index, train_datasets, train_ions = batch
+        train_x, index, train_datasets, train_ions, untransformed_images = batch
         
         self.knn_adj = self.knn_adj.to(self.device)
         self.ion_label_mat = self.ion_label_mat.to(self.device)
@@ -195,7 +195,8 @@ class colocContrastModel(pl.LightningModule):
             features, x_p = self.forward(train_x)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, 
                                          ll=self.curr_lower, train_datasets=train_datasets, 
-                                         index=index, train_images=train_x)
+                                         index=index, train_images=train_x, 
+                                         raw_images=untransformed_images)
             self.log('Training loss', loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
             return loss
@@ -205,7 +206,8 @@ class colocContrastModel(pl.LightningModule):
             loss_cae = self.mse_loss(x_p, train_x)
             loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, 
                                                ll=self.curr_lower, train_datasets=train_datasets, 
-                                               index=index, train_images=train_x)
+                                               index=index, train_images=train_x, 
+                                               raw_images=untransformed_images)
             loss = loss_cae + loss_clust
             self.log('Training loss', loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
@@ -217,7 +219,7 @@ class colocContrastModel(pl.LightningModule):
             return loss
     
     def validation_step(self, batch, batch_idx):
-        val_x, index, val_datasets, val_ions = batch
+        val_x, index, val_datasets, val_ions, untransformed_images = batch
         
         self.knn_adj = self.knn_adj.to(self.device)
         self.ion_label_mat = self.ion_label_mat.to(self.device)
@@ -229,7 +231,8 @@ class colocContrastModel(pl.LightningModule):
             features, x_p = self.forward(val_x)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, 
                                          ll=self.curr_lower, train_datasets=val_datasets, 
-                                         index=index, train_images=val_x)
+                                         index=index, train_images=val_x, 
+                                         raw_images=untransformed_images)
             self.log('Validation loss', loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
 
@@ -241,7 +244,8 @@ class colocContrastModel(pl.LightningModule):
             loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, 
                                                ll=self.curr_lower, 
                                                train_datasets=val_datasets, index=index, 
-                                               train_images=val_x)
+                                               train_images=val_x, 
+                                               raw_images=untransformed_images)
             loss = loss_cae + loss_clust
             self.log('Validation loss', loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)

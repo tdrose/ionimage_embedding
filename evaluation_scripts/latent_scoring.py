@@ -55,7 +55,7 @@ ds_list = [
 crldat = CRLdata(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
-                 fdr=.1, batch_size=100, 
+                 fdr=.1, batch_size=40, 
                  transformations=T.RandomRotation((0, 360)), # T.RandomRotation(degrees=(0, 360)) 
                  maxzero=.9)
 
@@ -72,14 +72,14 @@ colocs = ColocModel(crldat)
 
 # %%
 model = CRL(crldat,
-            num_cluster=50,
+            num_cluster=20,
             initial_upper=90, # 93
             initial_lower=22, # 37
-            upper_iteration=0.13, # .8
-            lower_iteration=0.24, # .8
+            upper_iteration=0.0, # .8
+            lower_iteration=0.0, # .8
             dataset_specific_percentiles=False, # True
             knn=True, # False
-            lr=0.18,
+            lr=0.1, # .18
             pretraining_epochs=10,
             training_epochs=40, # 30
             cae_encoder_dim=2,
@@ -88,7 +88,7 @@ model = CRL(crldat,
             cnn_dropout=0.01,
             activation='relu', # softmax
             loss_type='colocContrast', # 'selfContrast', 'colocContrast', 'regContrast',
-            resnet='resnet18',
+            resnet=None, # 'resrnet18
             resnet_pretrained=False,
             clip_gradients=None
             )

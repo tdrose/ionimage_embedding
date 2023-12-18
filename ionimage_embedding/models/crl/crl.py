@@ -216,11 +216,16 @@ class CRL:
                                          normalize_embeddings=True, device=device, 
                                          use_embed_layer=use_embed_layer)
     
-    def get_loss_mask(self, latent: torch.Tensor, index, train_datasets, train_images , 
-                      uu=90, ll=10, device: str ='cpu'):
+    def get_loss_mask(self, latent: torch.Tensor, index, train_datasets, train_images, 
+                      uu=90, ll=10, untransformed_images=None, device: str ='cpu'):
         
-        tmp = self.crl.loss_mask(latent, uu, ll, train_datasets, index, train_images)
-
+        if untransformed_images is None:
+            tmp = self.crl.loss_mask(latent, uu, ll, train_datasets, index, train_images, 
+                                    raw_images=train_images)
+        else:
+            tmp = self.crl.loss_mask(latent, uu, ll, train_datasets, index, train_images, 
+                                    raw_images=untransformed_images)
+        
         if self.loss_type == 'selfContrast':
             pos_loc, neg_loc, _ = tmp
             return (pos_loc - neg_loc).detach().cpu().numpy()
