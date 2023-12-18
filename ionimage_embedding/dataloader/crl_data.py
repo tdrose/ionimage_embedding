@@ -5,6 +5,7 @@ import math
 import os
 import pickle
 import uuid
+from typing import Optional
 
 from torch.utils.data import DataLoader
 import torchvision.transforms as T
@@ -17,7 +18,8 @@ from .crl_dataloader import mzImageDataset
 class CRLdata:
     
     def __init__(self, dataset_ids, test=0.3, val=0.1, 
-                 transformations=T.RandomRotation(degrees=(0, 360)), maindata_class=True,
+                 transformations: Optional[torch.nn.Module]=T.RandomRotation(degrees=(0, 360)), 
+                 maindata_class=True,
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', 
                  colocml_preprocessing=False,
