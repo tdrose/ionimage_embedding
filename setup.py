@@ -32,7 +32,10 @@ setup(
         'lightning',
         'torchvision',
         'metaspace2020',
-        'scikit-learn'
+        'scikit-learn',
+        'anndata',
+        'scanpy',
+        'umap-learn'
     ],
     python_requires=">=3.8",
 

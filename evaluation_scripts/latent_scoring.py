@@ -11,7 +11,10 @@ from ionimage_embedding.evaluation.scoring import (
     closest_accuracy_random,
     compute_ds_coloc,
     latent_dataset_silhouette,
-    same_ion_similarity
+    same_ion_similarity,
+    coloc_umap,
+    umap_inference,
+    closest_accuracy_umapcoloc
 )
 from ionimage_embedding.evaluation.utils import cluster_latent
 from ionimage_embedding.evaluation.plots import umap_latent,  umap_allorigin, plot_image_clusters
@@ -81,14 +84,14 @@ model = CRL(crldat,
             knn=True, # False
             lr=0.1, # .18
             pretraining_epochs=10,
-            training_epochs=40, # 30
+            training_epochs=20, # 30
             cae_encoder_dim=2,
             lightning_device='gpu',
             cae=False,
             cnn_dropout=0.01,
             activation='relu', # softmax
-            loss_type='colocContrast', # 'selfContrast', 'colocContrast', 'regContrast',
-            resnet=None, # 'resrnet18
+            loss_type='selfContrast', # 'selfContrast', 'colocContrast', 'regContrast',
+            resnet='resnet18', # 'resnet18
             resnet_pretrained=False,
             clip_gradients=None
             )
@@ -103,6 +106,11 @@ plt.plot(mylogger.logged_metrics['Training loss'], label='Training loss', color=
 plt.legend()
 plt.show()
 
+# %%
+coloc_embedding = coloc_umap(colocs, k=3, n_components=5)
+umap_test_latent = umap_inference(coloc_embedding, colocs.data.test_dataset.ion_labels)
+
+
 
 # %%
 ds = 'test'
@@ -115,6 +123,7 @@ print('Model accuracy: ', closest_accuracy_latent(dsc_dict, colocs, top=top, ori
 print('Random accuracy: ', closest_accuracy_random(dsc_dict, colocs, top=top, origin=ds))
 if ds == 'test':
     print(f'{coloc_agg} accuracy: ', closest_accuracy_aggcoloc(colocs, top=top))
+    print('Coloc UMAP accuracy: ', closest_accuracy_umapcoloc(umap_test_latent, colocs, top=3))
 
 print('Silhouette: ', latent_dataset_silhouette(model, origin=ds))
 

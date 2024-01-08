@@ -3,6 +3,9 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Literal
 from sklearn.metrics import silhouette_score, pairwise_kernels
+from anndata import AnnData
+import scanpy as sc
+from scipy import sparse
 
 from .utils import (
     precision, 
@@ -270,3 +273,91 @@ def same_ion_similarity(model: CRL, device: str='cpu',
     final_df = pd.concat([pd.DataFrame({'type': 'Same ion', 'similarity': same_similarities}), 
                           pd.DataFrame({'type': 'Different ion', 'similarity': different_similarities})])
     return final_df
+
+def coloc_knn(coloc_matrix: np.ndarray, k: int=30):
+
+    out_matrix = coloc_matrix.copy()
+
+    thresholds = np.sort(out_matrix, axis=1)[:, -k]
+    mask = out_matrix < thresholds[:, np.newaxis]
+
+    out_matrix[mask] = 0
+
+    return out_matrix
+
+def coloc_umap(colocs: ColocModel, k: int=3, n_components: int=10) -> pd.DataFrame:
+
+    labels = torch.unique(colocs.data.train_dataset.ion_labels)
+    mean_coloc, fraction = colocs.inference(labels)
+    mean_coloc[np.isnan(mean_coloc)] = 0
+    # Create anndata object
+
+    coloc_adata = AnnData(X=mean_coloc)
+
+    # Create nearest neighbor matrix (with n nearest neighbors weighted by coloc)
+    coloc_adata.uns['neighbors'] = {'params': {'method': 'umap', 
+                                            'metric': 'cosine'},
+                                    'connectivities_key': 'connectivities'}
+
+    coloc_adata.obsp['connectivities'] = sparse.csr_array(
+        coloc_knn(coloc_adata.X, k=k)
+    )
+
+    # run scnapy umap function
+    sc.tl.umap(coloc_adata, n_components=n_components)
+
+    return pd.DataFrame(coloc_adata.obsm['X_umap'], 
+                        index=labels.detach().cpu().numpy())
+
+def umap_inference(umap_df: pd.DataFrame, test_labels: torch.Tensor):
+    
+    sim = pd.DataFrame(torch_cosine(torch.tensor(np.array(umap_df))).detach().cpu().numpy(), 
+                       index=umap_df.index, columns=umap_df.index)
+    
+    sorted_ion_labels = np.sort(np.unique(test_labels.detach().cpu().numpy()))
+    out = np.zeros((len(sorted_ion_labels), len(sorted_ion_labels)))
+    
+    for i1 in range(len(sorted_ion_labels)):
+            for i2 in range(i1, len(sorted_ion_labels)):
+                if i1 == i2:
+                    out[i1, i2] = np.nan
+                elif sorted_ion_labels[i1] == sorted_ion_labels[i2]:
+                    out[i1, i2] = np.nan
+                    out[i2, i1] = np.nan
+                else:
+                    if sorted_ion_labels[i1] in sim.index and sorted_ion_labels[i2] in sim.index:
+                        out[i1, i2] = sim.loc[sorted_ion_labels[i1], sorted_ion_labels[i2]]
+                        out[i2, i1] = sim.loc[sorted_ion_labels[i1], sorted_ion_labels[i2]]
+                    else:
+                        out[i1, i2] = np.nan
+                        out[i2, i1] = np.nan
+    return pd.DataFrame(out, index=sorted_ion_labels, columns=sorted_ion_labels)
+
+def closest_accuracy_umapcoloc(umap_inferred: pd.DataFrame, colocs: ColocModel, top: int=5) -> float:
+
+    total_predictions = 0
+    correct_predictions = 0
+    clc = get_colocs(colocs, origin='test')
+
+    pred_df = umap_inferred
+    for ds, coloc_df in clc.items():
+        if clc[ds].shape[0] > 0:
+            # Get most colocalized image per image per dataset
+            max_coloc_id = most_colocalized(clc=clc, ds=ds)
+
+            # create ds coloc df from mean colocs
+            curr_cl = np.array(pred_df.loc[clc[ds].index, clc[ds].index]).copy() # type: ignore
+            np.fill_diagonal(curr_cl, 0)
+            curr_cl[np.isnan(curr_cl)] = 0
+
+            for i in range(len(curr_cl)):
+
+                # Descending sorted most colocalized
+                coloc_order = coloc_df.index[np.argsort(curr_cl[i])[::-1]]
+
+                if max_coloc_id[i] in coloc_order[:top]:
+                    correct_predictions += 1
+
+                total_predictions += 1
+
+    return correct_predictions / total_predictions
