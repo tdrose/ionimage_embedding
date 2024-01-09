@@ -82,6 +82,14 @@ class CRLdata:
         # Encoding for ds_labels and ion_labels
         self.ds_encoder = preprocessing.LabelEncoder()
         dsl_int = torch.tensor(self.ds_encoder.fit_transform(dataset_labels))
+        
+        self.dsl_int_mapper = {}
+        for dsid in set(dataset_labels):
+            mask = dataset_labels == dsid
+            idx = np.arange(len(dataset_labels))[mask][0]
+            self.dsl_int_mapper[dsl_int.detach().cpu().numpy()[idx]] = dsid
+        
+
         self.il_encoder = preprocessing.LabelEncoder()
         ill_int = torch.tensor(self.il_encoder.fit_transform(ion_labels))
         
