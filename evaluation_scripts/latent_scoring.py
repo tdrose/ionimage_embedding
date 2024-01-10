@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import torchvision.transforms as T
 from ionimage_embedding.evaluation.utils import get_ion_labels, get_latent
 
-from ionimage_embedding.models import CRL, ColocModel
+from ionimage_embedding.models import CRL, ColocModel, BioMedCLIP
 from ionimage_embedding.dataloader import CRLdata
 from ionimage_embedding.evaluation.scoring import (
     closest_accuracy_aggcoloc,
@@ -17,6 +17,7 @@ from ionimage_embedding.evaluation.scoring import (
     closest_accuracy_umapcoloc
 )
 from ionimage_embedding.evaluation.utils import cluster_latent
+from ionimage_embedding.datasets import KIDNEY_SMALL
 from ionimage_embedding.evaluation.plots import umap_latent,  umap_allorigin, plot_image_clusters
 
 
@@ -43,19 +44,8 @@ os.system('nvidia-smi')
 
 
 # %%
-ds_list = [
-    '2022-12-07_02h13m50s',
-    '2022-12-07_02h13m20s',
-    '2022-12-07_02h10m45s',
-    '2022-12-07_02h09m41s',
-    '2022-12-07_02h08m52s',
-    '2022-12-07_01h02m53s',
-    '2022-12-07_01h01m06s',
-    '2022-11-28_22h24m25s',
-    '2022-11-28_22h23m30s'
-                  ]
 
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
+crldat = CRLdata(KIDNEY_SMALL, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
@@ -114,17 +104,27 @@ umap_test_latent = umap_inference(coloc_embedding, colocs.data.test_dataset.ion_
 
 # %%
 ds = 'test'
-top = 3
+top = 5
 coloc_agg='mean'
+
+# %%
 dsc_dict = compute_ds_coloc(model, origin=ds)
 
+# %%
+bmc = BioMedCLIP(data=crldat)
+bmc_dsc_dict = compute_ds_coloc(bmc, origin=ds) # type: ignore
 
-print('Model accuracy: ', closest_accuracy_latent(dsc_dict, colocs, top=top, origin=ds))
-print('Random accuracy: ', closest_accuracy_random(dsc_dict, colocs, top=top, origin=ds))
+# %%
+
 if ds == 'test':
     print(f'{coloc_agg} accuracy: ', closest_accuracy_aggcoloc(colocs, top=top))
     print('Coloc UMAP accuracy: ', closest_accuracy_umapcoloc(umap_test_latent, colocs, top=3))
 
+print('Model accuracy: ', closest_accuracy_latent(dsc_dict, colocs, top=top, origin=ds))
+print('BMC accuracy: ', closest_accuracy_latent(bmc_dsc_dict, colocs, top=top, origin=ds))
+print('Random accuracy: ', closest_accuracy_random(dsc_dict, colocs, top=top, origin=ds))
+
+print()
 print('Silhouette: ', latent_dataset_silhouette(model, origin=ds))
 
 

@@ -228,6 +228,7 @@ def closest_accuracy_aggcoloc(colocs: ColocModel, top: int=5,
 
             # create ds coloc df from mean colocs
             curr_cl = np.array(pred_df.loc[clc[ds].index, clc[ds].index]).copy() # type: ignore
+            
             np.fill_diagonal(curr_cl, 0)
             curr_cl[np.isnan(curr_cl)] = 0
 
@@ -343,18 +344,27 @@ def closest_accuracy_umapcoloc(umap_inferred: pd.DataFrame, colocs: ColocModel, 
     pred_df = umap_inferred
     for ds, coloc_df in clc.items():
         if clc[ds].shape[0] > 0:
+            
             # Get most colocalized image per image per dataset
             max_coloc_id = most_colocalized(clc=clc, ds=ds)
 
-            # create ds coloc df from mean colocs
+            # create dataset specific coloc df from mean colocs
             curr_cl = np.array(pred_df.loc[clc[ds].index, clc[ds].index]).copy() # type: ignore
+            
+            # Set diagonal to zero (no self coloc)
             np.fill_diagonal(curr_cl, 0)
+            
+            # Set NA values to zero
             curr_cl[np.isnan(curr_cl)] = 0
 
+            # Loop over each molecule
             for i in range(len(curr_cl)):
 
                 # Descending sorted most colocalized
-                coloc_order = coloc_df.index[np.argsort(curr_cl[i])[::-1]]
+                mask = np.argsort(curr_cl[i])[::-1]
+
+                # We are using the coloc_df index for the curr_cl array
+                coloc_order = coloc_df.index[mask]
 
                 if max_coloc_id[i] in coloc_order[:top]:
                     correct_predictions += 1
