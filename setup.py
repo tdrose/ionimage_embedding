@@ -35,8 +35,10 @@ setup(
         'scikit-learn',
         'anndata',
         'scanpy',
-        'umap-learn'
+        'umap-learn',
+        'open_clip_torch>=2.23.0' # Known bug in model loading, fixed in version 0.23.0
     ],
+    
     python_requires=">=3.8",
 
     zip_safe=False,

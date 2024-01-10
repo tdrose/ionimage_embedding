@@ -1,7 +1,7 @@
 import torch
 import pandas as pd
 import numpy as np
-from typing import Dict, Literal
+from typing import Dict, Literal, Union
 from sklearn.metrics import silhouette_score, pairwise_kernels
 from anndata import AnnData
 import scanpy as sc
@@ -20,6 +20,7 @@ from ..dataloader.crl_dataloader import mzImageDataset
 from ..models.crl.crl import CRL
 from ..models.coloc.coloc import ColocModel
 from ..models.coloc.utils import torch_cosine
+from ..models.biomedclip import BioMedCLIP
 
 def ds_coloc_convert(colocs: torch.Tensor, 
                      ds_labels: torch.Tensor, ion_labels: torch.Tensor) -> dict[int, pd.DataFrame]:
@@ -100,7 +101,7 @@ def latent_dataset_silhouette(model: CRL, metric: str='cosine',
     return silhouette_score(X=latent, labels=ds_labels, metric=metric) 
 
 
-def compute_ds_coloc(model: CRL, device: str='cpu',
+def compute_ds_coloc(model: Union[CRL, BioMedCLIP], device: str='cpu',
                      origin: Literal['train', 'val', 'test']='train') -> Dict[int, pd.DataFrame]:
     latent = get_latent(model=model, device=device, origin=origin)
     
@@ -121,9 +122,9 @@ def compute_ds_coloc(model: CRL, device: str='cpu',
             # Compute coloc matrix (in correct order)
             cos = torch_cosine(features)
             out_dict[dsid] = pd.DataFrame(cos.cpu().detach().numpy(), 
-                                            columns=ions[ion_sorting_mask].cpu().detach().numpy(),
-                                            index=ions[ion_sorting_mask].cpu().detach().numpy()
-                                            )
+                                          columns=ions[ion_sorting_mask].cpu().detach().numpy(),
+                                          index=ions[ion_sorting_mask].cpu().detach().numpy()
+                                         )
         else:
             out_dict[dsid] = pd.DataFrame()
 
@@ -300,7 +301,7 @@ def coloc_umap(colocs: ColocModel, k: int=3, n_components: int=10) -> pd.DataFra
                                     'connectivities_key': 'connectivities'}
 
     coloc_adata.obsp['connectivities'] = sparse.csr_array(
-        coloc_knn(coloc_adata.X, k=k)
+        coloc_knn(coloc_adata.X, k=k) # type: ignore
     )
 
     # run scnapy umap function

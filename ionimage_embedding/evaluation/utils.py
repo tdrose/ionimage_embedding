@@ -1,4 +1,4 @@
-from typing import Literal, Tuple
+from typing import Literal, Tuple, Union
 import numpy as np
 import pandas as pd
 import umap
@@ -6,6 +6,7 @@ import seaborn as sns
 import sklearn.cluster as cluster
 
 from ..models.crl.crl import CRL
+from ..models.biomedclip import BioMedCLIP
 from ..dataloader.crl_dataloader import mzImageDataset
 
 def sensitivity(x: dict) -> float:
@@ -23,7 +24,7 @@ def f1score(x: dict) -> float:
 def precision(x: dict) -> float:
     return x['tp'] / (x['tp'] + x['fp'])
 
-def get_mzimage_dataset(model: CRL, 
+def get_mzimage_dataset(model: Union[CRL, BioMedCLIP], 
                         origin: Literal['train', 'val', 'test']='train') -> mzImageDataset:
     if origin == 'train':
         return model.data.train_dataset
@@ -34,7 +35,7 @@ def get_mzimage_dataset(model: CRL,
     else:
         raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
 
-def get_latent(model: CRL, device: str='cpu',
+def get_latent(model: Union[CRL, BioMedCLIP], device: str='cpu',
                origin: Literal['train', 'val', 'test']='train') -> np.ndarray:
     if origin == 'train':
         latent = model.inference_embeddings_train(device=device)
@@ -47,7 +48,7 @@ def get_latent(model: CRL, device: str='cpu',
     
     return latent
 
-def get_ds_labels(model: CRL,
+def get_ds_labels(model: Union[CRL, BioMedCLIP],
                   origin: Literal['train', 'val', 'test']='train') -> np.ndarray:
     if origin == 'train':
         ds_labels = model.data.train_dataset.dataset_labels.detach().cpu().numpy()
@@ -60,7 +61,7 @@ def get_ds_labels(model: CRL,
     
     return ds_labels
 
-def get_ion_labels(model: CRL,
+def get_ion_labels(model: Union[CRL, BioMedCLIP],
                    origin: Literal['train', 'val', 'test']='train') -> np.ndarray:
     if origin == 'train':
         ion_labels = model.data.train_dataset.ion_labels.detach().cpu().numpy()
@@ -73,7 +74,7 @@ def get_ion_labels(model: CRL,
     
     return ion_labels
 
-def get_ion_images(model: CRL,
+def get_ion_images(model: Union[CRL, BioMedCLIP],
                    origin: Literal['train', 'val', 'test']='train') -> np.ndarray:
     if origin == 'train':
         images = model.data.train_dataset.images
