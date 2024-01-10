@@ -98,9 +98,9 @@ def example_images(data: CRLdata, ncols: int=5, figsize=(10, 5), titlesize=1):
     for dsid in set(ds_arr):
         mask = ds_arr == dsid
         curr_images = imgs[mask]
-        id = np.random.choice(len(imgs), size=1)[0]
+        id = np.random.choice(len(curr_images), size=1)[0]
 
-        axs[dsid].imshow(imgs[id])
+        axs[dsid].imshow(curr_images[id])
         axs[dsid].axis('off')
         axs[dsid].set_title(data.dsl_int_mapper[dsid], size=titlesize)
     
@@ -174,7 +174,7 @@ example_images(crldat, ncols=9, figsize=(20, 10), titlesize=5)
 # %% BRAIN SMALL
 ds_list = [
     '2021-11-11_11h49m37s', '2022-05-31_10h27m17s',
-    '2022-05-30_20h44m19s', '2022-01-31_09h08m54s', '2022-01-31_08h54m51s',
+    '2022-01-31_09h08m54s', '2022-01-31_08h54m51s',
     '2017-02-17_14h56m37s', '2017-02-17_14h41m43s',
     '2022-08-23_23h48m59s', '2018-08-01_14h25m56s', '2018-08-01_14h26m17s',
     '2018-08-01_14h25m21s', '2016-09-21_16h06m55s', '2018-08-01_14h21m22s',
@@ -182,36 +182,30 @@ ds_list = [
                   ]
 
 crldat = CRLdata(ds_list, test=0.3, val=0.1, 
-                 cache=True, cache_folder='/tmp/model_testing',
+                 cache=False, cache_folder='/tmp/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
                  transformations=T.RandomRotation((0, 360)), # T.RandomRotation(degrees=(0, 360)) 
-                 maxzero=.9)
+                 maxzero=.99)
 
 ion_overview(crldat)
 ion_upset(crldat)
 example_images(crldat, ncols=9, figsize=(20, 10), titlesize=5)
 
-# %% BRAIN LARGE
-ds_list = [
-
-                  ]
-
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
-                 cache=True, cache_folder='/tmp/model_testing',
-                 colocml_preprocessing=True, 
-                 fdr=.1, batch_size=40, 
-                 transformations=T.RandomRotation((0, 360)), # T.RandomRotation(degrees=(0, 360)) 
-                 maxzero=.9)
-
-ion_overview(crldat)
-ion_upset(crldat)
-example_images(crldat, ncols=9)
-
-
 # %% LUNG SMALL
 ds_list = [
-
+    '2022-09-24_00h10m42s',
+    '2022-09-24_00h13m14s',
+    '2022-09-24_00h14m50s',
+    '2022-09-24_00h16m25s',
+    '2022-10-17_20h24m34s',
+    '2022-10-17_20h29m14s',
+    '2022-10-17_20h30m37s',
+    '2022-10-27_22h05m48s',
+    '2022-11-02_16h26m42s',
+    '2022-11-02_16h29m10s',
+    '2022-12-01_19h18m05s',
+    '2022-12-01_19h18m26s'
                   ]
 
 crldat = CRLdata(ds_list, test=0.3, val=0.1, 
@@ -219,15 +213,48 @@ crldat = CRLdata(ds_list, test=0.3, val=0.1,
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
                  transformations=T.RandomRotation((0, 360)), # T.RandomRotation(degrees=(0, 360)) 
-                 maxzero=.9)
+                 maxzero=.99)
 
+# %%
 ion_overview(crldat)
 ion_upset(crldat)
-example_images(crldat, ncols=9)
+example_images(crldat, ncols=9, figsize=(20, 10), titlesize=5)
 
 # %% LUNG LARGE
 ds_list = [
-
+    '2021-05-11_19h43m45s',
+    '2021-05-19_20h09m03s',
+    '2021-05-19_20h10m58s',
+    '2021-05-19_20h11m50s',
+    '2021-07-14_18h51m25s',
+    '2021-07-14_18h53m01s',
+    '2021-08-09_18h34m16s',
+    '2021-08-09_18h39m16s',
+    '2021-08-09_18h40m08s',
+    '2021-08-09_18h51m36s',
+    '2021-08-16_23h18m11s',
+    '2021-08-16_23h19m04s',
+    '2021-08-16_23h19m40s',
+    '2021-08-16_23h37m34s',
+    '2021-08-16_23h52m40s',
+    '2021-08-17_00h06m31s',
+    '2021-09-24_22h15m05s',
+    '2021-10-11_18h34m31s',
+    '2021-10-11_19h06m59s',
+    '2021-10-11_19h38m30s',
+    '2021-10-11_21h07m40s',
+    '2022-09-24_00h10m42s',
+    '2022-09-24_00h13m14s',
+    '2022-09-24_00h14m50s',
+    '2022-09-24_00h16m25s',
+    '2022-10-17_20h24m34s',
+    '2022-10-17_20h29m14s',
+    '2022-10-17_20h30m37s',
+    '2022-10-27_22h05m48s',
+    '2022-11-02_16h26m42s',
+    '2022-11-02_16h29m10s',
+    '2022-12-01_19h18m05s',
+    '2022-12-01_19h18m26s'
                   ]
 
 crldat = CRLdata(ds_list, test=0.3, val=0.1, 
@@ -235,16 +262,18 @@ crldat = CRLdata(ds_list, test=0.3, val=0.1,
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
                  transformations=T.RandomRotation((0, 360)), # T.RandomRotation(degrees=(0, 360)) 
-                 maxzero=.9)
-
+                 maxzero=.99)
+# %%
 ion_overview(crldat)
 ion_upset(crldat)
-example_images(crldat, ncols=9)
+example_images(crldat, ncols=9, figsize=(20, 10), titlesize=5)
 
 
 # %% LIVER SMALL
 ds_list = [
-
+    '2017-09-07_15h09m00s', '2017-09-07_15h12m25s', '2017-08-22_15h16m21s',
+    '2017-08-16_15h52m56s', '2017-08-16_15h51m46s', '2017-08-11_12h31m52s',
+    '2017-08-11_12h30m20s', '2017-08-07_13h21m54s', '2017-08-07_13h19m42s'
                   ]
 
 crldat = CRLdata(ds_list, test=0.3, val=0.1, 
@@ -253,23 +282,7 @@ crldat = CRLdata(ds_list, test=0.3, val=0.1,
                  fdr=.1, batch_size=40, 
                  transformations=T.RandomRotation((0, 360)), # T.RandomRotation(degrees=(0, 360)) 
                  maxzero=.9)
-
+# %%
 ion_overview(crldat)
 ion_upset(crldat)
-example_images(crldat, ncols=9)
-
-# %% LIVER LARGE
-ds_list = [
-
-                  ]
-
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
-                 cache=True, cache_folder='/tmp/model_testing',
-                 colocml_preprocessing=True, 
-                 fdr=.1, batch_size=40, 
-                 transformations=T.RandomRotation((0, 360)), # T.RandomRotation(degrees=(0, 360)) 
-                 maxzero=.9)
-
-ion_overview(crldat)
-ion_upset(crldat)
-example_images(crldat, ncols=9)
+example_images(crldat, ncols=9, figsize=(20, 10), titlesize=5)
