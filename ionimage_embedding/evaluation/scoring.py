@@ -16,7 +16,7 @@ from .utils import (
     get_ion_labels,
     get_latent,
     get_mzimage_dataset)
-from ..dataloader.crl_dataloader import mzImageDataset
+from ..dataloader.mzImageDataset import mzImageDataset
 from ..models.crl.crl import CRL
 from ..models.coloc.coloc import ColocModel
 from ..models.coloc.utils import torch_cosine
@@ -179,8 +179,8 @@ def closest_accuracy_random(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: Colo
     return correct_predictions / total_predictions
 
 
-def closest_accuracy_latent(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: ColocModel, top: int=5, 
-                            origin: Literal['train', 'val', 'test']='train') -> float:
+def closest_accuracy_coloclatent(ds_coloc_dict: Dict[int, pd.DataFrame], colocs: ColocModel, top: int=5, 
+                                 origin: Literal['train', 'val', 'test']='train') -> float:
 
     total_predictions = 0
     correct_predictions = 0
@@ -311,7 +311,7 @@ def coloc_umap(colocs: ColocModel, k: int=3, n_components: int=10) -> pd.DataFra
     return pd.DataFrame(coloc_adata.obsm['X_umap'], 
                         index=labels.detach().cpu().numpy())
 
-def umap_inference(umap_df: pd.DataFrame, test_labels: torch.Tensor):
+def latent_colocinference(umap_df: pd.DataFrame, test_labels: torch.Tensor):
     
     sim = pd.DataFrame(torch_cosine(torch.tensor(np.array(umap_df))).detach().cpu().numpy(), 
                        index=umap_df.index, columns=umap_df.index)
@@ -335,13 +335,13 @@ def umap_inference(umap_df: pd.DataFrame, test_labels: torch.Tensor):
                         out[i2, i1] = np.nan
     return pd.DataFrame(out, index=sorted_ion_labels, columns=sorted_ion_labels)
 
-def closest_accuracy_umapcoloc(umap_inferred: pd.DataFrame, colocs: ColocModel, top: int=5) -> float:
+def closest_accuracy_latent(latent: pd.DataFrame, colocs: ColocModel, top: int=5) -> float:
 
     total_predictions = 0
     correct_predictions = 0
     clc = get_colocs(colocs, origin='test')
 
-    pred_df = umap_inferred
+    pred_df = latent
     for ds, coloc_df in clc.items():
         if clc[ds].shape[0] > 0:
             

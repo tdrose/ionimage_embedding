@@ -94,7 +94,7 @@ print(loss)
 # Testing this with different loss functions
 
 from ionimage_embedding.models.crl.cnnClust import CNNClust
-from ionimage_embedding.dataloader.crl_data import CRLdata
+from ionimage_embedding.dataloader.IonImage_data import IonImagedata_random
 
 def get_data():
     ds_list = [
@@ -109,7 +109,7 @@ def get_data():
     '2022-11-28_22h23m30s'
                   ]
 
-    clrdat = CRLdata(ds_list, test=0.3, val=0.1, 
+    clrdat = IonImagedata_random(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=100, transformations=None)

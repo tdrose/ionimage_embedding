@@ -10,8 +10,8 @@ import torchvision.transforms as transforms
 import lightning.pytorch as pl
 
 from ionimage_embedding.models.crl.cae import CAE
-from ionimage_embedding.models.crl.selfContrastModel import CRLmodel
-from ionimage_embedding.dataloader.crl_data import CRLdata
+from ionimage_embedding.models.crl.selfContrastModel import selfContrastModel
+from ionimage_embedding.dataloader.IonImage_data import IonImagedata_random
 
 
 import unittest
@@ -27,11 +27,11 @@ class TestCLRlightning(unittest.TestCase):
             '2022-12-07_02h08m52s'
                           ]
 
-        self.dat = CRLdata(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
+        self.dat = IonImagedata_random(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
         
         self.random_seed = np.random.randint(0, 10000)
         torch.cuda.manual_seed(self.random_seed)
-        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.deterministic = True # type: ignore
         
     def test_fullmodel_train(self):
         print('Test full model')
@@ -42,7 +42,7 @@ class TestCLRlightning(unittest.TestCase):
         trainer.fit(cae_model, self.dat.get_train_dataloader(), self.dat.get_val_dataloader())
         
         
-        model = CRLmodel(height=self.dat.height, width=self.dat.width, num_cluster=8, 
+        model = selfContrastModel(height=self.dat.height, width=self.dat.width, num_cluster=8, 
                          encoder_dim=7, lr=0.01, knn=True, knn_adj=self.dat.knn_adj, 
                          ion_label_mat=self.dat.ion_label_mat, dataset_specific_percentiles=True, 
                          cae_pretrained_model=cae_model)

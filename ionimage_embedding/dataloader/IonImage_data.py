@@ -1,30 +1,26 @@
 import numpy as np
-import pandas as pd
 from sklearn import preprocessing
 import math
-import os
-import pickle
-import uuid
-from typing import Optional
+from typing import Optional, List, Tuple
 
 from torch.utils.data import DataLoader
 import torchvision.transforms as T
 import torch
 
-from .utils import download_data, pairwise_same_elements, run_knn
-from .crl_dataloader import mzImageDataset
+from .utils import pairwise_same_elements, run_knn, get_data
+from .mzImageDataset import mzImageDataset
 
 
-class CRLdata:
+class IonImagedata_random:
     
-    def __init__(self, dataset_ids, test=0.3, val=0.1, 
+    def __init__(self, dataset_ids: List[str], test: float=0.3, val: float=0.1, 
                  transformations: Optional[torch.nn.Module]=T.RandomRotation(degrees=(0, 360)), 
-                 maindata_class=True,
-                 # Download parameters:
-                 db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', 
-                 colocml_preprocessing=False,
-                 k=10, batch_size=128,
-                 cache=False, cache_folder='/scratch/model_testing', min_images=5, maxzero=.95
+                 maindata_class: bool=True,
+                 db: Tuple[str, str]=('HMDB', 'v4'), fdr: float=0.2, scale_intensity: str='TIC', 
+                 colocml_preprocessing: bool=False,
+                 k: int=10, batch_size: int=128,
+                 cache: bool=False, cache_folder: str='/scratch/model_testing', min_images: int=5, 
+                 maxzero: float=.95
                 ):
         
         self.dataset_ids = dataset_ids
@@ -36,45 +32,12 @@ class CRLdata:
         self.batch_size=batch_size
         self.min_images=min_images
         
-        # Download data
-        if cache:
-            # make hash of datasets
-            cache_hex = '{}_colocML{}_{}-{}_{}_{}'.format(''.join(dataset_ids), 
-                                                          colocml_preprocessing, 
-                                                          str(db[0]), str(db[1]), 
-                                                          str(fdr), str(scale_intensity))
-            
-            cache_hex = uuid.uuid5(uuid.NAMESPACE_URL, cache_hex).hex
-            cache_file = 'CRLdata_{}.pickle'.format(cache_hex)
-
-            # Check if cache folder exists
-            if not os.path.isdir(cache_folder):
-                os.mkdir(cache_folder)
-
-            # Download data if it does not exist
-            if cache_file not in os.listdir(cache_folder):
-                tmp = download_data(dataset_ids, db=db, 
-                                    fdr=fdr, 
-                                    scale_intensity=scale_intensity, 
-                                    colocml_preprocessing=colocml_preprocessing, 
-                                    maxzero=maxzero)
-                data, dataset_labels, ion_labels = tmp
-
-                pickle.dump((data, dataset_labels, ion_labels), 
-                            open(os.path.join(cache_folder, cache_file), "wb"))
-                print('Saved file: {}'.format(os.path.join(cache_folder, cache_file)))      
-            
-            # Load cached data
-            else:
-                print('Loading cached data from: {}'.format(os.path.join(cache_folder, cache_file)))
-                tmp = pickle.load(open(os.path.join(cache_folder, cache_file), "rb" ) )
-                data, dataset_labels, ion_labels = tmp
-        else:
-            tmp = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
-                                colocml_preprocessing=colocml_preprocessing, maxzero=maxzero)
-            data, dataset_labels, ion_labels = tmp
-            
-        
+        # Get data
+        data, dataset_labels, ion_labels = get_data(dataset_ids=dataset_ids, cache=cache, 
+                                                    cache_folder=cache_folder, db=db, fdr=fdr, 
+                                                    scale_intensity=scale_intensity, 
+                                                    colocml_preprocessing=colocml_preprocessing,
+                                                    maxzero=maxzero)
         
         # Normalize images
         data = self.image_normalization(data)
@@ -225,7 +188,7 @@ class CRLdata:
             raise AttributeError('Datasets not defined, DO NOT mess with the data classes!')
             
             
-class CRLlods(CRLdata):
+class IonImagedata_leaveOutDataSet(IonImagedata_random):
     
     def __init__(self, dataset_ids, test=1, val=0.1, 
                  transformations=T.RandomRotation(degrees=(0, 360)),
@@ -302,7 +265,7 @@ class CRLlods(CRLdata):
         self.check_dataexists()
         
         
-class CRLtransitivity(CRLdata):
+class IonImagedata_transitivity(IonImagedata_random):
     
     def __init__(self, dataset_ids, test=.3, val=0.1, 
                  transformations=T.RandomRotation(degrees=(0, 360)),

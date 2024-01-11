@@ -7,7 +7,7 @@ import sklearn.cluster as cluster
 
 from ..models.crl.crl import CRL
 from ..models.biomedclip import BioMedCLIP
-from ..dataloader.crl_dataloader import mzImageDataset
+from ..dataloader.mzImageDataset import mzImageDataset
 
 def sensitivity(x: dict) -> float:
     return x['tp'] / (x['tp'] + x['fn'])
@@ -87,7 +87,7 @@ def get_ion_images(model: Union[CRL, BioMedCLIP],
 
     return images
 
-def latent_centroids(model, 
+def latent_centroids(model: Union[CRL, BioMedCLIP], 
                      origin: Literal['train', 'val', 'test']='train') -> Tuple[np.ndarray, 
                                                                                np.ndarray]:
 
@@ -99,7 +99,7 @@ def latent_centroids(model,
     for i in set(ion_labels):
         if len(latent[ion_labels==i]) > 1:
             a = latent[ion_labels==i]
-            ion_centroids.append(a.sum(axis=0)/a.shape[0])
+            ion_centroids.append(np.mean(a, axis=0))
             centroid_labels.append(i)
         else:
             ion_centroids.append(latent[ion_labels==i][0])
@@ -107,6 +107,17 @@ def latent_centroids(model,
             
     return np.stack(ion_centroids), np.array(centroid_labels)
 
+def latent_centroids_df(model: Union[CRL, BioMedCLIP], 
+                        origin: Literal['train', 'val', 'test']='train') -> pd.DataFrame:
+    # Call the latent_centroids function and create a dataframe of the results 
+    # by using the centroid labels as the index
+    centroids, labels = latent_centroids(model=model, origin=origin)
+    df = pd.DataFrame(centroids, index=labels)
+    df.index.name = 'ion'
+    # sort the dataframe by the index
+    df = df.sort_index(inplace=False)
+
+    return df
 
 def compute_umap(latent: np.ndarray) -> pd.DataFrame:
     

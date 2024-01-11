@@ -3,7 +3,12 @@ import math
 import numpy as np
 import torch
 
-from ionimage_embedding.dataloader.crl_data import CRLdata, CRLlods, CRLtransitivity
+from ionimage_embedding.dataloader.IonImage_data import (
+    IonImagedata_random, 
+    IonImagedata_leaveOutDataSet, 
+    IonImagedata_transitivity
+)
+
 
 ds_list = evaluation_datasets = [
     '2022-12-07_02h13m50s',
@@ -13,12 +18,12 @@ ds_list = evaluation_datasets = [
     '2022-12-07_02h08m52s'
                   ]
 
-dat2 = CRLdata(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
+dat2 = IonImagedata_random(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
 
 lods_ntestds = 2
-dat3 = CRLlods(ds_list, test=lods_ntestds, val=0.1, cache=True, cache_folder='/scratch/model_testing')
+dat3 = IonImagedata_leaveOutDataSet(ds_list, test=lods_ntestds, val=0.1, cache=True, cache_folder='/scratch/model_testing')
 
-dat4 = CRLtransitivity(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
+dat4 = IonImagedata_transitivity(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
               
 class TestCLR(unittest.TestCase):
     

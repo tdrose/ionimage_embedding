@@ -11,7 +11,7 @@ import torchvision.transforms as T
 
 from ionimage_embedding.models import CRL
 from ionimage_embedding.models import ColocModel
-from ionimage_embedding.dataloader.crl_data import CRLdata
+from ionimage_embedding.dataloader.IonImage_data import IonImagedata_random
 from ionimage_embedding.models.coloc.utils import torch_cosine
 
 
@@ -50,7 +50,7 @@ ds_list = [
     '2022-11-28_22h23m30s'
                   ]
 
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
+crldat = IonImagedata_random(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=100, transformations=T.RandomRotation(degrees=(0, 360)), maxzero=.9)

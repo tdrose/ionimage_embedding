@@ -4,7 +4,7 @@ import torchvision.transforms as T
 from ionimage_embedding.evaluation.utils import get_ion_labels, get_latent
 
 from ionimage_embedding.models import CRL, ColocModel, BioMedCLIP
-from ionimage_embedding.dataloader import CRLdata
+from ionimage_embedding.dataloader import IonImagedata_random
 from ionimage_embedding.evaluation.scoring import (
     closest_accuracy_aggcoloc,
     closest_accuracy_latent,
@@ -13,10 +13,10 @@ from ionimage_embedding.evaluation.scoring import (
     latent_dataset_silhouette,
     same_ion_similarity,
     coloc_umap,
-    umap_inference,
-    closest_accuracy_umapcoloc
+    latent_colocinference,
+    closest_accuracy_coloclatent
 )
-from ionimage_embedding.evaluation.utils import cluster_latent
+from ionimage_embedding.evaluation.utils import cluster_latent, latent_centroids_df
 from ionimage_embedding.datasets import KIDNEY_SMALL
 from ionimage_embedding.evaluation.plots import umap_latent,  umap_allorigin, plot_image_clusters
 
@@ -45,7 +45,7 @@ os.system('nvidia-smi')
 
 # %%
 
-crldat = CRLdata(KIDNEY_SMALL, test=0.3, val=0.1, 
+crldat = IonImagedata_random(KIDNEY_SMALL, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
@@ -97,10 +97,18 @@ plt.legend()
 plt.show()
 
 # %%
+bmc = BioMedCLIP(data=crldat)
+bmc_dsc_dict = compute_ds_coloc(bmc, origin=ds) # type: ignore
+
+# %%
 coloc_embedding = coloc_umap(colocs, k=3, n_components=5)
-umap_test_latent = umap_inference(coloc_embedding, colocs.data.test_dataset.ion_labels)
+umap_coloc_inferred = latent_colocinference(coloc_embedding, colocs.data.test_dataset.ion_labels)
 
+latent_model = latent_centroids_df(model, origin='train')
+model_coloc_inferred = latent_colocinference(latent_model, colocs.data.test_dataset.ion_labels)
 
+latent_bmc = latent_centroids_df(bmc, origin='train')
+bmc_coloc_inferred = latent_colocinference(latent_bmc, colocs.data.test_dataset.ion_labels)
 
 # %%
 ds = 'test'
@@ -111,17 +119,16 @@ coloc_agg='mean'
 dsc_dict = compute_ds_coloc(model, origin=ds)
 
 # %%
-bmc = BioMedCLIP(data=crldat)
-bmc_dsc_dict = compute_ds_coloc(bmc, origin=ds) # type: ignore
-
-# %%
-
 if ds == 'test':
     print(f'{coloc_agg} accuracy: ', closest_accuracy_aggcoloc(colocs, top=top))
-    print('Coloc UMAP accuracy: ', closest_accuracy_umapcoloc(umap_test_latent, colocs, top=3))
+    print('Latent: ')
+    print('* Coloc UMAP accuracy: ', closest_accuracy_latent(umap_coloc_inferred, colocs, top=top))
+    print('* Model accuracy: ', closest_accuracy_latent(model_coloc_inferred, colocs, top=top))
+    print('* BMC accuracy: ', closest_accuracy_latent(bmc_coloc_inferred, colocs, top=top))
 
-print('Model accuracy: ', closest_accuracy_latent(dsc_dict, colocs, top=top, origin=ds))
-print('BMC accuracy: ', closest_accuracy_latent(bmc_dsc_dict, colocs, top=top, origin=ds))
+
+print('Model accuracy: ', closest_accuracy_coloclatent(dsc_dict, colocs, top=top, origin=ds))
+print('BMC accuracy: ', closest_accuracy_coloclatent(bmc_dsc_dict, colocs, top=top, origin=ds))
 print('Random accuracy: ', closest_accuracy_random(dsc_dict, colocs, top=top, origin=ds))
 
 print()

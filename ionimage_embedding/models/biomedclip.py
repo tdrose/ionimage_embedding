@@ -6,11 +6,11 @@ import open_clip
 import torch
 import numpy as np
 
-from ..dataloader.crl_data import CRLdata
+from ..dataloader.IonImage_data import IonImagedata_random
 
 
 class BioMedCLIP:
-    def __init__(self, data: CRLdata):
+    def __init__(self, data: IonImagedata_random):
         self.data = data
 
         tmp = open_clip.create_model_and_transforms('hf-hub:microsoft/BiomedCLIP-PubMedBERT_'

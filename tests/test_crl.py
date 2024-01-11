@@ -7,7 +7,7 @@ import torch
 from ionimage_embedding.models import CRL
 from ionimage_embedding.models.crl.pseudo_labeling import compute_dataset_ublb, pseudo_labeling
 from ionimage_embedding.dataloader.utils import size_adaption, size_adaption_symmetric
-from ionimage_embedding.dataloader.crl_data import CRLdata
+from ionimage_embedding.dataloader.IonImage_data import IonImagedata_random
 from ionimage_embedding.dataloader.utils import pairwise_same_elements
 
 from .test_crl_utils import original_ublb, original_dataset_ublb, original_ps, load_data
@@ -25,7 +25,7 @@ ds_list = evaluation_datasets = [
     '2022-12-07_02h08m52s'
                   ]
 
-dat = CRLdata(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
+dat = IonImagedata_random(ds_list, test=0.3, val=0.1, cache=True, cache_folder='/scratch/model_testing')
 
 model = CRL(dat,
             num_cluster=8,
@@ -47,7 +47,7 @@ device='cuda'
 model.train(logger=False)
 
 cae = model.cae.to(device)
-clust = model.clr.to(device)
+clust = model.crl.to(device)
 
 optimizer = torch.optim.RMSprop(params=clust.parameters(), lr=model.lr, weight_decay=model.weight_decay)
 
@@ -198,7 +198,7 @@ class TestCLR(unittest.TestCase):
                                    ion_label_mat=ion_label_mat.to(device), 
                                    dataset_specific_percentiles=False,
                                    dataset_ub=torch.tensor([]), dataset_lb=torch.tensor([]), 
-                                   ds_labels=torch.Tensor([]), device=device)
+                                   ds_labels=torch.tensor([]), device=device)
         
         self.assertTrue((pos.to(device)[0] == torch.tensor([1., 1., 1., 0., 0., 0., 0., 0., 0., 0.], 
                                                            device=device)).all())

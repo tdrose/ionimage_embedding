@@ -10,7 +10,7 @@ from .selfContrastModel import selfContrastModel
 from .colocContrastModel import colocContrastModel
 from .regContrastModel import regContrastModel
 
-from ...dataloader.crl_data import CRLdata
+from ...dataloader.IonImage_data import IonImagedata_random
 from ...logger import DictLogger
 
 
@@ -20,7 +20,7 @@ class CRL:
     crl: Union[regContrastModel, colocContrastModel, selfContrastModel]
 
     def __init__(self,
-                 data: CRLdata,
+                 data: IonImagedata_random,
                  num_cluster: int = 7,
                  initial_upper: int = 98,
                  initial_lower: int = 46,

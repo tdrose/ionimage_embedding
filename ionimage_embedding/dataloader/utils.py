@@ -2,7 +2,13 @@ from metaspace import SMInstance
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from scipy import ndimage
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
+import os
+import uuid
+import pickle
+
+from .constants import ION_IMAGE_DATA
+
 
 def size_adaption(image_dict: Dict[str, np.ndarray]):
     maxh = np.max(np.array([x.shape[1] for x in image_dict.values()]))
@@ -56,8 +62,11 @@ def size_adaption_symmetric(image_dict: Dict[str, np.ndarray]):
 
     return out_dict
 
-def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC', 
-                  colocml_preprocessing=False, maxzero=.95):
+def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: float=0.2, 
+                  scale_intensity: str='TIC', 
+                  colocml_preprocessing: bool=False, maxzero: float=.95) -> Tuple[np.ndarray,
+                                                                                  np.ndarray,
+                                                                                  np.ndarray]:
     
     sm = SMInstance()
     
@@ -113,6 +122,54 @@ def download_data(ds_ids, db=("HMDB", "v4"), fdr=0.2, scale_intensity='TIC',
     # zero_mask = (training_data == 0).reshape((training_data.shape[0], -1)).all(axis=1)
 
     return training_data[~zero_mask], training_datasets[~zero_mask], training_ions[~zero_mask]
+
+def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache', 
+             db: Tuple[str, str]=('HMDB', 'v4'), fdr: float=0.2, scale_intensity: str='TIC', 
+                 colocml_preprocessing: bool=False, maxzero: float=.95) -> Tuple[np.ndarray,
+                                                                                 np.ndarray,
+                                                                                 np.ndarray]:
+    if cache:
+        # make hash of datasets
+        cache_hex = '{}_{}_{}_{}-{}_{}_{}_{}'.format(ION_IMAGE_DATA,
+                                                     ''.join(dataset_ids), 
+                                                     colocml_preprocessing, 
+                                                     str(db[0]), str(db[1]), 
+                                                     str(fdr), str(scale_intensity),
+                                                     str(maxzero)
+                                                    )
+        
+        cache_hex = uuid.uuid5(uuid.NAMESPACE_URL, cache_hex).hex
+        cache_file = '{}_{}.pickle'.format(ION_IMAGE_DATA, cache_hex)
+
+        # Check if cache folder exists
+        if not os.path.isdir(cache_folder):
+            os.mkdir(cache_folder)
+
+        # Download data if it does not exist
+        if cache_file not in os.listdir(cache_folder):
+            tmp = download_data(dataset_ids, db=db, 
+                                fdr=fdr, 
+                                scale_intensity=scale_intensity, 
+                                colocml_preprocessing=colocml_preprocessing, 
+                                maxzero=maxzero)
+            data, dataset_labels, ion_labels = tmp
+
+            pickle.dump((data, dataset_labels, ion_labels), 
+                        open(os.path.join(cache_folder, cache_file), "wb"))
+            print('Saved file: {}'.format(os.path.join(cache_folder, cache_file)))      
+        
+        # Load cached data
+        else:
+            print('Loading cached data from: {}'.format(os.path.join(cache_folder, cache_file)))
+            tmp = pickle.load(open(os.path.join(cache_folder, cache_file), "rb" ) )
+            data, dataset_labels, ion_labels = tmp
+    else:
+        tmp = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
+                            colocml_preprocessing=colocml_preprocessing, maxzero=maxzero)
+        data, dataset_labels, ion_labels = tmp
+
+    return data, dataset_labels, ion_labels
+
 
 def pairwise_same_elements(int_list):
     # Convert the list to a NumPy array

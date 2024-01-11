@@ -9,7 +9,7 @@ import torch
 
 from ionimage_embedding.models import CRL
 from ionimage_embedding.models import ColocModel
-from ionimage_embedding.dataloader.crl_data import CRLdata
+from ionimage_embedding.dataloader.IonImage_data import IonImagedata_random
 from ionimage_embedding.models.coloc.utils import torch_cosine
 from ionimage_embedding.evaluation import evaluation_quantile_overlap, ds_coloc_convert
 from ionimage_embedding.evaluation.crl_inference import crl_ds_coloc, crl_fulllatent_coloc, crl_latent_coloc, crl_latent_inference
@@ -69,7 +69,7 @@ ds_list = [
 #     '2022-07-19_19h29m24s'
 #             ]
 
-clrdat = CRLdata(ds_list, test=0.3, val=0.1, 
+clrdat = IonImagedata_random(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=100, transformations=None)
