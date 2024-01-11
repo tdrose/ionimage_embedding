@@ -81,7 +81,7 @@ model = CRL(crldat,
             activation='relu', # softmax
             loss_type='selfContrast', # 'selfContrast', 'colocContrast', 'regContrast',
             resnet='resnet18', # 'resnet18
-            resnet_pretrained=False,
+            resnet_pretrained=True,
             clip_gradients=None
             )
 
@@ -94,6 +94,11 @@ plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', co
 plt.plot(mylogger.logged_metrics['Training loss'], label='Training loss', color='blue')
 plt.legend()
 plt.show()
+
+# %%
+ds = 'test'
+top = 5
+coloc_agg='mean'
 
 # %%
 bmc = BioMedCLIP(data=crldat)
@@ -109,10 +114,6 @@ model_coloc_inferred = latent_colocinference(latent_model, colocs.data.test_data
 latent_bmc = latent_centroids_df(bmc, origin='train')
 bmc_coloc_inferred = latent_colocinference(latent_bmc, colocs.data.test_dataset.ion_labels)
 
-# %%
-ds = 'test'
-top = 5
-coloc_agg='mean'
 
 # %%
 dsc_dict = compute_ds_coloc(model, origin=ds)
