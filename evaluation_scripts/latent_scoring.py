@@ -130,14 +130,21 @@ print('Model accuracy: ', closest_accuracy_coloclatent(dsc_dict, colocs, top=top
 print('BMC accuracy: ', closest_accuracy_coloclatent(bmc_dsc_dict, colocs, top=top, origin=ds))
 print('Random accuracy: ', closest_accuracy_random(dsc_dict, colocs, top=top, origin=ds))
 
-print()
-print('Silhouette: ', latent_dataset_silhouette(model, origin=ds))
+print('Silhouette scores:')
+print('* Model: ', latent_dataset_silhouette(model, origin=ds))
+print('* BMC: ', latent_dataset_silhouette(bmc, origin=ds))
+
+
+
+
 
 
 
 # %%
 umap_allorigin(model, device=device)
 umap_latent(model, origin='train', device=device)
+
+
 
 
 
@@ -154,6 +161,8 @@ from ionimage_embedding.evaluation.utils import get_latent, get_ion_labels
 # %%
 sim = same_ion_similarity(model, origin='test')
 sns.violinplot(data=sim, x='type', y='similarity', cut=0)
+
+
 
 
 # %%

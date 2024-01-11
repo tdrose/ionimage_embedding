@@ -84,7 +84,7 @@ def evaluation_quantile_overlap(evaluation_dict):
                          'lq': evaluation_dict['lq'], 'uq': evaluation_dict['uq']})
 
 
-def latent_dataset_silhouette(model: CRL, metric: str='cosine', 
+def latent_dataset_silhouette(model: Union[CRL, BioMedCLIP], metric: str='cosine', 
                               origin: Literal['train', 'val', 'test']='train', device: str='cpu'):
     if origin == 'train':
         latent = model.inference_embeddings_train(device=device)
