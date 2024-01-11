@@ -1,7 +1,6 @@
 # %%
 import matplotlib.pyplot as plt
 import torchvision.transforms as T
-from ionimage_embedding.evaluation.utils import get_ion_labels, get_latent
 
 from ionimage_embedding.models import CRL, ColocModel, BioMedCLIP
 from ionimage_embedding.dataloader import IonImagedata_random

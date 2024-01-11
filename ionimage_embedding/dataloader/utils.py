@@ -7,7 +7,7 @@ import os
 import uuid
 import pickle
 
-from .constants import ION_IMAGE_DATA
+from .constants import ION_IMAGE_DATA, DATASET_DATA
 
 
 def size_adaption(image_dict: Dict[str, np.ndarray]):
@@ -169,6 +169,22 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
         data, dataset_labels, ion_labels = tmp
 
     return data, dataset_labels, ion_labels
+
+
+def purge_cache(cache_folder: str='cache'):
+    purged_files = []
+    for f in os.listdir(cache_folder):
+        if f.startswith(ION_IMAGE_DATA):
+            purged_files.append(f)
+            os.remove(os.path.join(cache_folder, f))
+        elif f.startswith(DATASET_DATA):
+            purged_files.append(f)
+            os.remove(os.path.join(cache_folder, f))
+        else:
+            pass
+    print('Deleted files:')
+    for i in purged_files:
+        print('* ', i)
 
 
 def pairwise_same_elements(int_list):
