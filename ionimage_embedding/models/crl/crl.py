@@ -186,6 +186,7 @@ class CRL:
             test_x = test_x.reshape((-1, 1, self._height, self._width))
             
             crl = crl.to(device)
+            crl.eval()
 
             if use_embed_layer:
                 embeddings, _ = crl.embed_layers(test_x)

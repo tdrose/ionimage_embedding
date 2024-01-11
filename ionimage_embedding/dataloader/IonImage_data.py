@@ -195,7 +195,8 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,
-                 cache=False, cache_folder='/scratch/model_testing', min_images=5
+                 cache=False, cache_folder='/scratch/model_testing', min_images=5, 
+                 maxzero: float=.95
                 ):
         
         if test < 1:
@@ -207,7 +208,8 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                          db=db, fdr=fdr, scale_intensity=scale_intensity, 
                          colocml_preprocessing=colocml_preprocessing,
                          k=k, batch_size=batch_size,
-                         cache=cache, cache_folder=cache_folder, min_images=min_images)
+                         cache=cache, cache_folder=cache_folder, min_images=min_images, 
+                         maxzero=maxzero)
         
         # Train test split
         if len(self.dataset_ids) <= test:
@@ -273,7 +275,7 @@ class IonImagedata_transitivity(IonImagedata_random):
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', 
-                 min_images=5, min_codetection=2
+                 min_images=5, min_codetection=2, maxzero: float=.95
                 ):
             
         super().__init__(dataset_ids=dataset_ids, test=.3, val=val, 
@@ -281,7 +283,8 @@ class IonImagedata_transitivity(IonImagedata_random):
                          db=db, fdr=fdr, scale_intensity=scale_intensity, 
                          colocml_preprocessing=colocml_preprocessing,
                          k=k, batch_size=batch_size,
-                         cache=cache, cache_folder=cache_folder, min_images=min_images)
+                         cache=cache, cache_folder=cache_folder, min_images=min_images, 
+                         maxzero=maxzero)
         
         self.min_codetection=min_codetection
         

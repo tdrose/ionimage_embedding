@@ -233,7 +233,7 @@ def closest_accuracy_aggcoloc(colocs: ColocModel, top: int=5,
             curr_cl[np.isnan(curr_cl)] = 0
 
             for i in range(len(curr_cl)):
-
+                
                 # Descending sorted most colocalized
                 coloc_order = coloc_df.index[np.argsort(curr_cl[i])[::-1]]
 
