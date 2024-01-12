@@ -1,6 +1,8 @@
 # %%
 import matplotlib.pyplot as plt
 import torchvision.transforms as T
+from typing import Dict
+import pandas as pd
 
 from ionimage_embedding.models import CRL, ColocModel, BioMedCLIP
 from ionimage_embedding.dataloader import IonImagedata_random
@@ -13,7 +15,9 @@ from ionimage_embedding.evaluation.scoring import (
     same_ion_similarity,
     coloc_umap,
     latent_colocinference,
-    closest_accuracy_coloclatent
+    closest_accuracy_coloclatent,
+    remove_nan,
+    general_mse
 )
 from ionimage_embedding.evaluation.utils import cluster_latent, latent_centroids_df
 from ionimage_embedding.datasets import KIDNEY_SMALL
@@ -30,6 +34,7 @@ try:
         # Run IPython-specific commands
         ipython.run_line_magic('load_ext','autoreload')  # type: ignore 
         ipython.run_line_magic('autoreload','2')  # type: ignore 
+    print('Running in IPython, auto-reload enabled!')
 except ImportError:
     # Not in IPython, continue with normal Python code
     pass
@@ -136,9 +141,21 @@ print('* Model: ', latent_dataset_silhouette(model, origin=ds))
 print('* BMC: ', latent_dataset_silhouette(bmc, origin=ds))
 
 
+# %%
 
+model_colocs_filered = remove_nan(model_coloc_inferred)
+bmc_colocs_filered = remove_nan(bmc_coloc_inferred)
+umap_colocs_filered = remove_nan(umap_coloc_inferred)
 
+# Subset coloc_test to only include colocs that are in the model
+mean_colocs_filtered = colocs.test_mean_coloc.loc[model_colocs_filered.index,  # type: ignore
+                                                  model_colocs_filered.columns]
 
+print('Transitivity MSE:')
+print('* Model: ', general_mse(model_colocs_filered, mean_colocs_filtered, colocs.test_coloc))
+print('* BMC: ', general_mse(bmc_colocs_filered, mean_colocs_filtered, colocs.test_coloc))
+print('* UMAP: ', general_mse(umap_colocs_filered, mean_colocs_filtered, colocs.test_coloc))
+print('* Mean: ', general_mse(mean_colocs_filtered, mean_colocs_filtered, colocs.test_coloc))
 
 
 # %%

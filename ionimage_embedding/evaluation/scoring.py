@@ -372,3 +372,137 @@ def closest_accuracy_latent(latent: pd.DataFrame, colocs: ColocModel, top: int=5
                 total_predictions += 1
 
     return correct_predictions / total_predictions
+
+def remove_nan(df: pd.DataFrame) -> pd.DataFrame:
+    df_copy = df.dropna(how='all', axis=0).dropna(how='all', axis=1)
+    return df_copy
+
+def transitivity_mse(pred_df: pd.DataFrame, agg_coloc_pred: pd.DataFrame, 
+                     true_df_dict: Dict[int, pd.DataFrame]) -> float:
+    # Loop over all elements of agg_coloc_pred using their column and index names
+    suare_error = 0
+    counter = 0
+    for col in agg_coloc_pred.columns:
+        for idx in agg_coloc_pred.index:
+            # Check if the element is NaN
+            if idx != col:
+                if pd.isna(agg_coloc_pred.loc[idx, col]):
+                    # if the element is NAN, check if the the combination of idx and col 
+                    # occur in any of the true_df_dict values
+                    for true_df in true_df_dict.values():
+                        if idx in true_df.index and col in true_df.columns:
+                            # if the combination of idx and col occur in a true_df, 
+                            # add the squared error to the sum
+                            suare_error += (true_df.loc[idx, col] - 
+                                            pred_df.loc[idx, col])**2 # type: ignore
+                            counter += 1
+    
+    return suare_error / counter
+
+def general_mse(pred_df: pd.DataFrame, agg_coloc_pred: pd.DataFrame, 
+                     true_df_dict: Dict[int, pd.DataFrame]) -> float:
+    # Loop over all elements of agg_coloc_pred using their column and index names
+    suare_error = 0
+    counter = 0
+    for col in agg_coloc_pred.columns:
+        for idx in agg_coloc_pred.index:
+            # Check if the element is NaN
+            if idx != col:
+                if not pd.isna(agg_coloc_pred.loc[idx, col]):
+                    # if the element is NAN, check if the the combination of idx and col 
+                    # occur in any of the true_df_dict values
+                    for true_df in true_df_dict.values():
+                        if idx in true_df.index and col in true_df.columns:
+                            # if the combination of idx and col occur in a true_df, 
+                            # add the squared error to the sum
+                            suare_error += (true_df.loc[idx, col] - 
+                                            pred_df.loc[idx, col])**2 # type: ignore
+                            counter += 1
+    
+    return suare_error / counter
+                            
+def transitivity_top_accuracy(pred_df: pd.DataFrame, agg_coloc_pred: pd.DataFrame, 
+                              true_df_dict: Dict[int, pd.DataFrame], top: int=5) -> float:
+    correct_predictions = 0
+    total_predictions = 0
+
+    for idx in agg_coloc_pred.index:
+        
+        # get all the colnames for row idx which are nan
+        nan_cols = agg_coloc_pred.loc[idx, 
+                                      agg_coloc_pred.loc[idx, :].isna()].index # type: ignore
+        
+        # subset pref_df to the idx row and nan_cols columns
+        pred_df_subset = pred_df.loc[idx, nan_cols] # type: ignore
+
+        # Loop over all elemends of true_df_dict
+        for true_df in true_df_dict.values():
+
+            # Check if idx is in the index of true_df
+            if idx in true_df.index:
+
+                true_row = true_df.loc[idx, :].copy()
+                true_row[idx] = 0
+                
+                # Get the colnames of the row idx in true_df 
+                true_df_cols = true_row.sort_values(ascending=False).index # type: ignore
+
+                # Get the highest element that is also in pred_df_subset.columns
+                true_df_cols = [col for col in true_df_cols if col in pred_df_subset.index]
+
+                if len(true_df_cols) > 0:
+                    # Get the top elements of pred_df_subset
+                    pred_subsub = pred_df_subset[pred_df_subset.index.isin(true_df_cols)]
+
+                    top_pred = pred_subsub.sort_values(ascending=False).index[:top] # type: ignore
+
+                    # Check if any of the top elements of pred_df_subset are in true_df_cols
+                    if true_df_cols[0] in top_pred:
+                        correct_predictions += 1
+                    total_predictions += 1
+
+    return correct_predictions / total_predictions
+
+
+def transitivity_top_accuracy_random(pred_df: pd.DataFrame, agg_coloc_pred: pd.DataFrame, 
+                                     true_df_dict: Dict[int, pd.DataFrame], top: int=5) -> float:
+    correct_predictions = 0
+    total_predictions = 0
+
+    for idx in agg_coloc_pred.index:
+        
+        # get all the colnames for row idx which are nan
+        nan_cols = agg_coloc_pred.loc[idx, 
+                                      agg_coloc_pred.loc[idx, :].isna()].index # type: ignore
+        
+        # subset pref_df to the idx row and nan_cols columns
+        pred_df_subset = pred_df.loc[idx, nan_cols] # type: ignore
+
+        # Loop over all elemends of true_df_dict
+        for true_df in true_df_dict.values():
+
+            # Check if idx is in the index of true_df
+            if idx in true_df.index:
+                true_row = true_df.loc[idx, :].copy()
+                true_row[idx] = 0
+                
+                # Get the colnames of the row idx in true_df 
+                true_df_cols = true_row.sort_values(ascending=False).index # type: ignore
+
+                # Get the highest element that is also in pred_df_subset.columns
+                true_df_cols = [col for col in true_df_cols if col in pred_df_subset.index]
+
+                if len(true_df_cols) > 0:
+
+                    pred_subsub = pred_df_subset[pred_df_subset.index.isin(true_df_cols)]
+                    
+                    if len(pred_subsub) <= top:
+                        random_pred = pred_subsub.sample(top, replace=True).index
+                    else:
+                        random_pred = pred_subsub.sample(top).index # type: ignore
+
+                    if true_df_cols[0] in random_pred:
+                        correct_predictions += 1
+                    total_predictions += 1
+
+    return correct_predictions / total_predictions

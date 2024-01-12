@@ -1,6 +1,8 @@
 # %%
 import matplotlib.pyplot as plt
 import torchvision.transforms as T
+import pandas as pd
+from typing import Dict
 
 from ionimage_embedding.models import CRL, ColocModel, BioMedCLIP
 from ionimage_embedding.dataloader import IonImagedata_transitivity
@@ -13,7 +15,11 @@ from ionimage_embedding.evaluation.scoring import (
     same_ion_similarity,
     coloc_umap,
     latent_colocinference,
-    closest_accuracy_coloclatent
+    closest_accuracy_coloclatent,
+    remove_nan,
+    transitivity_mse,
+    transitivity_top_accuracy,
+    transitivity_top_accuracy_random
 )
 from ionimage_embedding.evaluation.utils import cluster_latent, latent_centroids_df
 from ionimage_embedding.datasets import KIDNEY_SMALL
@@ -117,6 +123,30 @@ bmc_coloc_inferred = latent_colocinference(latent_bmc, colocs.data.test_dataset.
 dsc_dict = compute_ds_coloc(model, origin=ds)
 
 # %%
+model_colocs_filered = remove_nan(model_coloc_inferred)
+bmc_colocs_filered = remove_nan(bmc_coloc_inferred)
+umap_colocs_filered = remove_nan(umap_coloc_inferred)
+
+# Subset coloc_test to only include colocs that are in the model
+mean_colocs_filtered = colocs.test_mean_coloc.loc[model_colocs_filered.index,  # type: ignore
+                                                  model_colocs_filered.columns]
+
+print('Transitivity MSE:')
+print('* Model: ', transitivity_mse(model_colocs_filered, mean_colocs_filtered, colocs.test_coloc))
+print('* BMC: ', transitivity_mse(bmc_colocs_filered, mean_colocs_filtered, colocs.test_coloc))
+print('* UMAP: ', transitivity_mse(umap_colocs_filered, mean_colocs_filtered, colocs.test_coloc))
+
+print('Transitivity top accuracy:')
+print('* Model: ', transitivity_top_accuracy(model_colocs_filered, mean_colocs_filtered, 
+                                             colocs.test_coloc, top=top))
+print('* BMC: ', transitivity_top_accuracy(bmc_colocs_filered, mean_colocs_filtered, 
+                                           colocs.test_coloc, top=top))
+print('* UMAP: ', transitivity_top_accuracy(umap_colocs_filered, mean_colocs_filtered, 
+                                            colocs.test_coloc, top=top))
+print('* Random: ', transitivity_top_accuracy_random(model_colocs_filered, mean_colocs_filtered, 
+                                                     colocs.test_coloc, top=top))
+
+# %%
 if ds == 'test':
     print(f'{coloc_agg} accuracy: ', closest_accuracy_aggcoloc(colocs, top=top))
     print('Latent: ')
@@ -132,6 +162,8 @@ print('Random accuracy: ', closest_accuracy_random(dsc_dict, colocs, top=top, or
 print('Silhouette scores:')
 print('* Model: ', latent_dataset_silhouette(model, origin=ds))
 print('* BMC: ', latent_dataset_silhouette(bmc, origin=ds))
+
+
 
 
 
