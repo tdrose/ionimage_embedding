@@ -85,7 +85,7 @@ model = CRL(crldat,
             cnn_dropout=0.01,
             activation='relu', # softmax
             loss_type='selfContrast', # 'selfContrast', 'colocContrast', 'regContrast',
-            resnet='resnet18', # 'resnet18
+            architecture='resnet18', # 'resnet18
             resnet_pretrained=False,
             clip_gradients=None
             )
