@@ -54,14 +54,16 @@ crldat = IonImagedata_random(KIDNEY_SMALL, test=0.3, val=0.1,
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
                  transformations=T.RandomRotation((0, 360)), # T.RandomRotation(degrees=(0, 360)) 
-                 maxzero=.9)
+                 maxzero=.9, vitb16_compatible=True)
 
 # print(np.isnan(crldat.full_dataset.images).any())
 # plt.imshow(crldat.full_dataset.images[10])
 # plt.show()
 
-
-
+print('Train data:\t\t', crldat.train_dataset.images.shape)
+print('Train data:\t\t', crldat.train_dataset.images.shape[0])
+print('Validation data:\t', crldat.val_dataset.images.shape[0])
+print('Test data:\t\t', crldat.test_dataset.images.shape[0])
 # %%
 colocs = ColocModel(crldat)
 

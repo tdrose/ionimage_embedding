@@ -36,11 +36,15 @@ def size_adaption(image_dict: Dict[str, np.ndarray]):
     return out_dict
 
 
-def size_adaption_symmetric(image_dict: Dict[str, np.ndarray]):
+def size_adaption_symmetric(image_dict: Dict[str, np.ndarray], vitb16_compatible: bool=False):
     maxh = np.max(np.array([x.shape[1] for x in image_dict.values()]))
     maxw = np.max(np.array([x.shape[2] for x in image_dict.values()]))
 
     absmax = max(maxh, maxw)
+    if vitb16_compatible:
+        # Check if divisible by 16
+        if absmax % 16 != 0:
+            absmax = absmax + (16 - (absmax % 16))
 
     out_dict = {}
     for dsid, imgs in image_dict.items():
@@ -64,9 +68,8 @@ def size_adaption_symmetric(image_dict: Dict[str, np.ndarray]):
 
 def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: float=0.2, 
                   scale_intensity: str='TIC', 
-                  colocml_preprocessing: bool=False, maxzero: float=.95) -> Tuple[np.ndarray,
-                                                                                  np.ndarray,
-                                                                                  np.ndarray]:
+                  colocml_preprocessing: bool=False, maxzero: float=.95, 
+                  vitb16_compatible: bool=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     
     sm = SMInstance()
     
@@ -97,7 +100,7 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
         training_if[k] = formula
     
     # Transform all images to squares of the same size
-    padding_images = size_adaption_symmetric(training_images)
+    padding_images = size_adaption_symmetric(training_images, vitb16_compatible=vitb16_compatible)
     
     training_data = []
     training_datasets = [] 
@@ -123,19 +126,22 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
 
     return training_data[~zero_mask], training_datasets[~zero_mask], training_ions[~zero_mask]
 
+
 def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache', 
-             db: Tuple[str, str]=('HMDB', 'v4'), fdr: float=0.2, scale_intensity: str='TIC', 
-                 colocml_preprocessing: bool=False, maxzero: float=.95) -> Tuple[np.ndarray,
-                                                                                 np.ndarray,
-                                                                                 np.ndarray]:
+             db: Tuple[str, str]=('HMDB', 'v4'), 
+             fdr: float=0.2, scale_intensity: str='TIC', 
+             colocml_preprocessing: bool=False, 
+             maxzero: float=.95, vitb16_compatible: bool=False) -> Tuple[np.ndarray,
+                                                                         np.ndarray,
+                                                                         np.ndarray]:
     if cache:
         # make hash of datasets
-        cache_hex = '{}_{}_{}_{}-{}_{}_{}_{}'.format(ION_IMAGE_DATA,
+        cache_hex = '{}_{}_{}_{}-{}_{}_{}_{}_{}'.format(ION_IMAGE_DATA,
                                                      ''.join(dataset_ids), 
                                                      colocml_preprocessing, 
                                                      str(db[0]), str(db[1]), 
                                                      str(fdr), str(scale_intensity),
-                                                     str(maxzero)
+                                                     str(maxzero), str(vitb16_compatible)
                                                     )
         
         cache_hex = uuid.uuid5(uuid.NAMESPACE_URL, cache_hex).hex
@@ -151,7 +157,7 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
                                 fdr=fdr, 
                                 scale_intensity=scale_intensity, 
                                 colocml_preprocessing=colocml_preprocessing, 
-                                maxzero=maxzero)
+                                maxzero=maxzero, vitb16_compatible=vitb16_compatible)
             data, dataset_labels, ion_labels = tmp
 
             pickle.dump((data, dataset_labels, ion_labels), 
@@ -165,7 +171,8 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
             data, dataset_labels, ion_labels = tmp
     else:
         tmp = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
-                            colocml_preprocessing=colocml_preprocessing, maxzero=maxzero)
+                            colocml_preprocessing=colocml_preprocessing, 
+                            maxzero=maxzero, vitb16_compatible=vitb16_compatible)
         data, dataset_labels, ion_labels = tmp
 
     return data, dataset_labels, ion_labels
