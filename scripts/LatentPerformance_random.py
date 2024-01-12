@@ -87,7 +87,7 @@ model = CRL(crldat,
             cnn_dropout=0.01,
             activation='relu', # softmax
             loss_type='selfContrast', # 'selfContrast', 'colocContrast', 'regContrast',
-            resnet='resnet18', # 'resnet18
+            architecture='vit_b_16', # 'resnet18
             resnet_pretrained=True,
             clip_gradients=None
             )
@@ -160,9 +160,24 @@ print('* UMAP: ', general_mse(umap_colocs_filered, mean_colocs_filtered, colocs.
 print('* Mean: ', general_mse(mean_colocs_filtered, mean_colocs_filtered, colocs.test_coloc))
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 # %%
 umap_allorigin(model, device=device)
 umap_latent(model, origin='train', device=device)
+
+
+
 
 
 

@@ -1,4 +1,5 @@
 from typing import Optional, Literal, List, Union
+from sympy import im
 
 import torch
 import torch.nn as nn
@@ -7,13 +8,14 @@ import lightning.pytorch as pl
 
 from .cnnClust import CNNClust
 from .resnet_wrapper import ResNetWrapper
+from .vit_b_16_wrapper import VitB16Wrapper
 from .cae import CAE
 from .pseudo_labeling import pseudo_labeling, compute_dataset_ublb
 from ..coloc.utils import torch_cosine
 
 class colocContrastModel(pl.LightningModule):
 
-    clust: Union[CNNClust, ResNetWrapper]
+    clust: Union[CNNClust, ResNetWrapper, VitB16Wrapper]
 
     def __init__(self, 
                  height, 
@@ -31,8 +33,11 @@ class colocContrastModel(pl.LightningModule):
                  lr=0.01,
                  cae_pretrained_model=None,
                  knn=False,
-                 resnet: Optional[Literal['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']] = None,
+                 architecture: Literal['cnnclust', 'vit_b_16', 'resnet18', 'resnet34', 'resnet50', 
+                                       'resnet101', 'resnet152'] = 'cnnclust',
                  resnet_pretrained: bool = False,
+                 vitb16_pretrained: Optional[Literal['IMAGENET1K_V1', 'IMAGENET1K_SWAG_E2E_V1', 
+                                                     'IMAGENET1K_SWAG_LINEAR_V1']] = None,
                  cnn_dropout=0.1, weight_decay=1e-4,
                  clip_gradients: Optional[float] = None
                 ):
@@ -75,12 +80,16 @@ class colocContrastModel(pl.LightningModule):
         else:
             self.cae = cae_pretrained_model
         
-        if resnet is None:
+        if architecture == 'cnnclust':
             self.clust = CNNClust(num_clust=self.num_cluster, height=self.height, width=self.width, 
                                 activation=activation, dropout=cnn_dropout)
-        else:
+        elif architecture == 'vit_b_16':
+            self.clust = VitB16Wrapper(num_clust=self.num_cluster, activation=activation, 
+                                       pretrained=vitb16_pretrained, 
+                                       height=self.height, width=self.width)
+        elif architecture in ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']:
             self.clust = ResNetWrapper(num_clust=self.num_cluster, activation=activation, 
-                                       resnet=resnet, 
+                                       resnet=architecture, 
                                        pretrained=resnet_pretrained, height=self.height, 
                                        width=self.width)
         

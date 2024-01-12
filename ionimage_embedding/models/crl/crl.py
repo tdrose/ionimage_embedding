@@ -1,3 +1,4 @@
+from platform import architecture
 import torch
 import numpy as np
 from typing import Literal, Optional, Union, List
@@ -35,8 +36,11 @@ class CRL:
                  lightning_device: str = 'gpu',
                  activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax',
                  loss_type: Literal['selfContrast', 'colocContrast', 'regContrast'] = 'selfContrast',
-                 resnet: Optional[Literal['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']] = None,
+                 architecture: Literal['cnnclust', 'vit_b_16', 'resnet18', 'resnet34', 'resnet50', 
+                                       'resnet101', 'resnet152'] = 'cnnclust',
                  resnet_pretrained: bool = False,
+                 vitb16_pretrained: Optional[Literal['IMAGENET1K_V1', 'IMAGENET1K_SWAG_E2E_V1', 
+                                                     'IMAGENET1K_SWAG_LINEAR_V1']] = None,
                  clip_gradients: Optional[float] = None,
                  overweight_cae: float = 1000,
                  cnn_dropout: float = 0.1,
@@ -102,9 +106,12 @@ class CRL:
 
         self.use_cae = cae
     
-        self.resnet_type: Optional[Literal['resnet18', 'resnet34', 'resnet50', 
-                                           'resnet101', 'resnet152']] = resnet
+        self.architecture: Literal['cnnclust', 'vit_b_16', 'resnet18', 'resnet34', 'resnet50', 
+                                   'resnet101', 'resnet152'] = architecture
+        
         self.resnet_pretrained = resnet_pretrained
+        self.vitb16_pretrained: Optional[Literal['IMAGENET1K_V1', 'IMAGENET1K_SWAG_E2E_V1', 
+                                                 'IMAGENET1K_SWAG_LINEAR_V1']] = vitb16_pretrained
 
     def image_normalization(self, new_data: np.ndarray):
         return self.data.image_normalization(new_data)
@@ -138,7 +145,10 @@ class CRL:
                                   cae_pretrained_model=cae, knn=self.KNN, knn_adj = self.knn_adj, 
                                   cnn_dropout=self.cnn_dropout, weight_decay=self.weight_decay, 
                                   clip_gradients=self.clip_gradients, 
-                                  resnet=self.resnet_type, resnet_pretrained=self.resnet_pretrained)
+                                  architecture=self.architecture, 
+                                  resnet_pretrained=self.resnet_pretrained, 
+                                  vitb16_pretrained=self.vitb16_pretrained)
+        
         dictlogger = DictLogger()
         trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, 
                              max_epochs=self.training_epochs, logger=dictlogger)

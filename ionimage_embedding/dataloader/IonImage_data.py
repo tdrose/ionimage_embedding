@@ -20,7 +20,7 @@ class IonImagedata_random:
                  colocml_preprocessing: bool=False,
                  k: int=10, batch_size: int=128,
                  cache: bool=False, cache_folder: str='/scratch/model_testing', min_images: int=5, 
-                 maxzero: float=.95, vitb16_compatible: bool=False
+                 maxzero: float=.95, vitb16_compatible: bool=False, force_size: Optional[int]=None
                 ):
         
         self.dataset_ids = dataset_ids
@@ -38,7 +38,8 @@ class IonImagedata_random:
                                                     scale_intensity=scale_intensity, 
                                                     colocml_preprocessing=colocml_preprocessing,
                                                     maxzero=maxzero, 
-                                                    vitb16_compatible=vitb16_compatible)
+                                                    vitb16_compatible=vitb16_compatible, 
+                                                    force_size=force_size)
         
         # Normalize images
         data = self.image_normalization(data)
@@ -197,7 +198,7 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', min_images=5, 
-                 maxzero: float=.95, vitb16_compatible: bool=False
+                 maxzero: float=.95, vitb16_compatible: bool=False, force_size: Optional[int]=None
                 ):
         
         if test < 1:
@@ -210,7 +211,8 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                          colocml_preprocessing=colocml_preprocessing,
                          k=k, batch_size=batch_size,
                          cache=cache, cache_folder=cache_folder, min_images=min_images, 
-                         maxzero=maxzero, vitb16_compatible=vitb16_compatible)
+                         maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
+                         force_size=force_size)
         
         # Train test split
         if len(self.dataset_ids) <= test:
@@ -276,7 +278,8 @@ class IonImagedata_transitivity(IonImagedata_random):
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', 
-                 min_images=5, min_codetection=2, maxzero: float=.95, vitb16_compatible: bool=False
+                 min_images=5, min_codetection=2, maxzero: float=.95, vitb16_compatible: bool=False, 
+                 force_size: Optional[int]=None
                 ):
             
         super().__init__(dataset_ids=dataset_ids, test=.3, val=val, 
@@ -285,7 +288,8 @@ class IonImagedata_transitivity(IonImagedata_random):
                          colocml_preprocessing=colocml_preprocessing,
                          k=k, batch_size=batch_size,
                          cache=cache, cache_folder=cache_folder, min_images=min_images, 
-                         maxzero=maxzero, vitb16_compatible=vitb16_compatible)
+                         maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
+                         force_size=force_size)
         
         self.min_codetection=min_codetection
         
