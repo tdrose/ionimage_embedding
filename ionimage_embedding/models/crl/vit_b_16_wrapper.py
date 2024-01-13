@@ -3,7 +3,9 @@ import torch.nn as nn
 from torchvision.models import vit_b_16
 from torchvision.models import ViT_B_16_Weights
 
-from typing import Literal, Optional
+from typing import Literal, Optional, Final
+
+VIT_B_16_DEFAULT_IMAGE_SIZE: Final = 224
 
 class VitB16Wrapper(torch.nn.Module):
     def __init__(self, 
