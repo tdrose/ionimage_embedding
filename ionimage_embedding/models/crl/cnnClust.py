@@ -1,7 +1,7 @@
 import torch.nn as nn
 from typing import Literal
 
-from .cae import conv2d_hwout
+from .dims import conv2d_hwout
 
 def init_weights(m):
     if type(m) == nn.Linear:

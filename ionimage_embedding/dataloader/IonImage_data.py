@@ -47,6 +47,7 @@ class IonImagedata_random:
         # Encoding for ds_labels and ion_labels
         self.ds_encoder = preprocessing.LabelEncoder()
         dsl_int = torch.tensor(self.ds_encoder.fit_transform(dataset_labels))
+        self.n_datasets: int = len(set(dataset_labels))
         
         self.dsl_int_mapper = {}
         for dsid in set(dataset_labels):
