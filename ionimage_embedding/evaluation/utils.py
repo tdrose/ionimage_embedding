@@ -7,6 +7,7 @@ import sklearn.cluster as cluster
 
 from ..models.crl.crl import CRL
 from ..models.biomedclip import BioMedCLIP
+from ..models.cvae.cvae import CVAE
 from ..dataloader.mzImageDataset import mzImageDataset
 
 def sensitivity(x: dict) -> float:
@@ -24,7 +25,7 @@ def f1score(x: dict) -> float:
 def precision(x: dict) -> float:
     return x['tp'] / (x['tp'] + x['fp'])
 
-def get_mzimage_dataset(model: Union[CRL, BioMedCLIP], 
+def get_mzimage_dataset(model: Union[CRL, BioMedCLIP, CVAE], 
                         origin: Literal['train', 'val', 'test']='train') -> mzImageDataset:
     if origin == 'train':
         return model.data.train_dataset
@@ -35,7 +36,7 @@ def get_mzimage_dataset(model: Union[CRL, BioMedCLIP],
     else:
         raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
 
-def get_latent(model: Union[CRL, BioMedCLIP], device: str='cpu',
+def get_latent(model: Union[CRL, BioMedCLIP, CVAE], device: str='cpu',
                origin: Literal['train', 'val', 'test']='train') -> np.ndarray:
     if origin == 'train':
         latent = model.inference_embeddings_train(device=device)
@@ -48,7 +49,7 @@ def get_latent(model: Union[CRL, BioMedCLIP], device: str='cpu',
     
     return latent
 
-def get_ds_labels(model: Union[CRL, BioMedCLIP],
+def get_ds_labels(model: Union[CRL, BioMedCLIP, CVAE],
                   origin: Literal['train', 'val', 'test']='train') -> np.ndarray:
     if origin == 'train':
         ds_labels = model.data.train_dataset.dataset_labels.detach().cpu().numpy()
@@ -61,7 +62,7 @@ def get_ds_labels(model: Union[CRL, BioMedCLIP],
     
     return ds_labels
 
-def get_ion_labels(model: Union[CRL, BioMedCLIP],
+def get_ion_labels(model: Union[CRL, BioMedCLIP, CVAE],
                    origin: Literal['train', 'val', 'test']='train') -> np.ndarray:
     if origin == 'train':
         ion_labels = model.data.train_dataset.ion_labels.detach().cpu().numpy()
@@ -74,7 +75,7 @@ def get_ion_labels(model: Union[CRL, BioMedCLIP],
     
     return ion_labels
 
-def get_ion_images(model: Union[CRL, BioMedCLIP],
+def get_ion_images(model: Union[CRL, BioMedCLIP, CVAE],
                    origin: Literal['train', 'val', 'test']='train') -> np.ndarray:
     if origin == 'train':
         images = model.data.train_dataset.images
@@ -87,7 +88,7 @@ def get_ion_images(model: Union[CRL, BioMedCLIP],
 
     return images
 
-def latent_centroids(model: Union[CRL, BioMedCLIP], 
+def latent_centroids(model: Union[CRL, BioMedCLIP, CVAE], 
                      origin: Literal['train', 'val', 'test']='train') -> Tuple[np.ndarray, 
                                                                                np.ndarray]:
 
@@ -107,7 +108,7 @@ def latent_centroids(model: Union[CRL, BioMedCLIP],
             
     return np.stack(ion_centroids), np.array(centroid_labels)
 
-def latent_centroids_df(model: Union[CRL, BioMedCLIP], 
+def latent_centroids_df(model: Union[CRL, BioMedCLIP, CVAE], 
                         origin: Literal['train', 'val', 'test']='train') -> pd.DataFrame:
     # Call the latent_centroids function and create a dataframe of the results 
     # by using the centroid labels as the index
@@ -127,7 +128,7 @@ def compute_umap(latent: np.ndarray) -> pd.DataFrame:
     return data
 
 
-def cluster_latent(model, n_clusters: int=10, plot: bool=False, device='cpu',
+def cluster_latent(model: Union[CRL, BioMedCLIP, CVAE], n_clusters: int=10, plot: bool=False, device='cpu',
                    origin: Literal['train', 'val', 'test']='train'):
     
     latent = get_latent(model=model, device=device, origin=origin)

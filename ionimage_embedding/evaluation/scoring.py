@@ -18,6 +18,7 @@ from .utils import (
     get_mzimage_dataset)
 from ..dataloader.mzImageDataset import mzImageDataset
 from ..models.crl.crl import CRL
+from ..models.cvae.cvae import CVAE
 from ..models.coloc.coloc import ColocModel
 from ..models.coloc.utils import torch_cosine
 from ..models.biomedclip import BioMedCLIP
@@ -84,7 +85,7 @@ def evaluation_quantile_overlap(evaluation_dict):
                          'lq': evaluation_dict['lq'], 'uq': evaluation_dict['uq']})
 
 
-def latent_dataset_silhouette(model: Union[CRL, BioMedCLIP], metric: str='cosine', 
+def latent_dataset_silhouette(model: Union[CRL, BioMedCLIP, CVAE], metric: str='cosine', 
                               origin: Literal['train', 'val', 'test']='train', device: str='cpu'):
     if origin == 'train':
         latent = model.inference_embeddings_train(device=device)
@@ -101,7 +102,7 @@ def latent_dataset_silhouette(model: Union[CRL, BioMedCLIP], metric: str='cosine
     return silhouette_score(X=latent, labels=ds_labels, metric=metric) 
 
 
-def compute_ds_coloc(model: Union[CRL, BioMedCLIP], device: str='cpu',
+def compute_ds_coloc(model: Union[CRL, BioMedCLIP, CVAE], device: str='cpu',
                      origin: Literal['train', 'val', 'test']='train') -> Dict[int, pd.DataFrame]:
     latent = get_latent(model=model, device=device, origin=origin)
     
