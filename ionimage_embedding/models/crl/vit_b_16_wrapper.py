@@ -34,28 +34,28 @@ class VitB16Wrapper(torch.nn.Module):
                              'Use IMAGENET1K_V1, IMAGENET1K_SWAG_E2E_V1, or '
                              'IMAGENET1K_SWAG_LINEAR_V1.')
 
+        # self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
+        #                            nn.BatchNorm1d(num_clust, momentum=0.01))
+        self.final = nn.Linear(self.vit_b_16.num_classes, num_clust)
+        
         if activation == 'softmax':
-            self.final = nn.Sequential(nn.Linear(self.vit_b_16.num_classes, num_clust),
-                                    nn.BatchNorm1d(num_clust, momentum=0.01),
-                                    nn.Softmax(dim=1))
+            self.act = nn.Softmax(dim=1)
         elif activation == 'sigmoid':
-            self.final = nn.Sequential(nn.Linear(self.vit_b_16.num_classes, num_clust),
-                                    nn.BatchNorm1d(num_clust, momentum=0.01),
-                                    nn.Sigmoid())
+            self.act = nn.Sigmoid()
         elif activation == 'relu':
-            self.final = nn.Sequential(nn.Linear(self.vit_b_16.num_classes, num_clust),
-                                    nn.BatchNorm1d(num_clust, momentum=0.01),
-                                    nn.ReLU())
+            self.act = nn.ReLU()
         else:
             raise ValueError('Activation function not available. Use softmax, relu, or sigmoid.')
+        
 
     def forward(self, x):
+        x = self.embed_layers(x)
+        x = self.act(x)
+        return x
+
+    def embed_layers(self, x):
         # Expanding to 3 channel image
         x = x.expand(-1, 3, -1, -1)
         x = self.vit_b_16(x)
         x = self.final(x)
         return x
-
-    def embed_layers(self, x):
-        # Currently just a dummy for forward pass
-        return self.forward(x)

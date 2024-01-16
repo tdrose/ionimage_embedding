@@ -41,28 +41,34 @@ class ResNetWrapper(torch.nn.Module):
 
         in_features = tmp2.shape[1]
 
+        # self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
+        #                            nn.BatchNorm1d(num_clust, momentum=0.01))
+        self.final = nn.Linear(in_features, num_clust)
+        
         if activation == 'softmax':
-            self.fc = nn.Sequential(nn.Linear(in_features, num_clust), 
-                                    nn.Softmax(dim=1)) # type: ignore
+            self.act = nn.Softmax(dim=1)
         elif activation == 'sigmoid':
-            self.fc = nn.Sequential(nn.Linear(in_features, num_clust), 
-                                    nn.Sigmoid()) # type: ignore
+            self.act = nn.Sigmoid()
         elif activation == 'relu':
-            self.fc = nn.Sequential(nn.Linear(in_features, num_clust), 
-                                    nn.ReLU()) # type: ignore
+            self.act = nn.ReLU()
         else:
             raise ValueError('Activation function not available. Use softmax, relu, or sigmoid.')
 
-        self.resnet = rn
+        # self.resnet = rn
 
     def forward(self, x):
-        # Expanding to 3 channel image
-        x = x.expand(-1, 3, -1, -1)
-        x = self.features(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
+        
+        x = self.embed_layers(x)
+        x = self.act(x)
+
         return x
     
     def embed_layers(self, x):
-        # Currently just a dummy for forward pass
-        return self.forward(x)
+        # Expanding to 3 channel image
+        x = x.expand(-1, 3, -1, -1)
+
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        x = self.final(x)
+
+        return x

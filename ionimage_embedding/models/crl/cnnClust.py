@@ -104,18 +104,16 @@ class CNNClust(nn.Module):
                                  nn.BatchNorm1d(self.h2, momentum=0.01),
                                  nn.ReLU())
         
+        # self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
+        #                            nn.BatchNorm1d(num_clust, momentum=0.01))
+        self.final = nn.Linear(self.h2, num_clust)
+        
         if activation == 'softmax':
-            self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
-                                    nn.BatchNorm1d(num_clust, momentum=0.01),
-                                    nn.Softmax(dim=1))
+            self.act = nn.Softmax(dim=1)
         elif activation == 'sigmoid':
-            self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
-                                    nn.BatchNorm1d(num_clust, momentum=0.01),
-                                    nn.Sigmoid())
+            self.act = nn.Sigmoid()
         elif activation == 'relu':
-            self.final = nn.Sequential(nn.Linear(self.h2, num_clust),
-                                    nn.BatchNorm1d(num_clust, momentum=0.01),
-                                    nn.ReLU())
+            self.act = nn.ReLU()
         else:
             raise ValueError('Activation function not available. Use softmax, relu, or sigmoid.')
         
@@ -132,11 +130,12 @@ class CNNClust(nn.Module):
         x = x.view(-1, self.final_conv_dim)
         x = self.lh1(x)
         x = self.lh2(x)
+        x = self.final(x)
 
         return x
 
     def forward(self, x):
         x = self.embed_layers(x)
-        x = self.final(x)
+        x = self.act(x)
 
         return x

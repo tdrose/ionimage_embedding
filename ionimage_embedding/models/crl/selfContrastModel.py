@@ -116,6 +116,7 @@ class selfContrastModel(pl.LightningModule):
         return ub, lb, sim_mat
 
     def loss_mask(self, features, uu, ll, train_datasets, index, train_images, raw_images):
+        
         ub, lb, sim_mat = self.compute_ublb(features, uu, ll, train_datasets, index)
 
         dataset_ub = torch.tensor(0)

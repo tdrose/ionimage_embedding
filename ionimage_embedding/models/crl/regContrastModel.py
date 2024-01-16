@@ -146,7 +146,7 @@ class regContrastModel(pl.LightningModule):
             mask2 = torch.eye(ds_mask.size(0), dtype=torch.bool)
             mask[mask2] = 0.
 
-            # Set maskin with datasets to 1
+            # Set mask within datasets to 1
             ds_mask[mask] = 1
 
         # Align the same ions
