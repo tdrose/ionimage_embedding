@@ -20,7 +20,7 @@ from ionimage_embedding.evaluation.scoring import (
     general_mse
 )
 from ionimage_embedding.evaluation.utils import cluster_latent, latent_centroids_df
-from ionimage_embedding.datasets import KIDNEY_SMALL
+from ionimage_embedding.datasets import KIDNEY_SMALL, BRAIN_SMALL
 from ionimage_embedding.evaluation.plots import umap_latent,  umap_allorigin, plot_image_clusters
 
 
@@ -49,7 +49,7 @@ os.system('nvidia-smi')
 
 # %%
 
-crldat = IonImagedata_random(KIDNEY_SMALL, test=0.3, val=0.1, 
+crldat = IonImagedata_random(BRAIN_SMALL, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
@@ -80,14 +80,14 @@ model = CRL(crldat,
             knn=True, # False
             lr=0.1, # .18
             pretraining_epochs=10,
-            training_epochs=20, # 30
+            training_epochs=50, # 30
             cae_encoder_dim=2,
             lightning_device='gpu',
             cae=False,
             cnn_dropout=0.01,
             activation='relu', # softmax
-            loss_type='selfContrast', # 'selfContrast', 'colocContrast', 'regContrast',
-            architecture='vit_b_16', # 'resnet18
+            loss_type='regContrast', # 'selfContrast', 'colocContrast', 'regContrast',
+            architecture='cnnclust', # 'resnet18
             resnet_pretrained=True,
             clip_gradients=None
             )
