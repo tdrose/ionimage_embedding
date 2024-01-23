@@ -72,7 +72,6 @@ class infoNCEModel(pl.LightningModule):
         self.dataset_specific_percentiles = dataset_specific_percentiles
         self.curr_lower = initial_lower
         self.curr_upper = initial_upper
-        
         self.ion_label_mat = ion_label_mat
 
         if cae_pretrained_model is None:
@@ -94,31 +93,6 @@ class infoNCEModel(pl.LightningModule):
                                        resnet=architecture, 
                                        pretrained=resnet_pretrained, height=self.height, 
                                        width=self.width)
-        
-    def cl(self, neg_loc, pos_loc, sim_mat):
-        pos_entropy = torch.mul(-torch.log(torch.clip(sim_mat, 1e-10, 1)), pos_loc)
-        neg_entropy = torch.mul(-torch.log(torch.clip(1 - sim_mat, 1e-10, 1)), neg_loc)
-        # print('cl')
-        # print(pos_entropy)
-        # print(neg_entropy)
-        # CNN loss
-        contrastive_loss = pos_entropy.sum() / pos_loc.sum() + neg_entropy.sum() / neg_loc.sum()
-        # print(contrastive_loss)
-        # print()
-        return contrastive_loss
-    
-    def compute_ublb(self, features, uu, ll, train_datasets, index):
-        features = functional.normalize(features, p=2, dim=-1)
-
-        sim_mat = torch.matmul(features, torch.transpose(features, 0, 1))
-
-        mask = torch.eye(sim_mat.size(0), dtype=torch.bool)
-        masked_matrix = sim_mat[~mask]
-
-        ub = torch.quantile(masked_matrix, uu/100).detach()
-        lb = torch.quantile(masked_matrix, ll/100).detach()
-
-        return ub, lb, sim_mat
 
     def loss_mask(self, features, uu, ll, train_datasets, index, train_images, raw_images):
 
@@ -155,7 +129,7 @@ class infoNCEModel(pl.LightningModule):
                 neg = torch.exp(raw_sim_mat[i, ds_mask][neg_mask]/TEMPERATURE).sum()
 
                 # Compute loss
-                loss += -torch.log(pos/neg)
+                loss = loss - torch.log(pos/neg)
                 counter += 1.
         
         # Same ion loss terms
@@ -182,13 +156,12 @@ class infoNCEModel(pl.LightningModule):
                         neg1 = torch.exp(raw_sim_mat[i, ds_mask1][neg_mask1]/TEMPERATURE).sum()
                         neg2 = torch.exp(raw_sim_mat[i, ds_mask2][neg_mask2]/TEMPERATURE).sum()
                         
-                        loss += -torch.log(pos/torch.cat([neg1, neg2]).sum())
+                        loss = loss  - torch.log(pos/(neg1 + neg2))
                         counter += 1.
 
         
         # Return mean loss
         loss = loss/counter
-        loss.requires_grad = True
         return loss
 
     def contrastive_loss(self, features, uu, ll, train_datasets, index, train_images, raw_images):
@@ -217,6 +190,7 @@ class infoNCEModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         
         train_x, index, train_datasets, train_ions, untransformed_images = batch
+
         
         self.knn_adj = self.knn_adj.to(self.device)
         self.ion_label_mat = self.ion_label_mat.to(self.device)
@@ -226,21 +200,23 @@ class infoNCEModel(pl.LightningModule):
         
         if self.cae is None:
             features, x_p = self.forward(train_x)
+            uti_features, uti_x_p = self.forward(untransformed_images)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
                                          train_datasets=train_datasets, index=index, 
-                                         train_images=train_x, raw_images=untransformed_images)
+                                         train_images=train_x, raw_images=uti_features)
             self.log('Training loss', loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
             return loss
         
         else:
             features, x_p = self.forward(train_x)
+            uti_features, uti_x_p = self.forward(untransformed_images)
             loss_cae = self.mse_loss(x_p, train_x)
             loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, 
                                                ll=self.curr_lower, 
                                                train_datasets=train_datasets, index=index, 
                                                train_images=train_x, 
-                                               raw_images=untransformed_images)
+                                               raw_images=uti_features)
             loss = loss_cae + loss_clust
             self.log('Training loss', loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
@@ -262,9 +238,10 @@ class infoNCEModel(pl.LightningModule):
 
         if self.cae is None:
             features, x_p = self.forward(val_x)
+            uti_features, uti_x_p = self.forward(untransformed_images)
             loss = self.contrastive_loss(features=features, uu=self.curr_upper, ll=self.curr_lower, 
                                          train_datasets=val_datasets, index=index, 
-                                         train_images=val_x, raw_images=untransformed_images)
+                                         train_images=val_x, raw_images=uti_features)
             self.log('Validation loss', loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
 
@@ -272,11 +249,12 @@ class infoNCEModel(pl.LightningModule):
         
         else:
             features, x_p = self.forward(val_x)
+            uti_features, uti_x_p = self.forward(untransformed_images)
             loss_cae = self.mse_loss(x_p, val_x)
             loss_clust = self.contrastive_loss(features=features, uu=self.curr_upper, 
                                                ll=self.curr_lower, 
                                                train_datasets=val_datasets, index=index, 
-                                               train_images=val_x, raw_images=untransformed_images)
+                                               train_images=val_x, raw_images=uti_features)
             loss = loss_cae + loss_clust
             self.log('Validation loss', loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)

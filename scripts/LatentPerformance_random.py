@@ -49,10 +49,10 @@ os.system('nvidia-smi')
 
 # %%
 
-crldat = IonImagedata_random(BRAIN_SMALL, test=0.3, val=0.1, 
+crldat = IonImagedata_random(KIDNEY_SMALL, test=0.3, val=0.1, 
                  cache=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
-                 fdr=.1, batch_size=40, 
+                 fdr=.1, batch_size=60, 
                  transformations=T.RandomRotation((0, 360)), # T.RandomRotation(degrees=(0, 360)) 
                  maxzero=.9, vitb16_compatible=True)
 
@@ -86,8 +86,8 @@ model = CRL(crldat,
             cae=False,
             cnn_dropout=0.01,
             activation='relu', # softmax
-            loss_type='regContrast', # 'selfContrast', 'colocContrast', 'regContrast',
-            architecture='cnnclust', # 'resnet18
+            loss_type='infoNCE', # 'selfContrast', 'colocContrast', 'regContrast', 'infoNCE'
+            architecture='resnet18', # 'resnet18
             resnet_pretrained=True,
             clip_gradients=None
             )
