@@ -10,6 +10,7 @@ from .cae import CAE
 from .selfContrastModel import selfContrastModel
 from .colocContrastModel import colocContrastModel
 from .regContrastModel import regContrastModel
+from .infoNCEModel import infoNCEModel
 
 from ...dataloader.IonImage_data import IonImagedata_random
 from ...logger import DictLogger
@@ -18,7 +19,7 @@ from ...logger import DictLogger
 class CRL:
 
     cae: CAE
-    crl: Union[regContrastModel, colocContrastModel, selfContrastModel]
+    crl: Union[regContrastModel, colocContrastModel, selfContrastModel, infoNCEModel]
 
     def __init__(self,
                  data: IonImagedata_random,
@@ -35,7 +36,8 @@ class CRL:
                  cae_encoder_dim: int = 7,
                  lightning_device: str = 'gpu',
                  activation: Literal['softmax', 'relu', 'sigmoid'] = 'softmax',
-                 loss_type: Literal['selfContrast', 'colocContrast', 'regContrast'] = 'selfContrast',
+                 loss_type: Literal['selfContrast', 'colocContrast', 
+                                    'regContrast', 'infoNCE'] = 'selfContrast',
                  architecture: Literal['cnnclust', 'vit_b_16', 'resnet18', 'resnet34', 'resnet50', 
                                        'resnet101', 'resnet152'] = 'cnnclust',
                  resnet_pretrained: bool = False,
@@ -74,13 +76,16 @@ class CRL:
         self.cnn_dropout = cnn_dropout
         self.weight_decay = weight_decay
 
-        self.loss_type: Literal['selfContrast', 'colocContrast', 'regContrast'] = loss_type
+        self.loss_type: Literal['selfContrast', 'colocContrast', 
+                                'regContrast', 'infoNCE'] = loss_type
         if loss_type == 'selfContrast':
             self.model_cls = selfContrastModel
         elif loss_type == 'colocContrast':
             self.model_cls = colocContrastModel
         elif loss_type == 'regContrast':
             self.model_cls = regContrastModel
+        elif loss_type == 'infoNCE':
+            self.model_cls = infoNCEModel
         else:
             raise ValueError('Loss type not available')
 

@@ -104,7 +104,7 @@ rcm = regContrastModel(
                  ion_label_mat= model.ion_label_mat,
                  knn_adj=model.knn_adj,
                  activation='relu',
-                 lr=0.01,
+                 lr=0.001,
                  architecture = 'resnet18',
                  resnet_pretrained = False,
                  vitb16_pretrained = None,
@@ -114,10 +114,11 @@ rcm = regContrastModel(
 
 # %%
 model_params = rcm.clust.parameters()
-optimizer = torch.optim.RMSprop(params=model_params, lr=rcm.lr, weight_decay=rcm.weight_decay)
+optimizer = torch.optim.Adam(params=model_params, lr=rcm.lr, weight_decay=rcm.weight_decay)
 device='cuda'
 rcm = rcm.to(device)
 
+losses = []
 # %%
 dl = iter(model.data.get_train_dataloader())
 
@@ -148,6 +149,7 @@ loss = rcm.contrastive_loss(features=final, uu=rcm.curr_upper,
                                 raw_images=untransformed_images)
 
 print('Loss: ', loss)
+losses.append(loss.item())
 
 # %%
 # Visualize gradient and weights
@@ -161,4 +163,6 @@ optimizer.step()
 counter += 1
 if counter == len(dl):
     print('Epoch finished, re-initialize dataloader')
+# %%
+plt.plot(losses)
 # %%
