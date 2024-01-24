@@ -5,22 +5,7 @@ import torchvision.transforms as T
 import numpy as np
 import upsetplot
 
-from ionimage_embedding.evaluation.utils import get_ion_labels, get_latent
-from ionimage_embedding.models import CRL, ColocModel
-from ionimage_embedding.dataloader import CRLdata
-from ionimage_embedding.evaluation.scoring import (
-    closest_accuracy_aggcoloc,
-    closest_accuracy_latent,
-    closest_accuracy_random,
-    compute_ds_coloc,
-    latent_dataset_silhouette,
-    same_ion_similarity,
-    coloc_umap,
-    umap_inference,
-    closest_accuracy_umapcoloc
-)
-from ionimage_embedding.evaluation.utils import cluster_latent
-from ionimage_embedding.evaluation.plots import umap_latent,  umap_allorigin, plot_image_clusters
+from ionimage_embedding.dataloader import IonImagedata_random
 
 
 # Load autoreload framework when running in ipython interactive session
@@ -40,7 +25,7 @@ except ImportError:
 
 
 # %%
-def ionlabel_hist(data: CRLdata, ax: plt.Axes):
+def ionlabel_hist(data: IonImagedata_random, ax: plt.Axes):
     arr = data.full_dataset.ion_labels.detach().cpu().numpy()
     
     _, counts = np.unique(arr, return_counts=True)
@@ -50,7 +35,7 @@ def ionlabel_hist(data: CRLdata, ax: plt.Axes):
     ax.set_xlabel('Ion')
     ax.set_ylabel('#datasets')
 
-def ions_per_dataset(data: CRLdata, ax: plt.Axes):
+def ions_per_dataset(data: IonImagedata_random, ax: plt.Axes):
     arr = data.full_dataset.dataset_labels.detach().cpu().numpy()
 
     _, counts = np.unique(arr, return_counts=True)
@@ -60,7 +45,7 @@ def ions_per_dataset(data: CRLdata, ax: plt.Axes):
     ax.set_xlabel('Dataset')
     ax.set_ylabel('#ions')
 
-def ion_overview(data: CRLdata):
+def ion_overview(data: IonImagedata_random):
     fig, (ax0, ax1) = plt.subplots(ncols=2)
 
     ionlabel_hist(data, ax0)
@@ -68,7 +53,7 @@ def ion_overview(data: CRLdata):
 
     plt.show()
 
-def ion_upset(data: CRLdata):
+def ion_upset(data: IonImagedata_random):
 
     ion_arr = data.full_dataset.ion_labels.detach().cpu().numpy()
     ds_arr = data.full_dataset.dataset_labels.detach().cpu().numpy()
@@ -82,7 +67,7 @@ def ion_upset(data: CRLdata):
 
     upsetplot.UpSet(upset_input, subset_size="count").plot()
 
-def example_images(data: CRLdata, ncols: int=5, figsize=(10, 5), titlesize=1):
+def example_images(data: IonImagedata_random, ncols: int=5, figsize=(10, 5), titlesize=1):
 
     ds_arr = data.full_dataset.dataset_labels.detach().cpu().numpy()
     imgs = data.full_dataset.images
@@ -126,7 +111,7 @@ ds_list = [
     '2022-11-28_22h23m30s'
                   ]
 
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
+crldat = IonImagedata_random(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/tmp/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
@@ -159,7 +144,7 @@ ds_list = [
     '2022-12-07_02h08m52s', '2020-12-09_02h41m05s'
                   ]
 
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
+crldat = IonImagedata_random(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/tmp/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
@@ -181,7 +166,7 @@ ds_list = [
     '2022-07-19_19h29m24s', '2016-09-21_16h06m56s'
                   ]
 
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
+crldat = IonImagedata_random(ds_list, test=0.3, val=0.1, 
                  cache=False, cache_folder='/tmp/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
@@ -208,7 +193,7 @@ ds_list = [
     '2022-12-01_19h18m26s'
                   ]
 
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
+crldat = IonImagedata_random(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/tmp/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
@@ -257,7 +242,7 @@ ds_list = [
     '2022-12-01_19h18m26s'
                   ]
 
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
+crldat = IonImagedata_random(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/tmp/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
@@ -276,7 +261,7 @@ ds_list = [
     '2017-08-11_12h30m20s', '2017-08-07_13h21m54s', '2017-08-07_13h19m42s'
                   ]
 
-crldat = CRLdata(ds_list, test=0.3, val=0.1, 
+crldat = IonImagedata_random(ds_list, test=0.3, val=0.1, 
                  cache=True, cache_folder='/tmp/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=40, 
