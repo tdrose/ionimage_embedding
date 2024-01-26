@@ -36,7 +36,9 @@ setup(
         'anndata',
         'scanpy',
         'umap-learn',
-        'open_clip_torch>=2.23.0' # Known bug in model loading, fixed in version 0.23.0
+        'open_clip_torch>=2.23.0', # Known bug in model loading, fixed in version 0.23.0
+        'torch_geometric',
+        'rdkit'
     ],
     
     python_requires=">=3.8",
