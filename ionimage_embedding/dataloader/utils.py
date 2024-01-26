@@ -136,6 +136,20 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
 
     return training_data[~zero_mask], training_datasets[~zero_mask], training_ions[~zero_mask]
 
+def cache_hashing(dataset_ids: List[str], colocml_preprocessing: bool,
+                  db: Tuple[str, str], fdr: float, scale_intensity: str,
+                  force_size: Optional[int], maxzero: float, vitb16_compatible: bool) -> str:
+    cache_hex = '{}_{}_{}_{}-{}_{}_{}_{}_{}_{}'.format(ION_IMAGE_DATA,
+                                                     ''.join(dataset_ids), 
+                                                     colocml_preprocessing, 
+                                                     str(db[0]), str(db[1]), 
+                                                     str(fdr), str(scale_intensity),
+                                                     str(maxzero), str(vitb16_compatible),
+                                                     str(force_size)
+                                                    )
+    
+    return uuid.uuid5(uuid.NAMESPACE_URL, cache_hex).hex
+
 
 def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache', 
              db: Tuple[str, str]=('HMDB', 'v4'), 
@@ -146,16 +160,9 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
                                                                          np.ndarray]:
     if cache:
         # make hash of datasets
-        cache_hex = '{}_{}_{}_{}-{}_{}_{}_{}_{}_{}'.format(ION_IMAGE_DATA,
-                                                     ''.join(dataset_ids), 
-                                                     colocml_preprocessing, 
-                                                     str(db[0]), str(db[1]), 
-                                                     str(fdr), str(scale_intensity),
-                                                     str(maxzero), str(vitb16_compatible),
-                                                     str(force_size)
-                                                    )
+        cache_hex = cache_hashing(dataset_ids, colocml_preprocessing, db, fdr, scale_intensity,
+                                  force_size, maxzero, vitb16_compatible)
         
-        cache_hex = uuid.uuid5(uuid.NAMESPACE_URL, cache_hex).hex
         cache_file = '{}_{}.pickle'.format(ION_IMAGE_DATA, cache_hex)
 
         # Check if cache folder exists
@@ -234,3 +241,19 @@ def run_knn(features: np.ndarray, k: int = 10):
     for i in range(len(idx)):
         adj[i, idx[i]] = 1
     return make_symmetric(adj)
+
+
+def create_edgelist(edges: Optional[np.ndarray], i: int, top_k: int,
+                                top_k_idx: np.ndarray) -> np.ndarray:
+                
+    new_edges = np.stack([np.repeat(i, top_k), 
+                          top_k_idx], axis=0).transpose()
+
+    # Make undirected
+    new_edges = np.vstack([new_edges, new_edges[:, ::-1]])
+
+    if edges is None:
+        return np.unique(new_edges, axis=0)
+    else:
+        tmp = np.vstack([new_edges, edges])
+        return np.unique(tmp, axis=0)

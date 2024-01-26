@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, Dict
 import torch
 import torch.nn.functional as f
 
@@ -72,7 +72,7 @@ class ColocModel:
 
         return out_dict
     
-    def compute_ds_coloc(self, dat) -> dict[int, pd.DataFrame]:
+    def compute_ds_coloc(self, dat) -> Dict[int, pd.DataFrame]:
         out_dict = {}        
 
         # loop over each dataset
