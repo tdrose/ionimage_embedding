@@ -98,6 +98,12 @@ class ColocModel:
     
     def inference(self, ion_labels: torch.Tensor, agg: str='mean') -> Tuple[pd.DataFrame, float]:
 
+        return self._inference(ion_labels, self.train_coloc, agg=agg)
+    
+    @staticmethod
+    def _inference(ion_labels: torch.Tensor, ds_colocs: Dict[int, pd.DataFrame], 
+                   agg: str='mean') -> Tuple[pd.DataFrame, float]:
+
         # Create torch matrix to fill
         numpy_ion_labels = ion_labels.cpu().detach().numpy()
         numpy_ion_labels = np.unique(numpy_ion_labels)
@@ -131,10 +137,10 @@ class ColocModel:
                     ion2 = int(sorted_ion_labels[i2])
                     counter += 1.
                     checker = True
-                    for ds in self.train_coloc.keys():
+                    for ds in ds_colocs.keys():
                         # Check if ion pair was co-detected in any of the training data
-                        if ion1 in self.train_coloc[ds].columns and ion2 in self.train_coloc[ds].columns:
-                            aggs.append(self.train_coloc[ds].loc[ion1, ion2])
+                        if ion1 in ds_colocs[ds].columns and ion2 in ds_colocs[ds].columns:
+                            aggs.append(ds_colocs[ds].loc[ion1, ion2])
                             checker = False
                     if checker:
                         not_possible += 1.

@@ -1,12 +1,13 @@
 # %%
 import matplotlib.pyplot as plt
-from torch import embedding
+import torch
+import numpy as np
 
 from ionimage_embedding.dataloader.constants import CACHE_FOLDER
 from ionimage_embedding.dataloader.ColocNet_data import ColocNetData_discrete
 from ionimage_embedding.datasets import KIDNEY_SMALL
 from ionimage_embedding.models import gnnDiscrete
-
+from ionimage_embedding import ColocModel
 
 # Load autoreload framework when running in ipython interactive session
 try:
@@ -37,7 +38,7 @@ dat = ColocNetData_discrete(KIDNEY_SMALL, test=2, val=1,
 # %%
 model = gnnDiscrete(data=dat, latent_dims=10, 
                     encoding = 'onehot',
-                    lr=1e-3, training_epochs=150, lightning_device='gpu')
+                    lr=1e-3, training_epochs=170, lightning_device='gpu')
 
 
 # %%
@@ -48,21 +49,25 @@ plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', co
 plt.plot(mylogger.logged_metrics['Training loss'], label='Training loss', color='blue')
 plt.legend()
 plt.show()
-# %%
 
-
-# %%
-model = gnnDiscrete(data=dat, latent_dims=10, 
-                    encoding = 'learned', embedding_dims=10,
-                    lr=1e-3, training_epochs=150, lightning_device='gpu')
 
 
 # %%
-mylogger = model.train()
+def mean_colocs(data: ColocNetData_discrete):
+    
+    train_ds = data._train_set
 
-# %%
-plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')
-plt.plot(mylogger.logged_metrics['Training loss'], label='Training loss', color='blue')
-plt.legend()
-plt.show()
+    test_ds = data._test_set
+    
+    test_ions = []
+    for dsid in test_ds:
+        test_ions.extend(data.dataset.coloc_dict[dsid].columns)
+    test_ions = torch.tensor(list(set(test_ions)))
+    # Compute mean coloc across training datasets
+    mean_colocs = ColocModel._inference(ds_colocs={k: v for k, v in data.dataset.coloc_dict.items() if k in train_ds}, 
+                                        ion_labels=test_ions, agg='mean')
+    
+    return mean_colocs
+
+tmp = mean_colocs(dat)
 # %%
