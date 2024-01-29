@@ -25,7 +25,7 @@ except ImportError:
 
 
 # %%
-dat = ColocNetData_discrete(KIDNEY_SMALL, test=0.3, val=0.1, 
+dat = ColocNetData_discrete(KIDNEY_SMALL, test=2, val=1, 
                  cache_images=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
                  fdr=.1, batch_size=60, min_images=6, top_k=3,
