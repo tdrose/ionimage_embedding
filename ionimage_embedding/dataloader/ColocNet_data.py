@@ -6,7 +6,7 @@ import torch
 from torch_geometric.loader import DataLoader
 
 from .IonImage_data import IonImagedata_random
-from ..models import ColocModel
+from ..coloc.coloc import ColocModel
 from .utils import cache_hashing
 from .constants import COLOC_NET_DISCRETE_DATA
 from .ColocNetDiscreteDataset import ColocNetDiscreteDataset

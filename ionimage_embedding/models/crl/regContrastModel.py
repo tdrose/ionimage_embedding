@@ -9,7 +9,7 @@ from .resnet_wrapper import ResNetWrapper
 from .vit_b_16_wrapper import VitB16Wrapper
 from .cae import CAE
 from .pseudo_labeling import pseudo_labeling, compute_dataset_ublb
-from ..coloc.utils import torch_cosine
+from ...coloc.utils import torch_cosine
 
 class regContrastModel(pl.LightningModule):
 

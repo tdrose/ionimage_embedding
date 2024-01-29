@@ -4,7 +4,7 @@ from typing import Tuple, Dict
 import torch
 import torch.nn.functional as f
 
-from ...dataloader.IonImage_data import IonImagedata_random
+from ..dataloader.IonImage_data import IonImagedata_random
 from .utils import torch_cosine, quantile_sets
 
 class ColocModel:
