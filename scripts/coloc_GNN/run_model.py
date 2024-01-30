@@ -22,7 +22,7 @@ import seaborn as sns
 
 from ionimage_embedding.dataloader.constants import CACHE_FOLDER
 from ionimage_embedding.dataloader.ColocNet_data import ColocNetData_discrete
-from ionimage_embedding.datasets import KIDNEY_SMALL
+from ionimage_embedding.datasets import KIDNEY_SMALL, KIDNEY_LARGE
 from ionimage_embedding.models import gnnDiscrete
 from ionimage_embedding import ColocModel
 from ionimage_embedding.evaluation.scoring import most_colocalized, latent_colocinference
@@ -45,8 +45,8 @@ dat = ColocNetData_discrete(KIDNEY_SMALL, test=2, val=1,
 
 # %%
 model = gnnDiscrete(data=dat, latent_dims=10, 
-                    encoding = 'onehot',
-                    lr=1e-3, training_epochs=170, lightning_device='gpu')
+                    encoding = 'learned', embedding_dims=10,
+                    lr=1e-3, training_epochs=50, lightning_device='gpu')
 
 
 # %%
@@ -241,16 +241,18 @@ acc_l = []
 
 for i in range(10):
     
-    dat = ColocNetData_discrete(KIDNEY_SMALL, test=2, val=1, 
+    dat = ColocNetData_discrete(KIDNEY_LARGE, test=2, val=1, 
                     cache_images=True, cache_folder='/scratch/model_testing',
                     colocml_preprocessing=True, 
                     fdr=.1, batch_size=1, min_images=6, top_k=3,
                     maxzero=.9)
 
+    # model = gnnDiscrete(data=dat, latent_dims=10, 
+    #                     encoding = 'onehot', embedding_dims=10
+    #                     lr=1e-3, training_epochs=170, lightning_device='gpu')
     model = gnnDiscrete(data=dat, latent_dims=10, 
-                        encoding = 'onehot',
-                        lr=1e-3, training_epochs=170, lightning_device='gpu')
-
+                    encoding = 'learned', embedding_dims=10,
+                    lr=1e-3, training_epochs=40, lightning_device='gpu')
 
 
     mylogger = model.train()
