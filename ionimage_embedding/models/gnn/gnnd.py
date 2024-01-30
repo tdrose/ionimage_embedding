@@ -1,11 +1,13 @@
-from ast import Dict
-from typing import Literal
-from IPython import embed
+from typing import Literal, Dict, Tuple
+import numpy as np
+import pandas as pd
 
 import torch
 import lightning.pytorch as pl
+from torch_geometric.data import Data
 
 from ...dataloader.ColocNet_data import ColocNetData_discrete
+from ...dataloader.ColocNetDiscreteDataset import ColocNetDiscreteDataset
 from .gnnDiscreteModel import gnnDiscreteModel
 
 from ...logger import DictLogger
@@ -45,4 +47,51 @@ class gnnDiscrete:
 
         return dictlogger
     
-    # TODO: Implement prediction functions
+    def predict(self, data: Data) -> torch.Tensor:
+        return self.model(data.x, data.edge_index)
+
+    def predict_multiple(self, data: ColocNetDiscreteDataset) -> Dict[int, torch.Tensor]:
+        out = {}
+        for i in range(len(data)):
+            out[i] = self.predict(data[i])# type: ignore
+
+        return out
+    
+    def predict_centroids(self, data: ColocNetDiscreteDataset) -> Tuple[np.ndarray, np.ndarray]:
+        pred_dict = self.predict_multiple(data)
+
+        # Get set of ion labels from all data objects
+        ion_labels = []
+        for i in range(len(data)):
+            ion_labels.extend(list(data[i].x.detach().cpu().numpy())) # type: ignore
+        ion_labels = list(set(ion_labels))
+
+        # Get mean prediction for each ion
+        ion_centroids = []
+        centroid_labels = []
+        for i in ion_labels:
+            tmp = []
+            for dsid, pred in pred_dict.items():
+                if i in data[dsid].x: # type: ignore
+                    tmp.append(pred[data[dsid].x == i].detach().cpu().numpy()[0]) # type: ignore
+            if len(tmp) > 1:
+                a = np.stack(tmp)
+                ion_centroids.append(np.mean(a, axis=0))
+                centroid_labels.append(i)
+            elif len(tmp) == 1:
+                ion_centroids.append(tmp[0])
+                centroid_labels.append(i)
+            else:
+                pass
+        
+        return np.stack(ion_centroids), np.array(centroid_labels)
+
+    def predict_centroids_df(self, data: ColocNetDiscreteDataset) -> pd.DataFrame:
+        ion_centroids, centroid_labels = self.predict_centroids(data)
+
+        df = pd.DataFrame(ion_centroids, index=centroid_labels)
+        df.index.name = 'ion'
+        # sort the dataframe by the index
+        df = df.sort_index(inplace=False)
+
+        return df

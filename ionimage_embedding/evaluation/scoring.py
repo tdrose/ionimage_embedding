@@ -19,8 +19,8 @@ from .utils import (
 from ..dataloader.mzImageDataset import mzImageDataset
 from ..models.crl.crl import CRL
 from ..models.cvae.cvae import CVAE
-from ..models.coloc.coloc import ColocModel
-from ..models.coloc.utils import torch_cosine
+from ..coloc.coloc import ColocModel
+from ..coloc.utils import torch_cosine
 from ..models.biomedclip import BioMedCLIP
 
 def ds_coloc_convert(colocs: torch.Tensor, 

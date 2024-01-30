@@ -52,11 +52,11 @@ class gnnDiscreteModel(pl.LightningModule):
         return torch.nn.functional.one_hot(x, num_classes=self.n_ions).float().to(self.device)
     
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
+        x = self.embedding(x)
         return self.gae(x, edge_index)
     
     def training_step(self, batch, batch_idx):
-        x = self.embedding(batch.x)
-        z = self.forward(x, batch.edge_index)
+        z = self.forward(batch.x, batch.edge_index)
         
         loss = self.gae.recon_loss(z, batch.edge_index, batch.neg_edge_index)
         
@@ -66,8 +66,7 @@ class gnnDiscreteModel(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
-        x = self.embedding(batch.x)
-        z = self.forward(x, batch.edge_index)
+        z = self.forward(batch.x, batch.edge_index)
         
         loss = self.gae.recon_loss(z, batch.edge_index, batch.neg_edge_index)
         

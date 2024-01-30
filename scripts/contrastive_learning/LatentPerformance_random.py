@@ -4,7 +4,8 @@ import torchvision.transforms as T
 from typing import Dict
 import pandas as pd
 
-from ionimage_embedding.models import CRL, ColocModel, BioMedCLIP
+from ionimage_embedding.models import CRL, BioMedCLIP
+from ionimage_embedding import ColocModel
 from ionimage_embedding.dataloader import IonImagedata_random
 from ionimage_embedding.evaluation.scoring import (
     closest_accuracy_aggcoloc,
