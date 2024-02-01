@@ -10,6 +10,7 @@ from torch_geometric.data import Data
 from ...dataloader.ColocNet_data import ColocNetData_discrete
 from ...dataloader.ColocNetDiscreteDataset import ColocNetDiscreteDataset
 from .gnnDiscreteModel import gnnDiscreteModel
+from .utils import compute_union_graph
 
 from ...logger import DictLogger
 
@@ -20,7 +21,8 @@ class gnnDiscrete:
     def __init__(self, data: ColocNetData_discrete, latent_dims: int=10,
                  lr=1e3, encoding: Literal['onehot', 'learned']= 'onehot',
                  embedding_dims: int=10,
-                 training_epochs: int = 11, lightning_device: str = 'gpu'
+                 training_epochs: int = 11, lightning_device: str = 'gpu',
+                 loss: Literal['recon', 'coloc'] = 'recon'
                  ) -> None:
         
         self.data = data
@@ -31,14 +33,14 @@ class gnnDiscrete:
         self.lr = lr
         self.lightning_device = lightning_device
         self.embedding_dims = embedding_dims
-
+        self.loss: Literal['recon', 'coloc'] = loss
 
     def train(self) -> DictLogger:
         self.model = gnnDiscreteModel(n_ions=self.data.n_ions,
                                       latent_dims=self.latent_dims,
                                       encoding=self.encoding,
                                       embedding_dims=self.embedding_dims,
-                                      lr=self.lr)
+                                      lr=self.lr, loss=self.loss)
         
         dictlogger = DictLogger()
         trainer = pl.Trainer(max_epochs=self.training_epochs, accelerator=self.lightning_device, 
@@ -91,6 +93,42 @@ class gnnDiscrete:
         ion_centroids, centroid_labels = self.predict_centroids(data)
 
         df = pd.DataFrame(ion_centroids, index=centroid_labels)
+        df.index.name = 'ion'
+        # sort the dataframe by the index
+        df = df.sort_index(inplace=False)
+
+        return df
+    
+    def predict_from_unconnected(self, data: ColocNetDiscreteDataset) -> pd.DataFrame:
+        # Get set of ion labels from all data objects
+        ion_labels = []
+        for i in range(len(data)):
+            ion_labels.extend(list(data[i].x.detach().cpu().numpy())) # type: ignore
+        ion_labels = sorted(list(set(ion_labels)))
+
+        # Predict for each ion using the unconnected graph
+        pred = self.model(torch.tensor(ion_labels).long(), 
+                          torch.tensor([[], []]).long()) # Empty edge_index
+        
+        pred = pred.detach().cpu().numpy()
+
+        df = pd.DataFrame(pred, index=ion_labels)
+        df.index.name = 'ion'
+        # sort the dataframe by the index
+        df = df.sort_index(inplace=False)
+
+        return df
+    
+    def predict_from_union(self, data: ColocNetDiscreteDataset) -> pd.DataFrame:
+        
+        ion_labels, edge_index = compute_union_graph(data)
+
+        # Predict for each ion using the unconnected graph
+        pred = self.model(ion_labels, 
+                          edge_index)        
+        pred = pred.detach().cpu().numpy()
+
+        df = pd.DataFrame(pred, index=ion_labels.detach().cpu().numpy())
         df.index.name = 'ion'
         # sort the dataframe by the index
         df = df.sort_index(inplace=False)

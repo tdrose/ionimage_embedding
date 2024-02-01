@@ -15,10 +15,12 @@ except ImportError:
     # Not in IPython, continue with normal Python code
     pass
 
+from hmac import new
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
 import seaborn as sns
+from typing import Literal
 
 from ionimage_embedding.dataloader.constants import CACHE_FOLDER
 from ionimage_embedding.dataloader.ColocNet_data import ColocNetData_discrete
@@ -38,15 +40,16 @@ os.system('nvidia-smi')
 dat = ColocNetData_discrete(KIDNEY_SMALL, test=2, val=1, 
                  cache_images=True, cache_folder='/scratch/model_testing',
                  colocml_preprocessing=True, 
-                 fdr=.1, batch_size=1, min_images=6, top_k=3,
-                 maxzero=.9)
+                 fdr=.1, batch_size=1, min_images=6, maxzero=.9, 
+                 top_k=2, bottom_k=2
+                 )
 
 
 
 # %%
 model = gnnDiscrete(data=dat, latent_dims=10, 
                     encoding = 'learned', embedding_dims=10,
-                    lr=1e-3, training_epochs=50, lightning_device='gpu')
+                    lr=1e-3, training_epochs=130, lightning_device='gpu')
 
 
 # %%
@@ -93,6 +96,8 @@ from anndata import AnnData
 import scanpy as sc
 from scipy import sparse
 from ionimage_embedding.evaluation.scoring import coloc_knn
+import torch
+from torch_geometric.data import Data
 
 def coloc_umap_ds(data: ColocNetData_discrete, k: int=3, n_components: int=10) -> pd.DataFrame:
 
@@ -119,11 +124,18 @@ def coloc_umap_ds(data: ColocNetData_discrete, k: int=3, n_components: int=10) -
     return pd.DataFrame(coloc_adata.obsm['X_umap'], 
                         index=labels.detach().cpu().numpy())
 
-def latent_gnn(model: gnnDiscrete, data: ColocNetData_discrete) -> pd.DataFrame:
+def latent_gnn(model: gnnDiscrete, data: ColocNetData_discrete, 
+               graph: Literal['training', 'unconnected', 'union']='training') -> pd.DataFrame:
     training_data = data.dataset.index_select(data._train_set)
 
-    return model.predict_centroids_df(training_data) # type: ignore
-    
+    if graph == 'training':
+        return model.predict_centroids_df(training_data) # type: ignore
+    elif graph == 'unconnected':
+        return model.predict_from_unconnected(training_data) # type: ignore
+    elif graph == 'union':
+        return model.predict_from_union(training_data) # type: ignore
+    else:
+        raise ValueError('graph must be either "training", "unconnected", or "union"')
 
 # %%
 # Scoring
@@ -238,21 +250,27 @@ def closest_accuracy_random_ds(latent: pd.DataFrame,
 # %%
 scenario_l = []
 acc_l = []
+tk = 5 # best for reconstruction loss: 2
+bk = 5 # best for reconstruction loss: 1
+min_images = 10 # Default 6
+top_acc = 3
+encoding = 'learned'
 
-for i in range(10):
-    
-    dat = ColocNetData_discrete(KIDNEY_LARGE, test=2, val=1, 
+dat = ColocNetData_discrete(KIDNEY_LARGE, test=2, val=1, 
                     cache_images=True, cache_folder='/scratch/model_testing',
                     colocml_preprocessing=True, 
-                    fdr=.1, batch_size=1, min_images=6, top_k=3,
-                    maxzero=.9)
+                    fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
+                    top_k=tk, bottom_k=bk
+                    )
 
-    # model = gnnDiscrete(data=dat, latent_dims=10, 
-    #                     encoding = 'onehot', embedding_dims=10
-    #                     lr=1e-3, training_epochs=170, lightning_device='gpu')
-    model = gnnDiscrete(data=dat, latent_dims=10, 
-                    encoding = 'learned', embedding_dims=10,
-                    lr=1e-3, training_epochs=40, lightning_device='gpu')
+# %%
+for i in range(10):
+    
+    dat.sample_sets()
+
+    model = gnnDiscrete(data=dat, latent_dims=20, 
+                        encoding = encoding, embedding_dims=10,
+                        lr=1e-3, training_epochs=130, lightning_device='gpu', loss='coloc')
 
 
     mylogger = model.train()
@@ -261,27 +279,45 @@ for i in range(10):
     
 
     pred_cu = coloc_umap_ds(dat, k=3, n_components=10)
-    pred_gnn = latent_gnn(model, dat)
+    
 
     coloc_cu = latent_colocinference(pred_cu, coloc_ion_labels(dat, dat._test_set))
-    coloc_gnn = latent_colocinference(pred_gnn, coloc_ion_labels(dat, dat._test_set))
 
-    top = 3
+    # pred_gnn_u = latent_gnn(model, dat, graph='union')
+    # coloc_gnn_u = latent_colocinference(pred_gnn_u, coloc_ion_labels(dat, dat._test_set))
+    pred_gnn_t = latent_gnn(model, dat, graph='training')
+    coloc_gnn_t = latent_colocinference(pred_gnn_t, coloc_ion_labels(dat, dat._test_set))
+    # pred_gnn_uc = latent_gnn(model, dat, graph='unconnected')
+    # coloc_gnn_uc = latent_colocinference(pred_gnn_uc, coloc_ion_labels(dat, dat._test_set))
+
+    
 
     
     scenario_l.append('Mean coloc')
-    acc_l.append(closest_accuracy_aggcoloc_ds(pred_mc, dat, top=top))
+    acc_l.append(closest_accuracy_aggcoloc_ds(pred_mc, dat, top=top_acc))
     scenario_l.append('UMAP')
-    acc_l.append(closest_accuracy_latent_ds(coloc_cu, dat, top=top))
-    scenario_l.append('GNN')
-    acc_l.append(closest_accuracy_latent_ds(coloc_gnn, dat, top=top))
+    acc_l.append(closest_accuracy_latent_ds(coloc_cu, dat, top=top_acc))
+    # scenario_l.append('GNN union')
+    # acc_l.append(closest_accuracy_latent_ds(coloc_gnn_u, dat, top=top_acc))
+    scenario_l.append('GNN training')
+    acc_l.append(closest_accuracy_latent_ds(coloc_gnn_t, dat, top=top_acc))
+    # scenario_l.append('GNN unconnected')
+    # acc_l.append(closest_accuracy_latent_ds(coloc_gnn_uc, dat, top=top_acc))
     scenario_l.append('Random')
-    acc_l.append(closest_accuracy_random_ds(coloc_gnn, dat, top=top))
+    acc_l.append(closest_accuracy_random_ds(coloc_gnn_t, dat, top=top_acc))
 
     #print(f'Fraction of predicted colocs: {pred_fraction:.2f}')
 
 # %%
 df = pd.DataFrame({'Scenario': scenario_l, 'Accuracy': acc_l})
-sns.boxplot(data=df, x='Scenario', y='Accuracy')
+ax = sns.boxplot(data=df, x='Scenario', y='Accuracy')
+ax.set_title(f'KIDNEY_LARGE (top-k: {tk}, bottom-k: {bk}, encoding: {encoding})')
+ax.set_ylabel(f'Top-{top_acc} Accuracy')
+ax.set_ylim(0, 1)
 
+# %%
+plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')
+plt.plot(mylogger.logged_metrics['Training loss'], label='Training loss', color='blue')
+plt.legend()
+plt.show()
 # %%

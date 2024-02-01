@@ -1,5 +1,4 @@
-from fileinput import filename
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 import numpy as np
 
 import torch
@@ -13,6 +12,11 @@ from .ColocNetDiscreteDataset import ColocNetDiscreteDataset
 
 
 class ColocNetData_discrete:
+
+    _test_set: np.ndarray
+    _val_set: np.ndarray
+    _train_set: np.ndarray
+
     def __init__(self, dataset_ids: List[str], test: int=1, val: int=1,
                  top_k: int=3, bottom_k: int=3,
                  db: Tuple[str, str]=('HMDB', 'v4'), fdr: float=0.2, scale_intensity: str='TIC', 
@@ -57,19 +61,24 @@ class ColocNetData_discrete:
 
         if test + val > len(self.dataset):
             raise ValueError('test and val must be smaller than dataset size')
+        self.test = test
+        self.val = val
         
-        mask = np.random.choice(np.arange(len(self.dataset)), test)
+        self.sample_sets()
+
+    def sample_sets(self) -> None:
+        mask = np.random.choice(np.arange(len(self.dataset)), self.test)
         tmp = np.delete(np.arange(len(self.dataset)), mask)
         
         self._test_set = mask
-        self._val_set = np.random.choice(tmp, val, replace=False)
+        self._val_set = np.random.choice(tmp, self.val, replace=False)
         
         train_mask = np.array([i not in self._test_set and i not in self._val_set 
                                for i in np.arange(len(self.dataset))])
         
         self._train_set = np.arange(len(self.dataset))[train_mask]
-
-
+    
+    
     def get_traindataloader(self):
         return DataLoader(self.dataset.index_select(self._train_set), 
                           batch_size=self.batch_size, shuffle=True) 

@@ -21,6 +21,7 @@ class gnnDiscreteModel(pl.LightningModule):
 
     def __init__(self, n_ions: int, latent_dims: int=10,
                   encoding: Literal['onehot', 'learned']= 'onehot',
+                  loss: Literal['recon', 'coloc'] = 'recon',
                   embedding_dims: int=10, lr=1e-3
                   ):     
         super(gnnDiscreteModel, self).__init__()
@@ -28,7 +29,7 @@ class gnnDiscreteModel(pl.LightningModule):
         self.n_ions = n_ions
         self.encoding: Literal['onehot', 'learned'] = encoding
         self.latent_dims = latent_dims
-
+        self.loss: Literal['recon', 'coloc'] = loss
         self.lr = lr
 
         # Create encoding
@@ -57,7 +58,13 @@ class gnnDiscreteModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         z = self.forward(batch.x, batch.edge_index)
         
-        loss = self.gae.recon_loss(z, batch.edge_index, batch.neg_edge_index)
+        if self.loss == 'recon':
+            loss = self.gae.recon_loss(z, batch.edge_index, batch.neg_edge_index)
+        elif self.loss == 'coloc':
+            loss = self.gae.coloc_loss(z, batch.edge_index, batch.neg_edge_index, 
+                                       batch.edge_attr, batch.neg_edge_weights)
+        else:
+            raise ValueError('loss must be one of "recon" or "coloc"')
         
         self.log('Training loss', loss, 
                  on_step=False, on_epoch=True, logger=True, prog_bar=True)
@@ -67,7 +74,13 @@ class gnnDiscreteModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         z = self.forward(batch.x, batch.edge_index)
         
-        loss = self.gae.recon_loss(z, batch.edge_index, batch.neg_edge_index)
+        if self.loss == 'recon':
+            loss = self.gae.recon_loss(z, batch.edge_index, batch.neg_edge_index)
+        elif self.loss == 'coloc':
+            loss = self.gae.coloc_loss(z, batch.edge_index, batch.neg_edge_index, 
+                                       batch.edge_attr, batch.neg_edge_weights)
+        else:
+            raise ValueError('loss must be one of "recon" or "coloc"')
         
         self.log('Validation loss', loss, 
                  on_step=False, on_epoch=True, logger=True, prog_bar=True)
