@@ -31,12 +31,13 @@ def get_GraphData(
 class ColocNetDiscreteDataset(InMemoryDataset):
     
     def __init__(self, path: str, name: str,
-                 top_k: int,
+                 top_k: int, bottom_k: int,
                  ion_labels: torch.Tensor, ds_labels: torch.Tensor, 
                  coloc: Dict[int, pd.DataFrame]) -> None:
         
         self.name = name
         self.top_k = top_k
+        self.bottom_k = bottom_k
         self.ion_labels = ion_labels
         self.ds_labels = ds_labels
         self.coloc_dict = coloc
@@ -102,8 +103,8 @@ class ColocNetDiscreteDataset(InMemoryDataset):
                 pos_edges = create_edgelist(pos_edges, i, self.top_k, top_k_idx)
 
 
-                bottom_k_idx = np.argsort(masked_array)[:self.top_k]
-                neg_edges = create_edgelist(neg_edges, i, self.top_k, bottom_k_idx)
+                bottom_k_idx = np.argsort(masked_array)[:self.bottom_k]
+                neg_edges = create_edgelist(neg_edges, i, self.bottom_k, bottom_k_idx)
 
             pos_edge_weights = np.array([carray[x[0], x[1]] for x in pos_edges]) # type: ignore
             neg_edge_weights = np.array([carray[x[0], x[1]] for x in neg_edges]) # type: ignore

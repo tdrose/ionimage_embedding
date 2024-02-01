@@ -4,6 +4,7 @@ import pandas as pd
 
 import torch
 import lightning.pytorch as pl
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from torch_geometric.data import Data
 
 from ...dataloader.ColocNet_data import ColocNetData_discrete
@@ -33,8 +34,7 @@ class gnnDiscrete:
 
 
     def train(self) -> DictLogger:
-        self.model = gnnDiscreteModel(n_ions=self.data.n_ions, 
-                                      top_k=self.data.top_k, 
+        self.model = gnnDiscreteModel(n_ions=self.data.n_ions,
                                       latent_dims=self.latent_dims,
                                       encoding=self.encoding,
                                       embedding_dims=self.embedding_dims,
@@ -42,7 +42,8 @@ class gnnDiscrete:
         
         dictlogger = DictLogger()
         trainer = pl.Trainer(max_epochs=self.training_epochs, accelerator=self.lightning_device, 
-                             logger=dictlogger)
+                             logger=dictlogger,
+                             callbacks=[EarlyStopping(monitor="Validation loss", mode="min")])
         trainer.fit(self.model, self.data.get_traindataloader(), self.data.get_valdataloader())
 
         return dictlogger

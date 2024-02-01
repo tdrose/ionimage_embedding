@@ -19,14 +19,13 @@ class GCNEncoder(torch.nn.Module):
 
 class gnnDiscreteModel(pl.LightningModule):
 
-    def __init__(self, n_ions: int, top_k: int, latent_dims: int=10,
+    def __init__(self, n_ions: int, latent_dims: int=10,
                   encoding: Literal['onehot', 'learned']= 'onehot',
                   embedding_dims: int=10, lr=1e-3
                   ):     
         super(gnnDiscreteModel, self).__init__()
 
         self.n_ions = n_ions
-        self.top_k = top_k
         self.encoding: Literal['onehot', 'learned'] = encoding
         self.latent_dims = latent_dims
 
