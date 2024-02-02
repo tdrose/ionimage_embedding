@@ -53,6 +53,7 @@ class ColocNetData_discrete:
         self.dataset = ColocNetDiscreteDataset(path=cache_folder,
                                                name=self.dataset_file,
                                                top_k=self.top_k, bottom_k=self.bottom_k,
+                                               min_ion_count=min_images,
                                                ion_labels=iidata.full_dataset.ion_labels,
                                                ds_labels=iidata.full_dataset.dataset_labels,
                                                coloc=colocs.full_coloc)
