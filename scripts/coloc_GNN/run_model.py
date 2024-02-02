@@ -37,33 +37,6 @@ os.system('nvidia-smi')
 
 
 # %%
-dat = ColocNetData_discrete(KIDNEY_SMALL, test=2, val=1, 
-                 cache_images=True, cache_folder='/scratch/model_testing',
-                 colocml_preprocessing=True, 
-                 fdr=.1, batch_size=1, min_images=6, maxzero=.9, 
-                 top_k=2, bottom_k=2
-                 )
-
-
-
-# %%
-model = gnnDiscrete(data=dat, latent_dims=10, 
-                    encoding = 'learned', embedding_dims=10,
-                    lr=1e-3, training_epochs=130, lightning_device='gpu')
-
-
-# %%
-mylogger = model.train()
-
-# %%
-plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')
-plt.plot(mylogger.logged_metrics['Training loss'], label='Training loss', color='blue')
-plt.legend()
-plt.show()
-
-
-
-# %%
 def mean_coloc_test(data: ColocNetData_discrete):
 
     return mean_colocs(data, data._test_set)
@@ -252,9 +225,9 @@ scenario_l = []
 acc_l = []
 tk = 5 # best for reconstruction loss: 2
 bk = 5 # best for reconstruction loss: 1
-min_images = 10 # Default 6
+min_images = tk + bk + 1 # Default 6
 top_acc = 3
-encoding = 'learned'
+encoding = 'onehot'
 
 dat = ColocNetData_discrete(KIDNEY_LARGE, test=2, val=1, 
                     cache_images=True, cache_folder='/scratch/model_testing',
@@ -262,6 +235,7 @@ dat = ColocNetData_discrete(KIDNEY_LARGE, test=2, val=1,
                     fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
                     top_k=tk, bottom_k=bk
                     )
+
 
 # %%
 for i in range(10):
@@ -283,12 +257,12 @@ for i in range(10):
 
     coloc_cu = latent_colocinference(pred_cu, coloc_ion_labels(dat, dat._test_set))
 
-    # pred_gnn_u = latent_gnn(model, dat, graph='union')
-    # coloc_gnn_u = latent_colocinference(pred_gnn_u, coloc_ion_labels(dat, dat._test_set))
+    pred_gnn_u = latent_gnn(model, dat, graph='union')
+    coloc_gnn_u = latent_colocinference(pred_gnn_u, coloc_ion_labels(dat, dat._test_set))
     pred_gnn_t = latent_gnn(model, dat, graph='training')
     coloc_gnn_t = latent_colocinference(pred_gnn_t, coloc_ion_labels(dat, dat._test_set))
-    # pred_gnn_uc = latent_gnn(model, dat, graph='unconnected')
-    # coloc_gnn_uc = latent_colocinference(pred_gnn_uc, coloc_ion_labels(dat, dat._test_set))
+    pred_gnn_uc = latent_gnn(model, dat, graph='unconnected')
+    coloc_gnn_uc = latent_colocinference(pred_gnn_uc, coloc_ion_labels(dat, dat._test_set))
 
     
 
@@ -297,12 +271,12 @@ for i in range(10):
     acc_l.append(closest_accuracy_aggcoloc_ds(pred_mc, dat, top=top_acc))
     scenario_l.append('UMAP')
     acc_l.append(closest_accuracy_latent_ds(coloc_cu, dat, top=top_acc))
-    # scenario_l.append('GNN union')
-    # acc_l.append(closest_accuracy_latent_ds(coloc_gnn_u, dat, top=top_acc))
+    scenario_l.append('GNN union')
+    acc_l.append(closest_accuracy_latent_ds(coloc_gnn_u, dat, top=top_acc))
     scenario_l.append('GNN training')
     acc_l.append(closest_accuracy_latent_ds(coloc_gnn_t, dat, top=top_acc))
-    # scenario_l.append('GNN unconnected')
-    # acc_l.append(closest_accuracy_latent_ds(coloc_gnn_uc, dat, top=top_acc))
+    scenario_l.append('GNN unconnected')
+    acc_l.append(closest_accuracy_latent_ds(coloc_gnn_uc, dat, top=top_acc))
     scenario_l.append('Random')
     acc_l.append(closest_accuracy_random_ds(coloc_gnn_t, dat, top=top_acc))
 
