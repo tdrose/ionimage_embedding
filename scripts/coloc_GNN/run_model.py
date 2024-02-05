@@ -28,6 +28,7 @@ from ionimage_embedding.datasets import KIDNEY_SMALL, KIDNEY_LARGE
 from ionimage_embedding.models import gnnDiscrete
 from ionimage_embedding import ColocModel
 from ionimage_embedding.evaluation.scoring import most_colocalized, latent_colocinference
+from ionimage_embedding.logger import DictLogger
 
 
 
@@ -229,13 +230,16 @@ min_images = tk + bk + 1 # Default 6
 top_acc = 3
 encoding = 'onehot'
 
+RANDOM_NETWORK = True
+
 dat = ColocNetData_discrete(KIDNEY_LARGE, test=2, val=1, 
                     cache_images=True, cache_folder='/scratch/model_testing',
                     colocml_preprocessing=True, 
                     fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
-                    top_k=tk, bottom_k=bk
+                    top_k=tk, bottom_k=bk, random_network=RANDOM_NETWORK
                     )
 
+mylogger = DictLogger()
 
 # %%
 for i in range(10):

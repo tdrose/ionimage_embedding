@@ -1,5 +1,6 @@
 from typing import List, Tuple
 import numpy as np
+from warnings import warn
 
 import torch
 from torch_geometric.loader import DataLoader
@@ -22,11 +23,15 @@ class ColocNetData_discrete:
                  db: Tuple[str, str]=('HMDB', 'v4'), fdr: float=0.2, scale_intensity: str='TIC', 
                  colocml_preprocessing: bool=False, min_images: int=6, maxzero: float=.95,
                  batch_size: int=128,
-                 cache_images: bool=False, cache_folder: str='/scratch/model_testing'
+                 cache_images: bool=False, cache_folder: str='/scratch/model_testing', 
+                 random_network: bool=False
                 ) -> None:
         
         if min_images < top_k + bottom_k:
             raise ValueError('min_images must larger or equal to top_k + bottom_k')
+        
+        if random_network:
+            warn('A random network is used. This network does not contain meaningful information.')
         
         iidata = IonImagedata_random(dataset_ids=dataset_ids, test=.3, val=.1, db=db, fdr=fdr,
                                       scale_intensity=scale_intensity, 
@@ -46,8 +51,10 @@ class ColocNetData_discrete:
         cache_hex = cache_hashing(dataset_ids, colocml_preprocessing, db, fdr, scale_intensity,
                                   maxzero=maxzero, vitb16_compatible=False, force_size=False)
         
-        self.dataset_file = '{}_{}_{}_{}'.format(COLOC_NET_DISCRETE_DATA, 
-                                                 cache_hex, str(top_k), str(bottom_k))
+        self.dataset_file = '{}_{}_{}_{}_{}'.format(COLOC_NET_DISCRETE_DATA, 
+                                                 cache_hex, 
+                                                 str(top_k), str(bottom_k),
+                                                 str(random_network))
 
 
         self.dataset = ColocNetDiscreteDataset(path=cache_folder,
@@ -56,7 +63,8 @@ class ColocNetData_discrete:
                                                min_ion_count=min_images,
                                                ion_labels=iidata.full_dataset.ion_labels,
                                                ds_labels=iidata.full_dataset.dataset_labels,
-                                               coloc=colocs.full_coloc)
+                                               coloc=colocs.full_coloc, 
+                                               random_network=random_network)
 
         self.batch_size = batch_size
 
