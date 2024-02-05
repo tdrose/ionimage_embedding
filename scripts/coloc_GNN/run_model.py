@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 import seaborn as sns
-from typing import Literal
+from typing import Literal, Tuple
 
 from ionimage_embedding.dataloader.constants import CACHE_FOLDER
 from ionimage_embedding.dataloader.ColocNet_data import ColocNetData_discrete
@@ -146,10 +146,15 @@ def closest_accuracy_aggcoloc_ds(predictions: pd.DataFrame,
     return correct_predictions / total_predictions
 
 def closest_accuracy_latent_ds(latent: pd.DataFrame, 
-                               data: ColocNetData_discrete, top: int=5) -> float:
+                               data: ColocNetData_discrete,
+                               aggcoloc: pd.DataFrame, 
+                               top: int=5) -> Tuple[float, float, float]:
 
-    total_predictions = 0
-    correct_predictions = 0
+    avail_corr = 0
+    avail_total = 1
+    trans_corr = 0
+    trans_total = 1
+
     ground_truth = {k: v for k, v in data.dataset.coloc_dict.items() if k in data._test_set}
 
     pred_df = latent
@@ -178,12 +183,18 @@ def closest_accuracy_latent_ds(latent: pd.DataFrame,
                 # We are using the coloc_df index for the curr_cl array
                 coloc_order = coloc_df.index[mask]
 
-                if max_coloc_id[i] in coloc_order[:top]:
-                    correct_predictions += 1
+                if np.isnan(aggcoloc.loc[ground_truth[ds].index[i], max_coloc_id[i]]):
+                    if max_coloc_id[i] in coloc_order[:top]:
+                        trans_corr += 1
 
-                total_predictions += 1
+                    trans_total += 1
+                else:
+                    if max_coloc_id[i] in coloc_order[:top]:
+                        avail_corr += 1
 
-    return correct_predictions / total_predictions
+                    avail_total += 1
+
+    return avail_corr / avail_total, trans_corr/trans_total, avail_total/(trans_total+avail_total)
 
 def closest_accuracy_random_ds(latent: pd.DataFrame, 
                                data: ColocNetData_discrete, top: int=5) -> float:
@@ -224,13 +235,15 @@ def closest_accuracy_random_ds(latent: pd.DataFrame,
 # %%
 scenario_l = []
 acc_l = []
+eval_l = []
+frac_l = []
 tk = 5 # best for reconstruction loss: 2
 bk = 5 # best for reconstruction loss: 1
 min_images = tk + bk + 1 # Default 6
 top_acc = 3
 encoding = 'onehot'
 
-RANDOM_NETWORK = True
+RANDOM_NETWORK = False
 
 dat = ColocNetData_discrete(KIDNEY_LARGE, test=2, val=1, 
                     cache_images=True, cache_folder='/scratch/model_testing',
@@ -261,37 +274,59 @@ for i in range(10):
 
     coloc_cu = latent_colocinference(pred_cu, coloc_ion_labels(dat, dat._test_set))
 
-    pred_gnn_u = latent_gnn(model, dat, graph='union')
-    coloc_gnn_u = latent_colocinference(pred_gnn_u, coloc_ion_labels(dat, dat._test_set))
+    
     pred_gnn_t = latent_gnn(model, dat, graph='training')
     coloc_gnn_t = latent_colocinference(pred_gnn_t, coloc_ion_labels(dat, dat._test_set))
-    pred_gnn_uc = latent_gnn(model, dat, graph='unconnected')
-    coloc_gnn_uc = latent_colocinference(pred_gnn_uc, coloc_ion_labels(dat, dat._test_set))
-
     
-
     
-    scenario_l.append('Mean coloc')
     acc_l.append(closest_accuracy_aggcoloc_ds(pred_mc, dat, top=top_acc))
+    scenario_l.append('Mean coloc')
+    eval_l.append('Available')
+    frac_l.append(pred_fraction)
+
+    avail, trans, fraction = closest_accuracy_latent_ds(coloc_cu, dat, pred_mc, top=top_acc)
     scenario_l.append('UMAP')
-    acc_l.append(closest_accuracy_latent_ds(coloc_cu, dat, top=top_acc))
-    scenario_l.append('GNN union')
-    acc_l.append(closest_accuracy_latent_ds(coloc_gnn_u, dat, top=top_acc))
+    acc_l.append(avail)
+    eval_l.append('Available')
+    frac_l.append(fraction)
+    scenario_l.append('UMAP')
+    acc_l.append(trans)
+    eval_l.append('Transitivity')
+    frac_l.append(fraction)
+
+    avail, trans, fraction = closest_accuracy_latent_ds(coloc_gnn_t, dat, pred_mc, top=top_acc)
     scenario_l.append('GNN training')
-    acc_l.append(closest_accuracy_latent_ds(coloc_gnn_t, dat, top=top_acc))
-    scenario_l.append('GNN unconnected')
-    acc_l.append(closest_accuracy_latent_ds(coloc_gnn_uc, dat, top=top_acc))
-    scenario_l.append('Random')
+    acc_l.append(avail)
+    eval_l.append('Available')
+    frac_l.append(fraction)
+    scenario_l.append('GNN training')
+    acc_l.append(trans)
+    eval_l.append('Transitivity')
+    frac_l.append(fraction)
+
     acc_l.append(closest_accuracy_random_ds(coloc_gnn_t, dat, top=top_acc))
+    scenario_l.append('Random')
+    eval_l.append('Available')
+    frac_l.append(fraction)
+    
 
     #print(f'Fraction of predicted colocs: {pred_fraction:.2f}')
 
 # %%
-df = pd.DataFrame({'Scenario': scenario_l, 'Accuracy': acc_l})
-ax = sns.boxplot(data=df, x='Scenario', y='Accuracy')
-ax.set_title(f'KIDNEY_LARGE (top-k: {tk}, bottom-k: {bk}, encoding: {encoding})')
-ax.set_ylabel(f'Top-{top_acc} Accuracy')
-ax.set_ylim(0, 1)
+df = pd.DataFrame({'Scenario': scenario_l, 'Accuracy': acc_l, 
+                   'Evaluation': eval_l, 'Fraction': frac_l})
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+
+sns.boxplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='Accuracy', ax=ax1)
+ax1.set_title(f'KIDNEY_LARGE (top-k: {tk}, bottom-k: {bk}, encoding: {encoding})')
+ax1.set_ylabel(f'Top-{top_acc} Accuracy (Available)')
+ax1.set_ylim(0, 1)
+
+sns.boxplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2)
+ax2.set_title(f'KIDNEY_LARGE (top-k: {tk}, bottom-k: {bk}, encoding: {encoding})')
+ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
+ax2.set_ylim(0, 1)
 
 # %%
 plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')
