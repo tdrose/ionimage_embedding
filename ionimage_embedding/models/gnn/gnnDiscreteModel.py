@@ -5,6 +5,7 @@ import torch
 from torch_geometric.nn import GCNConv
 
 from .gae import colocGAE
+from ..constants import TRAINING_LOSS, VALIDATION_LOSS
 
 class GCNEncoder(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
@@ -66,7 +67,7 @@ class gnnDiscreteModel(pl.LightningModule):
         else:
             raise ValueError('loss must be one of "recon" or "coloc"')
         
-        self.log('Training loss', loss, 
+        self.log(TRAINING_LOSS, loss, 
                  on_step=False, on_epoch=True, logger=True, prog_bar=True)
         
         return loss
@@ -82,7 +83,7 @@ class gnnDiscreteModel(pl.LightningModule):
         else:
             raise ValueError('loss must be one of "recon" or "coloc"')
         
-        self.log('Validation loss', loss, 
+        self.log(VALIDATION_LOSS, loss, 
                  on_step=False, on_epoch=True, logger=True, prog_bar=True)
         
         return loss

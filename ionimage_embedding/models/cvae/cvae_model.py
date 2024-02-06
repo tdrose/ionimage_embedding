@@ -1,17 +1,12 @@
-from random import sample
-from lightning.pytorch.callbacks.callback import Callback
-from matplotlib.font_manager import weight_dict
-from networkx import sigma
+from typing import Literal
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 import lightning.pytorch as pl
 
-from typing import Any, Literal, Sequence, Union
-
-from zmq import device
-
 from .vanilla import Encoder, Decoder
+from ..constants import TRAINING_LOSS, VALIDATION_LOSS
 
 
 class CVAEmodel(pl.LightningModule):
@@ -117,7 +112,7 @@ class CVAEmodel(pl.LightningModule):
         
         loss = recon_loss + kl_div + same_ion_loss
 
-        self.log('Training loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+        self.log(TRAINING_LOSS, loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
 
         return loss
     
@@ -131,7 +126,7 @@ class CVAEmodel(pl.LightningModule):
         
         loss = recon_loss + kl_div + same_ion_loss
 
-        self.log('Validation loss', loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+        self.log(VALIDATION_LOSS, loss, on_step=False, on_epoch=True, logger=True, prog_bar=True)
 
         return loss
     

@@ -10,8 +10,9 @@ from .cnnClust import CNNClust
 from .resnet_wrapper import ResNetWrapper
 from .vit_b_16_wrapper import VitB16Wrapper
 from .cae import CAE
-from .pseudo_labeling import pseudo_labeling, compute_dataset_ublb
+from .pseudo_labeling import compute_dataset_ublb
 from ...coloc.utils import torch_cosine
+from ..constants import TRAINING_LOSS, VALIDATION_LOSS
 
 class colocContrastModel(pl.LightningModule):
 
@@ -206,7 +207,7 @@ class colocContrastModel(pl.LightningModule):
                                          ll=self.curr_lower, train_datasets=train_datasets, 
                                          index=index, train_images=train_x, 
                                          raw_images=untransformed_images)
-            self.log('Training loss', loss, on_step=False, on_epoch=True, 
+            self.log(TRAINING_LOSS, loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
             return loss
         
@@ -218,7 +219,7 @@ class colocContrastModel(pl.LightningModule):
                                                index=index, train_images=train_x, 
                                                raw_images=untransformed_images)
             loss = loss_cae + loss_clust
-            self.log('Training loss', loss, on_step=False, on_epoch=True, 
+            self.log(TRAINING_LOSS, loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
             self.log('Training CAE-loss', loss_cae, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
@@ -242,7 +243,7 @@ class colocContrastModel(pl.LightningModule):
                                          ll=self.curr_lower, train_datasets=val_datasets, 
                                          index=index, train_images=val_x, 
                                          raw_images=untransformed_images)
-            self.log('Validation loss', loss, on_step=False, on_epoch=True, 
+            self.log(VALIDATION_LOSS, loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
 
             return loss
@@ -256,7 +257,7 @@ class colocContrastModel(pl.LightningModule):
                                                train_images=val_x, 
                                                raw_images=untransformed_images)
             loss = loss_cae + loss_clust
-            self.log('Validation loss', loss, on_step=False, on_epoch=True, 
+            self.log(VALIDATION_LOSS, loss, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
             self.log('Validation CAE-loss', loss_cae, on_step=False, on_epoch=True, 
                      logger=True, prog_bar=True)
