@@ -11,6 +11,7 @@ from ...dataloader.ColocNet_data import ColocNetData_discrete
 from ...dataloader.ColocNetDiscreteDataset import ColocNetDiscreteDataset
 from .gnnDiscreteModel import gnnDiscreteModel
 from .utils import compute_union_graph
+from ..constants import VALIDATION_LOSS
 
 from ...logger import DictLogger
 
@@ -44,8 +45,9 @@ class gnnDiscrete:
         
         dictlogger = DictLogger()
         trainer = pl.Trainer(max_epochs=self.training_epochs, accelerator=self.lightning_device, 
-                             logger=dictlogger,
-                             callbacks=[EarlyStopping(monitor="Validation loss", mode="min")])
+                             logger=dictlogger, enable_checkpointing=False,
+                             callbacks=[EarlyStopping(monitor=VALIDATION_LOSS, 
+                                                      mode="min", patience=5)])
         trainer.fit(self.model, self.data.get_traindataloader(), self.data.get_valdataloader())
 
         return dictlogger
