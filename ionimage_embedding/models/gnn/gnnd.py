@@ -1,4 +1,4 @@
-from typing import Literal, Dict, Tuple
+from typing import Literal, Dict, Tuple, Optional
 import numpy as np
 import pandas as pd
 
@@ -17,43 +17,71 @@ from ...logger import DictLogger
 
 class gnnDiscrete:
 
-    model: gnnDiscreteModel
+    model: Optional[gnnDiscreteModel] = None
 
     def __init__(self, data: ColocNetData_discrete, latent_dims: int=10,
                  lr=1e3, encoding: Literal['onehot', 'learned']= 'onehot',
                  embedding_dims: int=10,
-                 training_epochs: int = 11, lightning_device: str = 'gpu',
-                 loss: Literal['recon', 'coloc'] = 'recon'
+                 training_epochs: int = 11, early_stopping_patience: int = 5,
+                 lightning_device: str = 'gpu',
+                 loss: Literal['recon', 'coloc'] = 'recon',
+                 activation: Literal['softmax', 'relu', 'sigmoid', 'none']='none',
+                 num_layers: int=2
                  ) -> None:
         
         self.data = data
         self.latent_dims = latent_dims
         self.encoding: Literal['onehot', 'learned'] = encoding
+        self.num_layers = num_layers
 
         self.training_epochs = training_epochs
+        self.early_stopping_patience = early_stopping_patience
         self.lr = lr
         self.lightning_device = lightning_device
         self.embedding_dims = embedding_dims
         self.loss: Literal['recon', 'coloc'] = loss
+        self.activation: Literal['softmax', 'relu', 'sigmoid', 'none'] = activation
 
     def train(self) -> DictLogger:
         self.model = gnnDiscreteModel(n_ions=self.data.n_ions,
                                       latent_dims=self.latent_dims,
                                       encoding=self.encoding,
                                       embedding_dims=self.embedding_dims,
-                                      lr=self.lr, loss=self.loss)
+                                      lr=self.lr, loss=self.loss, 
+                                      activation=self.activation,
+                                      num_layers=self.num_layers)
         
         dictlogger = DictLogger()
         trainer = pl.Trainer(max_epochs=self.training_epochs, accelerator=self.lightning_device, 
                              logger=dictlogger, enable_checkpointing=False,
                              callbacks=[EarlyStopping(monitor=VALIDATION_LOSS, 
-                                                      mode="min", patience=5)])
+                                                      mode="min", 
+                                                      patience=self.early_stopping_patience)])
         trainer.fit(self.model, self.data.get_traindataloader(), self.data.get_valdataloader())
 
         return dictlogger
     
+    def check_model(self) -> None:
+        if self.model is None:
+            raise ValueError('Model has not been trained')
+        
     def predict(self, data: Data) -> torch.Tensor:
-        return self.model(data.x, data.edge_index)
+        self.check_model()
+        return self.model(data.x, data.edge_index) # type: ignore
+    
+    def fine_tune(self, data: ColocNetData_discrete, training_epochs: int = 11) -> DictLogger:
+        self.check_model()
+
+        dictlogger = DictLogger()
+        trainer = pl.Trainer(max_epochs=training_epochs, accelerator=self.lightning_device, 
+                             logger=dictlogger, enable_checkpointing=False,
+                             callbacks=[EarlyStopping(monitor=VALIDATION_LOSS, 
+                                                      mode="min", 
+                                                      patience=self.early_stopping_patience)])
+        
+        trainer.fit(self.model, data.get_traindataloader(), data.get_valdataloader()) # type: ignore
+
+        return dictlogger
 
     def predict_multiple(self, data: ColocNetDiscreteDataset) -> Dict[int, torch.Tensor]:
         out = {}
@@ -102,6 +130,8 @@ class gnnDiscrete:
         return df
     
     def predict_from_unconnected(self, data: ColocNetDiscreteDataset) -> pd.DataFrame:
+        self.check_model()
+
         # Get set of ion labels from all data objects
         ion_labels = []
         for i in range(len(data)):
@@ -109,7 +139,7 @@ class gnnDiscrete:
         ion_labels = sorted(list(set(ion_labels)))
 
         # Predict for each ion using the unconnected graph
-        pred = self.model(torch.tensor(ion_labels).long(), 
+        pred = self.model(torch.tensor(ion_labels).long(), # type: ignore
                           torch.tensor([[], []]).long()) # Empty edge_index
         
         pred = pred.detach().cpu().numpy()
@@ -122,11 +152,12 @@ class gnnDiscrete:
         return df
     
     def predict_from_union(self, data: ColocNetDiscreteDataset) -> pd.DataFrame:
-        
+        self.check_model()
+
         ion_labels, edge_index = compute_union_graph(data)
 
         # Predict for each ion using the unconnected graph
-        pred = self.model(ion_labels, 
+        pred = self.model(ion_labels, # type: ignore
                           edge_index)        
         pred = pred.detach().cpu().numpy()
 
