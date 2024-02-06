@@ -233,6 +233,7 @@ def closest_accuracy_random_ds(latent: pd.DataFrame,
 
 
 # %%
+# Hyperparameters
 scenario_l = []
 acc_l = []
 eval_l = []
@@ -242,10 +243,15 @@ bk = 5 # best for reconstruction loss: 1
 min_images = tk + bk + 1 # Default 6
 top_acc = 3
 encoding = 'onehot'
+early_stopping_patience = 3
+activation: Literal['softmax', 'relu', 'sigmoid', 'none'] = 'none'
+num_layers = 3
 
 RANDOM_NETWORK = False
 
-dat = ColocNetData_discrete(KIDNEY_LARGE, test=2, val=1, 
+# %%
+# Data
+dat = ColocNetData_discrete(KIDNEY_LARGE, test=10, val=5, 
                     cache_images=True, cache_folder='/scratch/model_testing',
                     colocml_preprocessing=True, 
                     fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
@@ -255,13 +261,20 @@ dat = ColocNetData_discrete(KIDNEY_LARGE, test=2, val=1,
 mylogger = DictLogger()
 
 # %%
-for i in range(10):
+# Training
+for i in range(100):
+    print('# #######')
+    print(f'# Iteration {i}')
+    print('# #######')
     
     dat.sample_sets()
 
     model = gnnDiscrete(data=dat, latent_dims=20, 
                         encoding = encoding, embedding_dims=10,
-                        lr=1e-3, training_epochs=130, lightning_device='gpu', loss='coloc')
+                        lr=1e-3, training_epochs=130, 
+                        early_stopping_patience=early_stopping_patience,
+                        lightning_device='gpu', loss='coloc',
+                        activation=activation, num_layers=num_layers)
 
 
     mylogger = model.train()
@@ -313,20 +326,23 @@ for i in range(10):
     #print(f'Fraction of predicted colocs: {pred_fraction:.2f}')
 
 # %%
+# Evaluation
 df = pd.DataFrame({'Scenario': scenario_l, 'Accuracy': acc_l, 
                    'Evaluation': eval_l, 'Fraction': frac_l})
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-sns.boxplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='Accuracy', ax=ax1)
+sns.violinplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='Accuracy', ax=ax1)
 ax1.set_title(f'KIDNEY_LARGE (top-k: {tk}, bottom-k: {bk}, encoding: {encoding})')
 ax1.set_ylabel(f'Top-{top_acc} Accuracy (Available)')
 ax1.set_ylim(0, 1)
 
-sns.boxplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2)
-ax2.set_title(f'KIDNEY_LARGE (top-k: {tk}, bottom-k: {bk}, encoding: {encoding})')
+sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2)
+ax2.set_title('Mean transifivity fraction: {:.2f}'.format(1-df[df['Evaluation']=='Transitivity']['Fraction'].mean()))
 ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 ax2.set_ylim(0, 1)
+
+fig.suptitle(f'Activation: {activation}')
 
 # %%
 plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')
