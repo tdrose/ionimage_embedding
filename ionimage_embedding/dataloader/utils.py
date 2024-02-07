@@ -77,7 +77,8 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
                   scale_intensity: str='TIC', 
                   colocml_preprocessing: bool=False, maxzero: float=.95, 
                   vitb16_compatible: bool=False, 
-                  force_size: Optional[int]=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                  force_size: Optional[int]=None,
+                  min_images: int=5) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     
     sm = SMInstance()
     
@@ -117,10 +118,10 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
     training_ions = []
     
     for dsid, imgs in padding_images.items():
-
-        training_data.append(imgs)
-        training_datasets += [dsid] * imgs.shape[0]
-        training_ions += training_if[dsid]
+        if imgs.shape[0] >= min_images:
+            training_data.append(imgs)
+            training_datasets += [dsid] * imgs.shape[0]
+            training_ions += training_if[dsid]
         
     training_data = np.concatenate(training_data)
     training_datasets = np.array(training_datasets)
@@ -131,21 +132,30 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
     zero_count = np.sum((training_data == 0).reshape((training_data.shape[0], -1)), axis=1)
     zero_mask = zero_count >= (imgsize*maxzero)
 
-    # Old version: filter out only all zero images
-    # zero_mask = (training_data == 0).reshape((training_data.shape[0], -1)).all(axis=1)
+    training_data = training_data[~zero_mask]
+    training_datasets = training_datasets[~zero_mask]
+    training_ions = training_ions[~zero_mask]
 
-    return training_data[~zero_mask], training_datasets[~zero_mask], training_ions[~zero_mask]
+    # Remove images from datasets with less than min_images
+    dataset_counts = np.unique(training_datasets, return_counts=True)
+    mask = np.isin(training_datasets, dataset_counts[0][dataset_counts[1] >= min_images])
+    training_data = training_data[mask]
+    training_datasets = training_datasets[mask]
+    training_ions = training_ions[mask]
+
+    return training_data, training_datasets, training_ions
 
 def cache_hashing(dataset_ids: List[str], colocml_preprocessing: bool,
                   db: Tuple[str, str], fdr: float, scale_intensity: str,
-                  force_size: Optional[int], maxzero: float, vitb16_compatible: bool) -> str:
-    cache_hex = '{}_{}_{}_{}-{}_{}_{}_{}_{}_{}'.format(ION_IMAGE_DATA,
+                  force_size: Optional[int], maxzero: float, vitb16_compatible: bool, 
+                  min_images: int) -> str:
+    cache_hex = '{}_{}_{}_{}-{}_{}_{}_{}_{}_{}_{}'.format(ION_IMAGE_DATA,
                                                      ''.join(dataset_ids), 
                                                      colocml_preprocessing, 
                                                      str(db[0]), str(db[1]), 
                                                      str(fdr), str(scale_intensity),
                                                      str(maxzero), str(vitb16_compatible),
-                                                     str(force_size)
+                                                     str(force_size), str(min_images)
                                                     )
     
     return uuid.uuid5(uuid.NAMESPACE_URL, cache_hex).hex
@@ -155,13 +165,14 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
              db: Tuple[str, str]=('HMDB', 'v4'), 
              fdr: float=0.2, scale_intensity: str='TIC', 
              colocml_preprocessing: bool=False, force_size: Optional[int]=None,
+             min_images: int=5,
              maxzero: float=.95, vitb16_compatible: bool=False) -> Tuple[np.ndarray,
                                                                          np.ndarray,
                                                                          np.ndarray]:
     if cache:
         # make hash of datasets
         cache_hex = cache_hashing(dataset_ids, colocml_preprocessing, db, fdr, scale_intensity,
-                                  force_size, maxzero, vitb16_compatible)
+                                  force_size, maxzero, vitb16_compatible, min_images)
         
         cache_file = '{}_{}.pickle'.format(ION_IMAGE_DATA, cache_hex)
 
@@ -176,7 +187,7 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
                                 scale_intensity=scale_intensity, 
                                 colocml_preprocessing=colocml_preprocessing, 
                                 maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
-                                force_size=force_size)
+                                force_size=force_size, min_images=min_images)
             data, dataset_labels, ion_labels = tmp
 
             pickle.dump((data, dataset_labels, ion_labels), 
@@ -192,7 +203,7 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
         tmp = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
                             colocml_preprocessing=colocml_preprocessing, 
                             maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
-                            force_size=force_size)
+                            force_size=force_size, min_images=min_images)
         data, dataset_labels, ion_labels = tmp
 
     return data, dataset_labels, ion_labels

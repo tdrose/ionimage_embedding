@@ -53,7 +53,8 @@ class ColocNetData_discrete:
 
 
         cache_hex = cache_hashing(dataset_ids, colocml_preprocessing, db, fdr, scale_intensity,
-                                  maxzero=maxzero, vitb16_compatible=False, force_size=False)
+                                  maxzero=maxzero, vitb16_compatible=False, force_size=False, 
+                                  min_images=min_images)
         
         self.dataset_file = '{}_{}_{}_{}_{}'.format(COLOC_NET_DISCRETE_DATA, 
                                                  cache_hex, 
@@ -97,6 +98,8 @@ class ColocNetData_discrete:
                                                coloc=coloc, 
                                                random_network=random_network)
 
+        print(self.dataset)
+        print({k: v.shape for k, v in self.dataset.coloc_dict.items()})
         
 
         if test + val > len(self.dataset):
@@ -108,6 +111,171 @@ class ColocNetData_discrete:
 
     def __len__(self) -> int:
         return len(self.dataset)
+    
+    def updated_k_data(self, top_k: int, bottom_k: int):
+        if top_k <= self.top_k and bottom_k <= self.bottom_k:
+            raise ValueError('The new k values must be larger than the current ones.')
+        
+        dat = ColocNetData_discrete(
+            dataset_ids=self.dataset_ids,
+            test=self.test, val=self.val,
+            top_k=top_k, bottom_k=bottom_k,
+            db=self.db, fdr=self.fdr, scale_intensity=self.scale_intensity, 
+            colocml_preprocessing=self.colocml_preprocessing, min_images=self.min_images, 
+            maxzero=self.maxzero,
+            batch_size=self.batch_size,
+            cache_images=False, cache_folder='/scratch/model_testing', 
+            random_network=self.random_network,
+            use_precomputed=True, # Important
+            ion_labels=self.dataset.ion_labels,
+            ds_labels=self.dataset.ds_labels,
+            coloc=self.dataset.coloc_dict
+            )
+        
+        # Copy the sets
+        dat._test_set = self._test_set
+        dat._val_set = self._val_set
+        dat._train_set = self._train_set
+        
+        return dat
+
+    def sample_sets(self) -> None:
+        mask = np.random.choice(np.arange(len(self.dataset)), self.test)
+        tmp = np.delete(np.arange(len(self.dataset)), mask)
+        
+        self._test_set = mask
+        self._val_set = np.random.choice(tmp, self.val, replace=False)
+        
+        train_mask = np.array([i not in self._test_set and i not in self._val_set 
+                               for i in np.arange(len(self.dataset))])
+        
+        self._train_set = np.arange(len(self.dataset))[train_mask]
+    
+    
+    def get_traindataloader(self):
+        return DataLoader(self.dataset.index_select(self._train_set), 
+                          batch_size=self.batch_size, shuffle=True) 
+
+    def get_testdataloader(self):
+        return DataLoader(self.dataset.index_select(self._test_set), 
+                          batch_size=self.batch_size, shuffle=False)
+
+    def get_valdataloader(self):
+        return DataLoader(self.dataset.index_select(self._val_set), 
+                          batch_size=self.batch_size, shuffle=False)
+    
+    def get_train_dsids(self) -> torch.Tensor:
+        return self.dataset.index_select(self._train_set).ds_label.unique() # type: ignore
+    
+    def get_test_dsids(self) -> torch.Tensor:
+        return self.dataset.index_select(self._test_set).ds_label.unique() # type: ignore
+    
+    def get_val_dsids(self) -> torch.Tensor:
+        return self.dataset.index_select(self._val_set).ds_label.unique() # type: ignore
+
+
+class MeanColocNetData_discrete:
+
+    _test_set: np.ndarray
+    _val_set: np.ndarray
+    _train_set: np.ndarray
+
+    def __init__(self, dataset_ids: List[str], test: int=1, val: int=1,
+                 top_k: int=3, bottom_k: int=3,
+                 db: Tuple[str, str]=('HMDB', 'v4'), fdr: float=0.2, scale_intensity: str='TIC', 
+                 colocml_preprocessing: bool=False, min_images: int=6, maxzero: float=.95,
+                 batch_size: int=128,
+                 cache_images: bool=False, cache_folder: str='/scratch/model_testing', 
+                 random_network: bool=False,
+                 use_precomputed: bool=False,
+                ) -> None:
+        if min_images < top_k + bottom_k:
+            raise ValueError('min_images must larger or equal to top_k + bottom_k')
+        
+        if random_network:
+            warn('A random network is used. This network does not contain meaningful information.')
+        
+        self.top_k = top_k
+        self.bottom_k = bottom_k
+        self.dataset_ids = dataset_ids
+        self.db = db
+        self.fdr = fdr
+        self.scale_intensity = scale_intensity
+        self.colocml_preprocessing = colocml_preprocessing
+        self.min_images = min_images
+        self.maxzero = maxzero
+        self.random_network = random_network
+
+
+        cache_hex = cache_hashing(dataset_ids, colocml_preprocessing, db, fdr, scale_intensity,
+                                  maxzero=maxzero, vitb16_compatible=False, force_size=False, 
+                                  min_images=min_images)
+        
+        self.dataset_file = '{}_{}_{}_{}_{}'.format(COLOC_NET_DISCRETE_DATA, 
+                                                 cache_hex, 
+                                                 str(top_k), str(bottom_k),
+                                                 str(random_network))
+        
+        self.batch_size = batch_size
+
+        raise NotImplementedError('This class is not implemented yet.')
+        
+        # Create the IonImagedata object otherwise use the given one
+        iidata = IonImagedata_random(
+            dataset_ids=dataset_ids, test=.3, val=.1, db=db, fdr=fdr,
+            scale_intensity=scale_intensity, 
+            colocml_preprocessing=colocml_preprocessing,
+            batch_size=batch_size, cache=cache_images, 
+            cache_folder=cache_folder,
+            min_images=min_images, maxzero=maxzero)
+    
+        colocs = ColocModel(iidata)
+
+        # Extract the list of unique ion labels from the colocs
+        ion_labels = iidata.full_dataset.ion_labels
+        ds_labels = iidata.full_dataset.dataset_labels
+        coloc = colocs.full_coloc
+
+
+        self.n_ions = ion_labels.unique().shape[0]
+
+        # Remove datasets that have less than min_images
+        mask = torch.zeros(len(ds_labels), dtype=torch.bool)
+        for dsid in torch.unique(ds_labels):
+            mask = mask | (ds_labels == dsid).sum() >= min_images
+        ion_labels = ion_labels[mask]
+        ds_labels = ds_labels[mask]
+        coloc = {k: v for k, v in coloc.items() if k in 
+                 torch.unique(ds_labels).cpu().detach().numpy()}
+        
+
+        # Sample dsids for train, test and val
+        dsids = torch.unique(ds_labels)
+        perm = torch.randperm(len(dsids))
+        test_dsids = dsids[perm[:test]]
+        val_dsids = dsids[perm[test:test+val]]
+        train_dsids = dsids[perm[test+val:]]
+
+
+
+
+
+
+        self.dataset = ColocNetDiscreteDataset(path=cache_folder,
+                                               name=self.dataset_file,
+                                               top_k=self.top_k, bottom_k=self.bottom_k,
+                                               min_ion_count=min_images,
+                                               ion_labels=ion_labels,
+                                               ds_labels=ds_labels,
+                                               coloc=coloc, 
+                                               random_network=random_network)
+
+        
+        self.test = test
+        self.val = val
+        
+        self.sample_sets()
+
     
     def updated_k_data(self, top_k: int, bottom_k: int):
         if top_k <= self.top_k and bottom_k <= self.bottom_k:

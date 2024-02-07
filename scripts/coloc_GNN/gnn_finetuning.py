@@ -55,7 +55,7 @@ RANDOM_NETWORK = False
 
 # %%
 # Data
-dat = ColocNetData_discrete(KIDNEY_LARGE, test=10, val=5, 
+dat = ColocNetData_discrete(KIDNEY_LARGE, test=10, val=5, # 10, 5
                     cache_images=True, cache_folder=CACHE_FOLDER,
                     colocml_preprocessing=True, 
                     fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,

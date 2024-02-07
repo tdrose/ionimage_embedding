@@ -22,6 +22,7 @@ def mean_coloc_train(data: ColocNetData_discrete):
     
     return mean_colocs(data, data._train_set)
 
+
 def coloc_ion_labels(data: ColocNetData_discrete, prediction_set: np.ndarray):
     test_ions = []
     for dsid in prediction_set:
@@ -32,11 +33,13 @@ def coloc_ion_labels(data: ColocNetData_discrete, prediction_set: np.ndarray):
 
 def mean_colocs(data: ColocNetData_discrete, prediction_set: np.ndarray):
     
+    train_data = {k: v for k, v in data.dataset.coloc_dict.items() if k in data.get_train_dsids()}
+
     train_ds = data._train_set
     
     test_ions = coloc_ion_labels(data, prediction_set)
     # Compute mean coloc across training datasets
-    mean_colocs = ColocModel._inference(ds_colocs={k: v for k, v in data.dataset.coloc_dict.items() if k in train_ds}, 
+    mean_colocs = ColocModel._inference(ds_colocs=train_data, 
                                         ion_labels=test_ions, agg='mean')
     
     return mean_colocs
@@ -46,7 +49,7 @@ def coloc_umap_ds(data: ColocNetData_discrete, k: int=3, n_components: int=10) -
     mean_coloc, _ = mean_coloc_train(data)
     mean_coloc[np.isnan(mean_coloc)] = 0
     
-    labels = coloc_ion_labels(data, data._train_set)
+    labels = coloc_ion_labels(data, data.get_train_dsids().detach().cpu().numpy())
 
     # Create anndata object
     coloc_adata = AnnData(X=mean_coloc)
@@ -87,7 +90,7 @@ def closest_accuracy_aggcoloc_ds(predictions: pd.DataFrame,
     total_predictions = 0
     correct_predictions = 0
 
-    ground_truth = {k: v for k, v in data.dataset.coloc_dict.items() if k in data._test_set}
+    ground_truth = {k: v for k, v in data.dataset.coloc_dict.items() if k in data.get_test_dsids()}
 
     for ds, coloc_df in ground_truth.items():
         if coloc_df.shape[0] > 0:
@@ -123,7 +126,7 @@ def closest_accuracy_latent_ds(latent: pd.DataFrame,
     trans_corr = 0
     trans_total = 1
 
-    ground_truth = {k: v for k, v in data.dataset.coloc_dict.items() if k in data._test_set}
+    ground_truth = {k: v for k, v in data.dataset.coloc_dict.items() if k in data.get_test_dsids()}
 
     pred_df = latent
     for ds, coloc_df in ground_truth.items():
@@ -169,7 +172,7 @@ def closest_accuracy_random_ds(latent: pd.DataFrame,
 
     total_predictions = 0
     correct_predictions = 0
-    ground_truth = {k: v for k, v in data.dataset.coloc_dict.items() if k in data._test_set}
+    ground_truth = {k: v for k, v in data.dataset.coloc_dict.items() if k in data.get_test_dsids()}
 
     pred_df = latent
     for ds, coloc_df in ground_truth.items():

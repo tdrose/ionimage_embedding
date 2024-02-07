@@ -39,7 +39,7 @@ class IonImagedata_random:
                                                     colocml_preprocessing=colocml_preprocessing,
                                                     maxzero=maxzero, 
                                                     vitb16_compatible=vitb16_compatible, 
-                                                    force_size=force_size)
+                                                    force_size=force_size, min_images=min_images)
         
         # Normalize images
         data = self.image_normalization(data)

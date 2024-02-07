@@ -72,7 +72,9 @@ class ColocNetDiscreteDataset(InMemoryDataset):
     def process(self) -> None:
         data_list = []
 
-        for dsid in self.coloc_dict.keys():
+        dsids = sorted(list(self.coloc_dict.keys()))
+
+        for dsid in dsids:
 
             coloc = self.coloc_dict[dsid]
             
@@ -129,7 +131,9 @@ class ColocNetDiscreteDataset(InMemoryDataset):
                 
                 data_list.append(data)
             else:
-                print(f'Dataset {dsid} has less than {self.min_ion_count} ions')
+                # Should be handled by IonImageData, if this is the case here, this will result in
+                # data leakage
+                raise ValueError(f'Dataset {dsid} has less than {self.min_ion_count} ions')
 
 
         self.save(data_list, self.processed_paths[0])
