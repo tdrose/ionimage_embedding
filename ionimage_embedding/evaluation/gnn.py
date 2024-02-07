@@ -11,7 +11,7 @@ from torch_geometric.data import Data
 from ..dataloader.ColocNet_data import ColocNetData_discrete
 from ..coloc.coloc import ColocModel
 from ..models import gnnDiscrete
-from .scoring import most_colocalized
+from .scoring import most_colocalized, coloc_knn
 
 
 def mean_coloc_test(data: ColocNetData_discrete):

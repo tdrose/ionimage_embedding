@@ -129,6 +129,11 @@ class ColocNetData_discrete:
             coloc=self.dataset.coloc_dict
             )
         
+        # Copy the sets
+        dat._test_set = self._test_set
+        dat._val_set = self._val_set
+        dat._train_set = self._train_set
+        
         return dat
 
     def sample_sets(self) -> None:

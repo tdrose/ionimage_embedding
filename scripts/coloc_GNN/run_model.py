@@ -1,4 +1,3 @@
-
 # %%
 # Load autoreload framework when running in ipython interactive session
 try:
@@ -57,7 +56,7 @@ top_acc = 3
 encoding = 'onehot'
 early_stopping_patience = 3
 activation: Literal['softmax', 'relu', 'sigmoid', 'none'] = 'none'
-num_layers = 3
+num_layers = 2
 
 RANDOM_NETWORK = False
 
