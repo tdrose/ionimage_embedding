@@ -73,7 +73,7 @@ mylogger = DictLogger()
 
 # %%
 # Training
-for i in range(30):
+for i in range(100):
     print('# #######')
     print(f'# Iteration {i}')
     print('# #######')
