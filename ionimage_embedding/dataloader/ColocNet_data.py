@@ -1,4 +1,6 @@
-from typing import List, Tuple
+import io
+from typing import List, Tuple, Optional, Dict
+import pandas as pd
 import numpy as np
 from warnings import warn
 
@@ -24,7 +26,12 @@ class ColocNetData_discrete:
                  colocml_preprocessing: bool=False, min_images: int=6, maxzero: float=.95,
                  batch_size: int=128,
                  cache_images: bool=False, cache_folder: str='/scratch/model_testing', 
-                 random_network: bool=False
+                 random_network: bool=False,
+                 use_precomputed: bool=False,
+                 ion_labels: Optional[torch.Tensor]=None,
+                 ds_labels: Optional[torch.Tensor]=None,
+                 coloc: Optional[Dict[int, pd.DataFrame]]=None,
+
                 ) -> None:
         
         if min_images < top_k + bottom_k:
@@ -33,20 +40,17 @@ class ColocNetData_discrete:
         if random_network:
             warn('A random network is used. This network does not contain meaningful information.')
         
-        iidata = IonImagedata_random(dataset_ids=dataset_ids, test=.3, val=.1, db=db, fdr=fdr,
-                                      scale_intensity=scale_intensity, 
-                                      colocml_preprocessing=colocml_preprocessing,
-                                      batch_size=batch_size, cache=cache_images, 
-                                      cache_folder=cache_folder,
-                                      min_images=min_images, maxzero=maxzero)
-        
-        colocs = ColocModel(iidata)
-
-        # Extract the list of unique ion labels from the colocs
-        self.n_ions = iidata.full_dataset.ion_labels.unique().shape[0]
-
         self.top_k = top_k
         self.bottom_k = bottom_k
+        self.dataset_ids = dataset_ids
+        self.db = db
+        self.fdr = fdr
+        self.scale_intensity = scale_intensity
+        self.colocml_preprocessing = colocml_preprocessing
+        self.min_images = min_images
+        self.maxzero = maxzero
+        self.random_network = random_network
+
 
         cache_hex = cache_hashing(dataset_ids, colocml_preprocessing, db, fdr, scale_intensity,
                                   maxzero=maxzero, vitb16_compatible=False, force_size=False)
@@ -55,18 +59,45 @@ class ColocNetData_discrete:
                                                  cache_hex, 
                                                  str(top_k), str(bottom_k),
                                                  str(random_network))
+        
+        self.batch_size = batch_size
+        
+        if not use_precomputed:
+            # Create the IonImagedata object otherwise use the given one
+            iidata = IonImagedata_random(
+                dataset_ids=dataset_ids, test=.3, val=.1, db=db, fdr=fdr,
+                scale_intensity=scale_intensity, 
+                colocml_preprocessing=colocml_preprocessing,
+                batch_size=batch_size, cache=cache_images, 
+                cache_folder=cache_folder,
+                min_images=min_images, maxzero=maxzero)
+        
+            colocs = ColocModel(iidata)
 
+            # Extract the list of unique ion labels from the colocs
+            
+
+            ion_labels = iidata.full_dataset.ion_labels
+            ds_labels = iidata.full_dataset.dataset_labels
+            coloc = colocs.full_coloc
+
+        else:
+            if ion_labels is None or ds_labels is None or coloc is None:
+                raise ValueError('If use_precomputed is True, ion_labels, '
+                                 'ds_labels and coloc must be provided.')
+
+        self.n_ions = ion_labels.unique().shape[0]
 
         self.dataset = ColocNetDiscreteDataset(path=cache_folder,
                                                name=self.dataset_file,
                                                top_k=self.top_k, bottom_k=self.bottom_k,
                                                min_ion_count=min_images,
-                                               ion_labels=iidata.full_dataset.ion_labels,
-                                               ds_labels=iidata.full_dataset.dataset_labels,
-                                               coloc=colocs.full_coloc, 
+                                               ion_labels=ion_labels,
+                                               ds_labels=ds_labels,
+                                               coloc=coloc, 
                                                random_network=random_network)
 
-        self.batch_size = batch_size
+        
 
         if test + val > len(self.dataset):
             raise ValueError('test and val must be smaller than dataset size')
@@ -74,6 +105,31 @@ class ColocNetData_discrete:
         self.val = val
         
         self.sample_sets()
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+    
+    def updated_k_data(self, top_k: int, bottom_k: int):
+        if top_k <= self.top_k and bottom_k <= self.bottom_k:
+            raise ValueError('The new k values must be larger than the current ones.')
+        
+        dat = ColocNetData_discrete(
+            dataset_ids=self.dataset_ids,
+            test=self.test, val=self.val,
+            top_k=top_k, bottom_k=bottom_k,
+            db=self.db, fdr=self.fdr, scale_intensity=self.scale_intensity, 
+            colocml_preprocessing=self.colocml_preprocessing, min_images=self.min_images, 
+            maxzero=self.maxzero,
+            batch_size=self.batch_size,
+            cache_images=False, cache_folder='/scratch/model_testing', 
+            random_network=self.random_network,
+            use_precomputed=True, # Important
+            ion_labels=self.dataset.ion_labels,
+            ds_labels=self.dataset.ds_labels,
+            coloc=self.dataset.coloc_dict
+            )
+        
+        return dat
 
     def sample_sets(self) -> None:
         mask = np.random.choice(np.arange(len(self.dataset)), self.test)
