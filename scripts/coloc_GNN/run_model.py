@@ -56,7 +56,9 @@ top_acc = 3
 encoding = 'onehot'
 early_stopping_patience = 3
 activation: Literal['softmax', 'relu', 'sigmoid', 'none'] = 'none'
-num_layers = 2
+gnn_layer_type: Literal['GCNConv', 'GATv2Conv', 'GraphConv'] = 'GATv2Conv'
+loss_type: Literal['recon', 'coloc'] = 'coloc'
+num_layers = 1
 
 RANDOM_NETWORK = False
 
@@ -84,8 +86,9 @@ for i in range(100):
                         encoding = encoding, embedding_dims=10,
                         lr=1e-3, training_epochs=130, 
                         early_stopping_patience=early_stopping_patience,
-                        lightning_device='gpu', loss='coloc',
-                        activation=activation, num_layers=num_layers)
+                        lightning_device='gpu', loss=loss_type,
+                        activation=activation, num_layers=num_layers,
+                        gnn_layer_type=gnn_layer_type)
 
 
     mylogger = model.train()

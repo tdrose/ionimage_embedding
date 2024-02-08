@@ -26,7 +26,8 @@ class gnnDiscrete:
                  lightning_device: str = 'gpu',
                  loss: Literal['recon', 'coloc'] = 'recon',
                  activation: Literal['softmax', 'relu', 'sigmoid', 'none']='none',
-                 num_layers: int=2
+                 num_layers: int=2,
+                 gnn_layer_type: Literal['GCNConv', 'GATv2Conv', 'GraphConv'] = 'GCNConv'
                  ) -> None:
         
         self.data = data
@@ -41,6 +42,7 @@ class gnnDiscrete:
         self.embedding_dims = embedding_dims
         self.loss: Literal['recon', 'coloc'] = loss
         self.activation: Literal['softmax', 'relu', 'sigmoid', 'none'] = activation
+        self.gnn_layer_type: Literal['GCNConv', 'GATv2Conv', 'GraphConv'] = gnn_layer_type
 
     def train(self) -> DictLogger:
         self.model = gnnDiscreteModel(n_ions=self.data.n_ions,
@@ -49,7 +51,8 @@ class gnnDiscrete:
                                       embedding_dims=self.embedding_dims,
                                       lr=self.lr, loss=self.loss, 
                                       activation=self.activation,
-                                      num_layers=self.num_layers)
+                                      num_layers=self.num_layers,
+                                      gnn_layer_type=self.gnn_layer_type)
         
         dictlogger = DictLogger()
         trainer = pl.Trainer(max_epochs=self.training_epochs, accelerator=self.lightning_device, 
@@ -67,7 +70,7 @@ class gnnDiscrete:
         
     def predict(self, data: Data) -> torch.Tensor:
         self.check_model()
-        return self.model(data.x, data.edge_index) # type: ignore
+        return self.model(data.x, data.edge_index, data.edge_attr) # type: ignore
     
     def fine_tune(self, data: ColocNetData_discrete, training_epochs: int = 11) -> DictLogger:
         self.check_model()
