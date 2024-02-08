@@ -109,7 +109,7 @@ class gnnDiscreteModel(pl.LightningModule):
         
         # Set GAE model
         self.gae = colocGAE(GCNEncoder(in_channels=self.embedding_dims, 
-                                       hidden_channels=self.latent_dims*3, 
+                                       hidden_channels=self.embedding_dims//2, 
                                        out_channels=self.latent_dims, 
                                        activation=activation, num_layers=num_layers, 
                                        gnn_layer_type=gnn_layer_type))
