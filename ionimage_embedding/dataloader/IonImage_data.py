@@ -58,6 +58,13 @@ class IonImagedata_random:
 
         self.il_encoder = preprocessing.LabelEncoder()
         ill_int = torch.tensor(self.il_encoder.fit_transform(ion_labels))
+
+        self.ion_int_mapper = {}
+        for ionid in set(ion_labels):
+            mask = ion_labels == ionid
+            idx = np.arange(len(ion_labels))[mask][0]
+            self.ion_int_mapper[ill_int.detach().cpu().numpy()[idx]] = ionid
+        
         
         # self.data = data
         print(data.shape)
