@@ -111,7 +111,8 @@ class ColocNetDiscreteDataset(InMemoryDataset):
                         neg_edges = create_edgelist(neg_edges, i, self.bottom_k, k_idx[-self.bottom_k:])
                     else:
                         # Get the top k indices
-                        top_k_idx = np.argsort(masked_array)[(-self.top_k-1):-1]
+                        nans = np.sum(np.isnan(masked_array)) # Exclude potential nans in mean coloc
+                        top_k_idx = np.argsort(masked_array)[(-self.top_k-nans):-nans]
                         pos_edges = create_edgelist(pos_edges, i, self.top_k, top_k_idx)
                         # Get the bottom k indices
                         bottom_k_idx = np.argsort(masked_array)[:self.bottom_k]
