@@ -24,6 +24,10 @@ class GCNEncoder(torch.nn.Module):
 
         self.convs = nn.ModuleList()
 
+        print(f'in_channels: {in_channels}')
+        print(f'hidden_channels: {hidden_channels}')
+        print(f'out_channels: {out_channels}')
+
         if gnn_layer_type == 'GCNConv':
             # Define the first GCNConv layer
             self.conv1 = GCNConv(in_channels, hidden_channels)
@@ -32,7 +36,7 @@ class GCNEncoder(torch.nn.Module):
         elif gnn_layer_type == 'GATv2Conv':
             self.conv1 = GATv2Conv(in_channels, hidden_channels, heads=1, edge_dim=1)
             for _ in range(num_layers-1):
-                self.convs.append(GATv2Conv(in_channels, hidden_channels, heads=1, edge_dim=1))
+                self.convs.append(GATv2Conv(hidden_channels, hidden_channels, heads=1, edge_dim=1))
         elif gnn_layer_type == 'GraphConv':
             self.conv1 = GraphConv(in_channels, hidden_channels, aggr='mean')
             for _ in range(num_layers-1):
@@ -65,13 +69,16 @@ class GCNEncoder(torch.nn.Module):
             edge_attr = edge_attr.unsqueeze(-1)
         
         x = self.conv1(x, edge_index, edge_attr).relu()
+        # print(x.shape)
 
         # Apply intermediate GCNConv layers
         for conv in self.convs:
             x = conv(x, edge_index, edge_attr).relu()
+            # print(x.shape)
 
         # Apply the output projection layer
         x = self.proj(x)
+        # print(x.shape)
         
         return self.activation(x)
     
