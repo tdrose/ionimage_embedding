@@ -112,7 +112,7 @@ def objective(trial: optuna.Trial):
         trans_l.append(trans)
         avail_l.append(avail)
 
-    res = - (np.mean(trans_l)*2 + np.mean(avail_l))
+    res = - (np.mean(trans_l)*100 + np.mean(avail_l))
 
     # Create a dictionary of all hyperparameters
     hyperparameters = {
@@ -139,8 +139,8 @@ def objective(trial: optuna.Trial):
 # Optimize study
 study = optuna.create_study(sampler=TPESampler())
 study.optimize(objective, 
-               n_trials=2000, # This would be 24 hours 
-               timeout=86000, 
+               n_trials=2000, 
+               timeout=59*60*60, 
                catch=(ValueError, ZeroDivisionError, 
                       RuntimeError), 
                show_progress_bar=True)
@@ -150,4 +150,5 @@ print('Best parameters')
 print(study.best_params)
 print('###############')
 
-pickle.dump(study, open(osp.join(CACHE_FOLDER, 'GNN_tuning.pkl'), 'wb'))
+pickle.dump(study, open(osp.join(CACHE_FOLDER, 'GNN_tuning_transitivity.pkl'), 'wb'))
+
