@@ -108,6 +108,10 @@ class gnnDiscreteModel(pl.LightningModule):
             raise ValueError('encoding must be one of "onehot" or "learned"')
         
         # Set GAE model
+        hidden_channels = self.embedding_dims//2
+        if hidden_channels < latent_dims:
+            hidden_channels = latent_dims*2
+        
         self.gae = colocGAE(GCNEncoder(in_channels=self.embedding_dims, 
                                        hidden_channels=self.embedding_dims//2, 
                                        out_channels=self.latent_dims, 
