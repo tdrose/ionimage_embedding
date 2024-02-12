@@ -34,9 +34,8 @@ from ionimage_embedding.evaluation.gnn import (
 
 # %%
 # #####################
-# Fixed Hyperparameters
+# Hyperparameters
 # #####################
-# device
 # min_images
 min_images = 30
 # test
@@ -48,26 +47,17 @@ top_acc = 3
 # Dataset
 DSID = KIDNEY_LARGE
 # Number of bootstraps
-N_BOOTSTRAPS = 30
+N_BOOTSTRAPS = 100
 
-# Latent size
-latent_size = 35
-# Top-k
+latent_size = 27
 top_k = 2
-# Bottom-k
-bottom_k = 7
-# encoding
+bottom_k = 2
 encoding = 'onehot'
-# early_stopping_patience
-early_stopping_patience = 5
-# GNN layer type
+early_stopping_patience = 2
 gnn_layer_type = 'GATv2Conv'
-# Loss type
-loss_type = 'recon'
-# Number of layers
-num_layers = 2
-# learning rate
-lr = 0.0003
+loss_type = 'coloc'
+num_layers = 1
+lr = 0.005945
 
 
 # %%
@@ -87,7 +77,7 @@ trans_l = []
 avail_l = []
 
 for i in range(N_BOOTSTRAPS):
-
+    print(f'# Iteration {i}')
     dat.sample_sets()
 
     model = gnnDiscrete(data=dat, 

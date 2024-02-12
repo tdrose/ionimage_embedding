@@ -45,50 +45,88 @@ os.system('nvidia-smi')
 
 # %%
 # Hyperparameters
+# #####################
+# Hyperparameters
+# #####################
+# min_images
+min_images = 30
+# test
+test = 5
+# val
+val = 3
+# accuracy top-k
+top_acc = 3
+# Dataset
+DSID = KIDNEY_LARGE
+# Number of bootstraps
+N_BOOTSTRAPS = 100
+
+
+hyperparams_avail = {
+    'latent_size': 27,
+    'top_k': 2,
+    'bottom_k':  2,
+    'encoding': 'onehot', # 'recon', 'coloc'
+    'early_stopping_patience': 2,
+    'gnn_layer_type': 'GATv2Conv', # 'GCNConv', 'GATv2Conv', 'GraphConv'
+    'loss_type': 'coloc',
+    'num_layers': 1,
+    'lr': 0.005945,
+    'activation': 'none' # 'softmax', 'relu', 'sigmoid', 'none'
+}
+
+hyperparams_transitivity = {
+    'latent_size': 23,
+    'top_k': 3,
+    'bottom_k':  7,
+    'encoding': 'onehot', # 'recon', 'coloc'
+    'early_stopping_patience': 10,
+    'gnn_layer_type': 'GCNConv', # 'GCNConv', 'GATv2Conv', 'GraphConv'
+    'loss_type': 'coloc',
+    'num_layers': 1,
+    'lr': 0.009140,
+    'activation': 'none' # 'softmax', 'relu', 'sigmoid', 'none'
+}
+
+
+hyperparams = hyperparams_transitivity
+
+
 scenario_l = []
 acc_l = []
 eval_l = []
 frac_l = []
-tk = 5 # best for reconstruction loss: 2
-bk = 5 # best for reconstruction loss: 1
-min_images = tk + bk + 1 # Default 6
-top_acc = 3
-encoding = 'onehot'
-early_stopping_patience = 3
-activation: Literal['softmax', 'relu', 'sigmoid', 'none'] = 'none'
-gnn_layer_type: Literal['GCNConv', 'GATv2Conv', 'GraphConv'] = 'GATv2Conv'
-loss_type: Literal['recon', 'coloc'] = 'coloc'
-num_layers = 1
 
 RANDOM_NETWORK = False
 
 # %%
 # Data
-dat = ColocNetData_discrete(KIDNEY_LARGE, test=10, val=5, 
+dat = ColocNetData_discrete(KIDNEY_LARGE, test=test, val=val, 
                     cache_images=True, cache_folder=CACHE_FOLDER,
                     colocml_preprocessing=True, 
                     fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
-                    top_k=tk, bottom_k=bk, random_network=RANDOM_NETWORK
+                    top_k=hyperparams['top_k'], bottom_k=hyperparams['bottom_k'], 
+                    random_network=RANDOM_NETWORK
                     )
 
 mylogger = DictLogger()
 
 # %%
 # Training
-for i in range(100):
+for i in range(N_BOOTSTRAPS):
     print('# #######')
     print(f'# Iteration {i}')
     print('# #######')
     
     dat.sample_sets()
 
-    model = gnnDiscrete(data=dat, latent_dims=20, 
-                        encoding = encoding, embedding_dims=10,
-                        lr=1e-3, training_epochs=130, 
-                        early_stopping_patience=early_stopping_patience,
-                        lightning_device='gpu', loss=loss_type,
-                        activation=activation, num_layers=num_layers,
-                        gnn_layer_type=gnn_layer_type)
+    model = gnnDiscrete(data=dat, latent_dims=hyperparams['latent_size'], 
+                        encoding = hyperparams['encoding'], embedding_dims=40,
+                        lr=hyperparams['lr'], training_epochs=130, 
+                        early_stopping_patience=hyperparams['early_stopping_patience'],
+                        lightning_device='gpu', loss=hyperparams['loss_type'],
+                        activation=hyperparams['activation'], num_layers=hyperparams['num_layers'],
+                        gnn_layer_type=hyperparams['gnn_layer_type'])
 
 
     mylogger = model.train()
@@ -147,7 +185,9 @@ df = pd.DataFrame({'Scenario': scenario_l, 'Accuracy': acc_l,
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
 sns.violinplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='Accuracy', ax=ax1)
-ax1.set_title(f'KIDNEY_LARGE (top-k: {tk}, bottom-k: {bk}, encoding: {encoding})')
+ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
+                                                                            hyperparams['bottom_k'],
+                                                                            hyperparams['encoding']))
 ax1.set_ylabel(f'Top-{top_acc} Accuracy (Available)')
 ax1.set_ylim(0, 1)
 
@@ -156,7 +196,7 @@ ax2.set_title('Mean transifivity fraction: {:.2f}'.format(1-df[df['Evaluation']=
 ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 ax2.set_ylim(0, 1)
 
-fig.suptitle(f'Activation: {activation}')
+fig.suptitle('Activation: {}'.format(hyperparams['activation']))
 
 # %%
 plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')

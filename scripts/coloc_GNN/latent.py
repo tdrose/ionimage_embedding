@@ -48,26 +48,26 @@ top_acc = 3
 # Dataset
 DSID = KIDNEY_LARGE
 # Number of bootstraps
-N_BOOTSTRAPS = 30
+N_BOOTSTRAPS = 100
+# Random network
+RANDOM_NETWORK = False
+
 
 # Latent size
-latent_size = 35
-# Top-k
-top_k = 2
-# Bottom-k
-bottom_k = 7
-# encoding
-encoding = 'onehot'
-# early_stopping_patience
-early_stopping_patience = 5
-# GNN layer type
-gnn_layer_type = 'GATv2Conv'
-# Loss type
-loss_type = 'recon'
-# Number of layers
-num_layers = 2
-# learning rate
-lr = 0.0003
+hyperparams_avail = {
+    'latent_size': 27,
+    'top_k': 2,
+    'bottom_k':  2,
+    'encoding': 'onehot', # 'recon', 'coloc'
+    'early_stopping_patience': 2,
+    'gnn_layer_type': 'GATv2Conv', # 'GCNConv', 'GATv2Conv', 'GraphConv'
+    'loss_type': 'coloc',
+    'num_layers': 1,
+    'lr': 0.005945,
+    'activation': 'none' # 'softmax', 'relu', 'sigmoid', 'none'
+}
+
+hyperparams = hyperparams_avail
 
 
 # %%
@@ -75,7 +75,8 @@ dat = ColocNetData_discrete(KIDNEY_LARGE, test=test, val=val,
                     cache_images=True, cache_folder=CACHE_FOLDER,
                     colocml_preprocessing=True, 
                     fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
-                    top_k=top_k, bottom_k=bottom_k, random_network=False
+                    top_k=hyperparams['top_k'], bottom_k=hyperparams['bottom_k'], 
+                    random_network=RANDOM_NETWORK
                     )
 
 
@@ -84,21 +85,15 @@ dat = ColocNetData_discrete(KIDNEY_LARGE, test=test, val=val,
 # Train model
 # ###########
 
-
 dat.sample_sets()
 
-model = gnnDiscrete(data=dat, 
-                    latent_dims=latent_size, 
-                    encoding = encoding, # type: ignore
-                    embedding_dims=40,
-                    lr=lr, 
-                    training_epochs=130, 
-                    early_stopping_patience=early_stopping_patience,
-                    lightning_device='gpu', 
-                    loss=loss_type, # type: ignore
-                    activation='none', 
-                    num_layers=num_layers,
-                    gnn_layer_type=gnn_layer_type) # type: ignore
+model = gnnDiscrete(data=dat, latent_dims=hyperparams['latent_size'], 
+                        encoding = hyperparams['encoding'], embedding_dims=40,
+                        lr=hyperparams['lr'], training_epochs=130, 
+                        early_stopping_patience=hyperparams['early_stopping_patience'],
+                        lightning_device='gpu', loss=hyperparams['loss_type'],
+                        activation=hyperparams['activation'], num_layers=hyperparams['num_layers'],
+                        gnn_layer_type=hyperparams['gnn_layer_type'])
 
 
 _ = model.train()
@@ -164,8 +159,16 @@ adata.obs = adata.obs.join(pd.DataFrame(metadata_dict).set_index('ion_label'))
 sc.pp.pca(adata)
 sc.pp.neighbors(adata)
 sc.tl.umap(adata)
+sc.tl.leiden(adata)
 
 # %%
 sc.pl.pca(adata, color='sub_class', dimensions=[0, 1], size=80.)
+
+
+# %%
+sc.pl.umap(adata, color='sub_class', size=80.)
+
+# %%
+sc.pl.umap(adata, color='leiden', size=80.)
 
 # %%
