@@ -33,6 +33,7 @@ from ionimage_embedding.evaluation.gnn import (
     coloc_ion_labels
     )
 from ionimage_embedding.logger import DictLogger
+from ionimage_embedding.dataloader.IonImage_data import IonImagedata_random
 
 
 

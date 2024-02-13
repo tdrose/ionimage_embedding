@@ -31,6 +31,14 @@ from ionimage_embedding.evaluation.gnn import (
     coloc_ion_labels,
     closest_accuracy_latent_ds
     )
+from ionimage_embedding.coloc.coloc import ColocModel
+from ionimage_embedding.dataloader.IonImage_data import IonImagedata_random
+
+
+# %%
+import os
+os.system('nvidia-smi')
+
 
 # %%
 # #####################
@@ -71,12 +79,27 @@ hyperparams = hyperparams_avail
 
 
 # %%
+# %%
+iidata = IonImagedata_random(KIDNEY_LARGE, test=.1, val=.1, transformations=None, fdr=.1,
+                             min_images=min_images, maxzero=.9, batch_size=10, 
+                             colocml_preprocessing=True, cache=True)
+
+
+colocs = ColocModel(iidata)
+
+# %%
 dat = ColocNetData_discrete(KIDNEY_LARGE, test=test, val=val, 
                     cache_images=True, cache_folder=CACHE_FOLDER,
                     colocml_preprocessing=True, 
                     fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
                     top_k=hyperparams['top_k'], bottom_k=hyperparams['bottom_k'], 
-                    random_network=RANDOM_NETWORK
+                    random_network=RANDOM_NETWORK,
+                    use_precomputed=True,
+                    ds_labels=iidata.full_dataset.dataset_labels,
+                    ion_labels=iidata.full_dataset.ion_labels,
+                    coloc=colocs.full_coloc,
+                    dsl_int_mapper=iidata.dsl_int_mapper,
+                    ion_int_mapper=iidata.ion_int_mapper
                     )
 
 
@@ -166,9 +189,50 @@ sc.pl.pca(adata, color='sub_class', dimensions=[0, 1], size=80.)
 
 
 # %%
-sc.pl.umap(adata, color='sub_class', size=80.)
+sc.pl.umap(adata, color='class', size=80.)
 
 # %%
 sc.pl.umap(adata, color='leiden', size=80.)
 
+
+
+
+
+# %%
+import matplotlib.pyplot as plt
+
+LEIDEN_CLUSTER = 9
+N_MOLS = 5
+N_SAMPLES = 5
+
+ion_labels = iidata.full_dataset.ion_labels
+
+tmp = adata.obs[adata.obs['leiden']==str(LEIDEN_CLUSTER)].reset_index()
+
+# Sample ions
+sample_ions = np.random.choice(tmp['ion'].values.astype(int), N_MOLS, replace=False)
+
+# Create figure grid
+fig, axs = plt.subplots(N_MOLS, N_SAMPLES, figsize=(5, 5))
+
+for ax in axs.flatten():
+    ax.axis('off')
+
+for i, ion in enumerate(sample_ions):
+    # Mask the ions
+    mask = iidata.full_dataset.ion_labels == ion
+
+    image_idx = np.arange(len(ion_labels))[mask]
+
+    # Shuffle image_idx
+    np.random.shuffle(image_idx)
+
+    image_idx = image_idx[:N_SAMPLES]
+
+    for j, idx in enumerate(image_idx):
+        axs[i, j].imshow(iidata.full_dataset.images[idx])
+
+fig.suptitle('Leiden cluster: {}'.format(LEIDEN_CLUSTER))
+
+plt.show()
 # %%
