@@ -31,7 +31,8 @@ class ColocNetData_discrete:
                  ds_labels: Optional[torch.Tensor]=None,
                  coloc: Optional[Dict[int, pd.DataFrame]]=None,
                  dsl_int_mapper: Optional[Dict[int, str]]=None,
-                 ion_int_mapper: Optional[Dict[int, str]]=None
+                 ion_int_mapper: Optional[Dict[int, str]]=None,
+                 force_reload: bool=False
                 ) -> None:
         
         if min_images < top_k + bottom_k:
@@ -56,10 +57,18 @@ class ColocNetData_discrete:
                                   maxzero=maxzero, vitb16_compatible=False, force_size=False, 
                                   min_images=min_images)
         
-        self.dataset_file = '{}_{}_{}_{}_{}'.format(COLOC_NET_DISCRETE_DATA, 
-                                                 cache_hex, 
-                                                 str(top_k), str(bottom_k),
-                                                 str(random_network))
+        if force_reload:
+            # In torch_gemetric <=2.4.0 force reload is not implemented for inmemory datasets
+            self.dataset_file = '{}_{}_{}_{}_{}_{}'.format(COLOC_NET_DISCRETE_DATA, 
+                                                           cache_hex, 
+                                                           str(top_k), str(bottom_k),
+                                                           str(random_network),
+                                                           str(np.random.randint(0, 1000000)))
+        else:
+            self.dataset_file = '{}_{}_{}_{}_{}'.format(COLOC_NET_DISCRETE_DATA, 
+                                                    cache_hex, 
+                                                    str(top_k), str(bottom_k),
+                                                    str(random_network))
         
         self.batch_size = batch_size
         

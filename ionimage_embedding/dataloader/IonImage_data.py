@@ -17,7 +17,7 @@ class IonImagedata_random:
                  transformations: Optional[torch.nn.Module]=T.RandomRotation(degrees=(0, 360)), 
                  maindata_class: bool=True,
                  db: Tuple[str, str]=('HMDB', 'v4'), fdr: float=0.2, scale_intensity: str='TIC', 
-                 colocml_preprocessing: bool=False,
+                 colocml_preprocessing: bool=True,
                  k: int=10, batch_size: int=128,
                  cache: bool=False, cache_folder: str='/scratch/model_testing', min_images: int=5, 
                  maxzero: float=.95, vitb16_compatible: bool=False, force_size: Optional[int]=None
