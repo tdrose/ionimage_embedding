@@ -129,7 +129,16 @@ class gnnDiscreteModel(pl.LightningModule):
         return torch.nn.functional.one_hot(x, num_classes=self.n_ions).float().to(self.device)
     
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor) -> torch.Tensor:
+        #print('x: ', x)
+        #print('x.shape: ', x.shape)
+        #print('edge_index: ', edge_index)
+        #print('edge_index.shape: ', edge_index.shape)
+        #print('edge_attr: ', edge_attr)
+        #print('edge_attr.shape: ', edge_attr.shape)
+
         x = self.embedding(x)
+        #print('x: ', x)
+        #print('x.shape: ', x.shape)
         return self.gae(x, edge_index, edge_attr)
     
     def get_loss(self, z: torch.Tensor, edge_index: torch.Tensor, neg_edge_index: torch.Tensor,

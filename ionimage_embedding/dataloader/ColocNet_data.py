@@ -32,6 +32,7 @@ class ColocNetData_discrete:
                  coloc: Optional[Dict[int, pd.DataFrame]]=None,
                  dsl_int_mapper: Optional[Dict[int, str]]=None,
                  ion_int_mapper: Optional[Dict[int, str]]=None,
+                 n_ions: Optional[int]=None,
                  force_reload: bool=False
                 ) -> None:
         
@@ -93,18 +94,19 @@ class ColocNetData_discrete:
 
             self.dsl_int_mapper = iidata.dsl_int_mapper
             self.ion_int_mapper = iidata.ion_int_mapper
+            self.n_ions = ion_labels.unique().shape[0]
 
         else:
             if ion_labels is None or ds_labels is None or coloc is None or \
-                dsl_int_mapper is None or ion_int_mapper is None:
+                dsl_int_mapper is None or ion_int_mapper is None or n_ions is None:
                 
                 raise ValueError('If use_precomputed is True, ion_labels, '
                                  'ds_labels and coloc must be provided.')
 
             self.dsl_int_mapper = dsl_int_mapper
             self.ion_int_mapper = ion_int_mapper
-
-        self.n_ions = ion_labels.unique().shape[0]
+            self.n_ions = n_ions
+        
 
         self.dataset = ColocNetDiscreteDataset(path=cache_folder,
                                                name=self.dataset_file,

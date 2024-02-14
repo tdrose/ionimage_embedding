@@ -124,6 +124,7 @@ dat = ColocNetData_discrete([""],
                     coloc=colocs.train_coloc,
                     dsl_int_mapper=iidata.dsl_int_mapper,
                     ion_int_mapper=iidata.ion_int_mapper,
+                    n_ions=int(iidata.full_dataset.ion_labels.max().numpy()),
                     force_reload=True,
                     )
 
