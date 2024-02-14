@@ -124,7 +124,7 @@ dat = ColocNetData_discrete([""],
                     coloc=colocs.train_coloc,
                     dsl_int_mapper=iidata.dsl_int_mapper,
                     ion_int_mapper=iidata.ion_int_mapper,
-                    n_ions=int(iidata.full_dataset.ion_labels.max().numpy()),
+                    n_ions=int(iidata.full_dataset.ion_labels.max().numpy())+1,
                     force_reload=True,
                     )
 
@@ -161,8 +161,13 @@ acc_l.append(perf)
 
 
 pred_gnn_t = latent_gnn(model, dat, graph='training')
-perf = None
+gnn_coloc_inferred = latent_colocinference(pred_gnn_t, colocs.data.test_dataset.ion_labels)
+perf = scoring.closest_accuracy_latent(gnn_coloc_inferred, colocs, top=top_acc)
 scenario_l.append('GNN training')
 acc_l.append(perf)
 
 coloc_gnn_t = latent_colocinference(pred_gnn_t, coloc_ion_labels(dat, dat._test_set))
+
+# %%
+df = pd.DataFrame({'Scenario': scenario_l, 'Accuracy': acc_l})
+# %%
