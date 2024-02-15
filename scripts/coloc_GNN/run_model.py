@@ -192,7 +192,8 @@ ax1.set_ylabel(f'Top-{top_acc} Accuracy (Available)')
 ax1.set_ylim(0, 1)
 
 sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2)
-ax2.set_title('Mean transitivity fraction: {:.2f}'.format(1-df[df['Evaluation']=='Transitivity']['Fraction'].mean()))
+frac = 1-df[df['Evaluation']=='Transitivity']['Fraction'].mean()
+ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
 ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 ax2.set_ylim(0, 1)
 

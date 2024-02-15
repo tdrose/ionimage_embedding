@@ -99,7 +99,8 @@ dat = ColocNetData_discrete(KIDNEY_LARGE, test=test, val=val,
                     ion_labels=iidata.full_dataset.ion_labels,
                     coloc=colocs.full_coloc,
                     dsl_int_mapper=iidata.dsl_int_mapper,
-                    ion_int_mapper=iidata.ion_int_mapper
+                    ion_int_mapper=iidata.ion_int_mapper,
+                    n_ions=len(iidata.full_dataset.ion_labels.unique())
                     )
 
 
@@ -129,7 +130,11 @@ pred_mc, _ = mean_coloc_test(dat)
 pred_gnn_t = latent_gnn(model, dat, graph='training')
 coloc_gnn_t = latent_colocinference(pred_gnn_t, coloc_ion_labels(dat, dat._test_set))
 
-avail, trans, _ = closest_accuracy_latent_ds(coloc_gnn_t, dat, pred_mc, top=top_acc)
+avail, trans, fraction = closest_accuracy_latent_ds(coloc_gnn_t, dat, pred_mc, top=top_acc)
+print('Available: ', avail)
+print('Transitivity: ', trans)
+print('Fraction: ', fraction)
+
 
 
 # %%

@@ -58,7 +58,7 @@ def objective(trial: optuna.Trial):
     # Loss type
     loss_type = trial.suggest_categorical('Loss type', ['recon', 'coloc'])
     # Number of layers
-    num_layers = trial.suggest_int('Number of layers', 1, 2)
+    num_layers = trial.suggest_int('Number of layers', 1, 3)
     # learning rate
     lr = trial.suggest_float('learning rate', 0.0001, 0.01)
 
@@ -112,7 +112,17 @@ def objective(trial: optuna.Trial):
         trans_l.append(trans)
         avail_l.append(avail)
 
-    res = - (np.mean(trans_l)*100 + np.mean(avail_l))
+    
+    
+    trans = np.nanmean(trans_l)
+    avail = np.nanmean(avail_l)
+
+    if np.isnan(trans):
+        trans = 0
+    if np.isnan(avail):
+        avail= 0
+
+    res = - (trans*100 + avail)
 
     # Create a dictionary of all hyperparameters
     hyperparameters = {
@@ -150,5 +160,5 @@ print('Best parameters')
 print(study.best_params)
 print('###############')
 
-pickle.dump(study, open(osp.join(CACHE_FOLDER, 'GNN_tuning_transitivity.pkl'), 'wb'))
+pickle.dump(study, open(osp.join(CACHE_FOLDER, 'GNN_tuning_transitivity2.pkl'), 'wb'))
 
