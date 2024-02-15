@@ -1,3 +1,4 @@
+from math import isnan
 from typing import Literal, Tuple
 import pandas as pd
 from anndata import AnnData
@@ -82,7 +83,7 @@ def latent_gnn(model: gnnDiscrete, data: ColocNetData_discrete,
     else:
         raise ValueError('graph must be either "training", "unconnected", or "union"')
 
-# %%
+
 # Scoring
 def closest_accuracy_aggcoloc_ds(predictions: pd.DataFrame, 
                                  data: ColocNetData_discrete, top: int=5) -> float:
@@ -122,9 +123,9 @@ def closest_accuracy_latent_ds(latent: pd.DataFrame,
                                top: int=5) -> Tuple[float, float, float]:
 
     avail_corr = 0
-    avail_total = 1
+    avail_total = 0
     trans_corr = 0
-    trans_total = 1
+    trans_total = 0
 
     ground_truth = {k: v for k, v in data.dataset.coloc_dict.items() if k in data.get_test_dsids()}
 
@@ -148,24 +149,46 @@ def closest_accuracy_latent_ds(latent: pd.DataFrame,
             # Loop over each molecule
             for i in range(len(curr_cl)):
 
-                # Descending sorted most colocalized
-                mask = np.argsort(curr_cl[i])[::-1]
+                # Only evaluate if molecule has been observed in training data
+                if not all(curr_cl[i] == 0):
 
-                # We are using the coloc_df index for the curr_cl array
-                coloc_order = coloc_df.index[mask]
+                    # Descending sorted most colocalized
+                    mask = np.argsort(curr_cl[i])[::-1]
 
-                if np.isnan(aggcoloc.loc[ground_truth[ds].index[i], max_coloc_id[i]]):
-                    if max_coloc_id[i] in coloc_order[:top]:
-                        trans_corr += 1
+                    # We are using the coloc_df index for the curr_cl array
+                    coloc_order = coloc_df.index[mask]
 
-                    trans_total += 1
-                else:
-                    if max_coloc_id[i] in coloc_order[:top]:
-                        avail_corr += 1
+                    if np.isnan(aggcoloc.loc[ground_truth[ds].index[i], 
+                                             max_coloc_id[i]]) and \
+                        not np.isnan(pred_df.loc[ground_truth[ds].index[i], max_coloc_id[i]]):
+                        
+                        if max_coloc_id[i] in coloc_order[:top]:
+                            trans_corr += 1
 
-                    avail_total += 1
+                        trans_total += 1
+                    elif not np.isnan(aggcoloc.loc[ground_truth[ds].index[i], max_coloc_id[i]]):
+                        if max_coloc_id[i] in coloc_order[:top]:
+                            avail_corr += 1
 
-    return avail_corr / avail_total, trans_corr/trans_total, avail_total/(trans_total+avail_total)
+                        avail_total += 1
+
+    if avail_total == 0:
+        avail = np.nan
+    else:
+        avail = avail_corr / avail_total
+
+    if trans_total == 0:
+        trans = np.nan
+    else:
+        trans = trans_corr / trans_total
+
+    if np.isnan(avail) or np.isnan(trans):
+        fraction = np.nan
+    else:
+        fraction = avail_total/(trans_total+avail_total)
+    
+    return avail, trans, fraction
+
 
 def closest_accuracy_random_ds(latent: pd.DataFrame, 
                                data: ColocNetData_discrete, top: int=5) -> float:
