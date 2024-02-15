@@ -1,7 +1,7 @@
 import torch
 import pandas as pd
 import numpy as np
-from typing import Dict, Literal, Union
+from typing import Dict, Literal, Union, Tuple
 from sklearn.metrics import silhouette_score, pairwise_kernels
 from anndata import AnnData
 import scanpy as sc
@@ -336,10 +336,16 @@ def latent_colocinference(umap_df: pd.DataFrame, test_labels: torch.Tensor):
                         out[i2, i1] = np.nan
     return pd.DataFrame(out, index=sorted_ion_labels, columns=sorted_ion_labels)
 
-def closest_accuracy_latent(latent: pd.DataFrame, colocs: ColocModel, top: int=5) -> float:
+def closest_accuracy_latent(latent: pd.DataFrame, 
+                            colocs: ColocModel, 
+                            aggcoloc: pd.DataFrame,
+                            top: int=5) -> Tuple[float, float, float]:
 
-    total_predictions = 0
-    correct_predictions = 0
+    avail_corr = 0
+    avail_total = 0
+    trans_corr = 0
+    trans_total = 0
+
     clc = get_colocs(colocs, origin='test')
 
     pred_df = latent
@@ -360,19 +366,47 @@ def closest_accuracy_latent(latent: pd.DataFrame, colocs: ColocModel, top: int=5
 
             # Loop over each molecule
             for i in range(len(curr_cl)):
+                
+                # Only evaluate if molecule has been observed in training data
+                if not all(curr_cl[i] == 0):
 
-                # Descending sorted most colocalized
-                mask = np.argsort(curr_cl[i])[::-1]
+                    # Descending sorted most colocalized
+                    mask = np.argsort(curr_cl[i])[::-1]
 
-                # We are using the coloc_df index for the curr_cl array
-                coloc_order = coloc_df.index[mask]
+                    # We are using the coloc_df index for the curr_cl array
+                    coloc_order = coloc_df.index[mask]
 
-                if max_coloc_id[i] in coloc_order[:top]:
-                    correct_predictions += 1
+                    if np.isnan(aggcoloc.loc[clc[ds].index[i], 
+                                             max_coloc_id[i]]) and \
+                        not np.isnan(pred_df.loc[clc[ds].index[i], max_coloc_id[i]]):
+                        
+                        if max_coloc_id[i] in coloc_order[:top]:
+                            trans_corr += 1
 
-                total_predictions += 1
+                        trans_total += 1
+                    elif not np.isnan(aggcoloc.loc[clc[ds].index[i], max_coloc_id[i]]):
+                        if max_coloc_id[i] in coloc_order[:top]:
+                            avail_corr += 1
 
-    return correct_predictions / total_predictions
+                        avail_total += 1
+
+    if avail_total == 0:
+        avail = np.nan
+    else:
+        avail = avail_corr / avail_total
+
+    if trans_total == 0:
+        trans = np.nan
+    else:
+        trans = trans_corr / trans_total
+
+    if np.isnan(avail) or np.isnan(trans):
+        fraction = np.nan
+    else:
+        fraction = avail_total/(trans_total+avail_total)
+    
+    return avail, trans, fraction
+
 
 def remove_nan(df: pd.DataFrame) -> pd.DataFrame:
     df_copy = df.dropna(how='all', axis=0).dropna(how='all', axis=1)
