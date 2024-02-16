@@ -1,6 +1,9 @@
+import pandas as pd
+import collections
+
 from lightning.pytorch.loggers.logger import Logger
 from lightning.pytorch.utilities import rank_zero_only
-import collections
+
 
 class DictLogger(Logger):
     """
@@ -57,3 +60,29 @@ class DictLogger(Logger):
         # Optional. Any code that needs to be run after training
         # finishes goes here
         pass
+
+class PerformanceLogger:
+    
+    def __init__(self, scenario: str='Scenario',metric: str='Accuracy', 
+                 evaluation: str='Evaluation', fraction: str='Fraction'):
+        self.scenario_l = []
+        self.metric_l = []
+        self.eval_l = []
+        self.frac_l = []
+
+        self.scenario = scenario
+        self.metric = metric
+        self.evaluation = evaluation
+        self.fraction = fraction
+
+    def add_result(self, scenario: str, metric: float, evaluation: str, fraction: float):
+        self.scenario_l.append(scenario)
+        self.metric_l.append(metric)
+        self.eval_l.append(evaluation)
+        self.frac_l.append(fraction)
+
+    def get_df(self):
+        return pd.DataFrame({self.scenario: self.scenario_l, 
+                             self.metric: self.metric_l, 
+                             self.evaluation: self.eval_l, 
+                             self.fraction: self.frac_l})
