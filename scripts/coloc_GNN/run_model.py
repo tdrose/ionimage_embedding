@@ -17,6 +17,7 @@ except ImportError:
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from torch import gt
 
 from ionimage_embedding.dataloader.constants import CACHE_FOLDER
 from ionimage_embedding.dataloader.ColocNet_data import ColocNetData_discrete
@@ -32,8 +33,10 @@ from ionimage_embedding.evaluation.gnn import (
     latent_gnn,
     coloc_ion_labels
     )
-from ionimage_embedding.logger import DictLogger
+from ionimage_embedding.logger import DictLogger, PerformanceLogger
 from ionimage_embedding.dataloader.IonImage_data import IonImagedata_random
+from ionimage_embedding.coloc.coloc import ColocModel
+from ionimage_embedding.evaluation.scoring import get_colocs
 
 
 
@@ -59,7 +62,7 @@ top_acc = 7
 # Dataset
 DSID = KIDNEY_LARGE
 # Number of bootstraps
-N_BOOTSTRAPS = 100
+N_BOOTSTRAPS = 10
 
 
 hyperparams_avail = {
@@ -92,11 +95,6 @@ hyperparams_transitivity = {
 hyperparams = hyperparams_transitivity
 
 
-scenario_l = []
-acc_l = []
-eval_l = []
-frac_l = []
-
 RANDOM_NETWORK = False
 
 # %%
@@ -111,7 +109,19 @@ dat = ColocNetData_discrete(KIDNEY_LARGE, test=test, val=val,
 
 mylogger = DictLogger()
 
+
+
+
 # %%
+
+
+
+# %%
+    
+acc_perf = PerformanceLogger(scenario='Scenario',metric='Accuracy', 
+                             evaluation='Evaluation', fraction='Fraction')
+mse_perf = PerformanceLogger(scenario='Scenario',metric='MSE',
+                             evaluation='Evaluation', fraction='Fraction')
 # Training
 for i in range(N_BOOTSTRAPS):
     print('# #######')
@@ -133,54 +143,47 @@ for i in range(N_BOOTSTRAPS):
 
     pred_mc, pred_fraction = mean_coloc_test(dat)
     
-
     pred_cu = coloc_umap_ds(dat, k=3, n_components=10)
-    
-
     coloc_cu = latent_colocinference(pred_cu, coloc_ion_labels(dat, dat._test_set))
-
     
     pred_gnn_t = latent_gnn(model, dat, graph='training')
     coloc_gnn_t = latent_colocinference(pred_gnn_t, coloc_ion_labels(dat, dat._test_set))
     
-    
-    acc_l.append(closest_accuracy_aggcoloc_ds(pred_mc, dat, top=top_acc))
-    scenario_l.append('Mean coloc')
-    eval_l.append('Available')
-    frac_l.append(pred_fraction)
+    # Accuracy
+    acc_perf.add_result('Mean coloc', closest_accuracy_aggcoloc_ds(pred_mc, dat, top=top_acc), 
+                        'Available', pred_fraction)
 
     avail, trans, fraction = closest_accuracy_latent_ds(coloc_cu, dat, pred_mc, top=top_acc)
-    scenario_l.append('UMAP')
-    acc_l.append(avail)
-    eval_l.append('Available')
-    frac_l.append(fraction)
-    scenario_l.append('UMAP')
-    acc_l.append(trans)
-    eval_l.append('Transitivity')
-    frac_l.append(fraction)
+    acc_perf.add_result('UMAP', avail, 'Available', fraction)
+    acc_perf.add_result('UMAP', trans, 'Transitivity', 1-fraction)
 
     avail, trans, fraction = closest_accuracy_latent_ds(coloc_gnn_t, dat, pred_mc, top=top_acc)
-    scenario_l.append('GNN training')
-    acc_l.append(avail)
-    eval_l.append('Available')
-    frac_l.append(fraction)
-    scenario_l.append('GNN training')
-    acc_l.append(trans)
-    eval_l.append('Transitivity')
-    frac_l.append(fraction)
+    acc_perf.add_result('GNN', avail, 'Available', fraction)
+    acc_perf.add_result('GNN', trans, 'Transitivity', 1-fraction)
 
-    acc_l.append(closest_accuracy_random_ds(coloc_gnn_t, dat, top=top_acc))
-    scenario_l.append('Random')
-    eval_l.append('Available')
-    frac_l.append(fraction)
+    acc_perf.add_result('Random', closest_accuracy_random_ds(coloc_gnn_t, dat, top=top_acc),
+                        'Available', fraction)
     
+    # MSE
+    avail, trans, fraction = coloc_mse_gnn(pred_mc, pred_mc, dat)
+    mse_perf.add_result('Mean coloc', avail, 'Available', 1)
 
-    #print(f'Fraction of predicted colocs: {pred_fraction:.2f}')
+    avail, trans, fraction = coloc_mse_gnn(coloc_cu, pred_mc, dat)
+    mse_perf.add_result('UMAP', avail, 'Available', fraction)
+    mse_perf.add_result('UMAP', trans, 'Transitivity', 1-fraction)
+
+    avail, trans, fraction = coloc_mse_gnn(coloc_gnn_t, pred_mc, dat)
+    mse_perf.add_result('GNN', avail, 'Available', fraction)
+    mse_perf.add_result('GNN', trans, 'Transitivity', 1-fraction)
+
+    avail, trans, fraction = coloc_mse_gnn_random(coloc_gnn_t, pred_mc, dat)
+    mse_perf.add_result('Random', avail, 'Available', fraction)
+    mse_perf.add_result('Random', trans, 'Transitivity', 1-fraction)
+
 
 # %%
-# Evaluation
-df = pd.DataFrame({'Scenario': scenario_l, 'Accuracy': acc_l, 
-                   'Evaluation': eval_l, 'Fraction': frac_l})
+# Accuracy 
+df = acc_perf.get_df()
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
@@ -192,12 +195,34 @@ ax1.set_ylabel(f'Top-{top_acc} Accuracy (Available)')
 ax1.set_ylim(0, 1)
 
 sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2)
-frac = 1-df[df['Evaluation']=='Transitivity']['Fraction'].mean()
+frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
 ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
 ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 ax2.set_ylim(0, 1)
 
 fig.suptitle('Activation: {}'.format(hyperparams['activation']))
+plt.show()
+
+# %%
+# MSE
+df = mse_perf.get_df()
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+sns.violinplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='MSE', ax=ax1)
+ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
+                                                                            hyperparams['bottom_k'],
+                                                                            hyperparams['encoding']))
+ax1.set_ylabel(f'MSE (Available)')
+
+sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='MSE', ax=ax2)
+frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
+ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
+ax2.set_ylabel(f'MSE (Transitivity)')
+
+fig.suptitle('Activation: {}'.format(hyperparams['activation']))
+plt.show()
+
 
 # %%
 plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')

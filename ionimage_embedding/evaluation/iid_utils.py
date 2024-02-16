@@ -1,29 +1,28 @@
-from typing import Literal, Tuple, Union
+from typing import Literal, Union, Tuple, Dict
 import numpy as np
-import pandas as pd
-import umap
 import seaborn as sns
+import pandas as pd
 import sklearn.cluster as cluster
+from sklearn.metrics import pairwise_kernels
 
-from ..models.crl.crl import CRL
-from ..models.biomedclip import BioMedCLIP
-from ..models.cvae.cvae import CVAE
+import torch
+
+from ..coloc.coloc import ColocModel
+from ..coloc.utils import torch_cosine
+from ..models import CRL, BioMedCLIP, CVAE
 from ..dataloader.mzImageDataset import mzImageDataset
+from ._utils import compute_umap
 
-def sensitivity(x: dict) -> float:
-    return x['tp'] / (x['tp'] + x['fn'])
 
-def specificity(x: dict) -> float:
-    return x['tn'] / (x['tn'] + x['fp'])
-
-def accuracy(x: dict) -> float:
-    return (x['tp'] + x['tn'])/(x['fn']+x['tn']+x['fp']+x['tp'])
-
-def f1score(x: dict) -> float:
-    return (x['tp']*2)/(x['tp']*2 + x['fp'] + x['fn'])
-
-def precision(x: dict) -> float:
-    return x['tp'] / (x['tp'] + x['fp'])
+def get_colocs(colocs: ColocModel, origin: Literal['train', 'val', 'test']='train'):
+    if origin == 'train':
+        return colocs.train_coloc
+    elif origin == 'test':
+        return colocs.test_coloc
+    elif origin == 'val':
+        return colocs.val_coloc
+    else:
+        raise ValueError("`dataset` must be one of: ['train', 'val', 'test']")
 
 def get_mzimage_dataset(model: Union[CRL, BioMedCLIP, CVAE], 
                         origin: Literal['train', 'val', 'test']='train') -> mzImageDataset:
@@ -120,14 +119,6 @@ def latent_centroids_df(model: Union[CRL, BioMedCLIP, CVAE],
 
     return df
 
-def compute_umap(latent: np.ndarray) -> pd.DataFrame:
-    
-    reducer = umap.UMAP()
-    data = pd.DataFrame(reducer.fit_transform(latent))
-    data = data.rename(columns={0: 'x', 1: 'y'})
-    return data
-
-
 def cluster_latent(model: Union[CRL, BioMedCLIP, CVAE], n_clusters: int=10, plot: bool=False, device='cpu',
                    origin: Literal['train', 'val', 'test']='train'):
     
@@ -148,3 +139,66 @@ def cluster_latent(model: Union[CRL, BioMedCLIP, CVAE], n_clusters: int=10, plot
         df['cluster'] = df['cluster'].astype(str)
         sns.scatterplot(data=df, x='x', y='y', hue='cluster')
     return umap_df
+
+
+def compute_ds_coloc(model: Union[CRL, BioMedCLIP, CVAE], device: str='cpu',
+                     origin: Literal['train', 'val', 'test']='train') -> Dict[int, pd.DataFrame]:
+    latent = get_latent(model=model, device=device, origin=origin)
+    
+    # lcos = torch_cosine(torch.tensor(latent))
+    # Make DS specific dict
+    out_dict = {}        
+    data = get_mzimage_dataset(model, origin=origin)
+    # loop over each dataset
+    for dsl in torch.unique(data.dataset_labels):
+        dsid = int(dsl)
+        mask = data.dataset_labels==dsid
+        if sum(mask) > 1:
+            # Convert data to array (in correct order)
+            features = torch.tensor(latent)[mask]
+            ions = data.ion_labels[mask]
+            ion_sorting_mask = torch.argsort(ions)
+            features = features[ion_sorting_mask]
+            # Compute coloc matrix (in correct order)
+            cos = torch_cosine(features)
+            out_dict[dsid] = pd.DataFrame(cos.cpu().detach().numpy(), 
+                                          columns=ions[ion_sorting_mask].cpu().detach().numpy(),
+                                          index=ions[ion_sorting_mask].cpu().detach().numpy()
+                                         )
+        else:
+            out_dict[dsid] = pd.DataFrame()
+
+    return out_dict
+
+def same_ion_similarity(model: CRL, device: str='cpu',
+                        origin: Literal['train', 'val', 'test']='train'):
+
+    latent = get_latent(model, origin=origin, device=device)
+    ion_labels = get_ion_labels(model, origin=origin) 
+    
+    # Same ion similarities
+    same_similarities = []
+    same_ion_counter = 0
+    for i in set(ion_labels):
+        if len(latent[ion_labels==i]) > 1:
+            # Compute cosine of latent reps of all same ions
+            a = pairwise_kernels(latent[ion_labels==i], metric='cosine')
+            mask = ~np.diag(np.ones(a.shape[0])).astype(bool)
+            same_similarities.append(np.mean(a[mask]))
+            same_ion_counter += 1
+            
+    print(f'{same_ion_counter} ions observed in multiple images')
+    
+    # Compute distance between all Sample N random similarities that are not the same ion
+    different_similarities = []
+    for i in range(5000):
+        samples = np.random.randint(0, high=latent.shape[0], size=2)
+        if ion_labels[samples[0]] != ion_labels[samples[1]]:
+            a = pairwise_kernels(latent[samples], metric='cosine')
+            different_similarities.append(a[1,0])
+
+    # Plot distances as violins
+    final_df = pd.concat([pd.DataFrame({'type': 'Same ion', 'similarity': same_similarities}), 
+                          pd.DataFrame({'type': 'Different ion', 'similarity': different_similarities})])
+    return final_df
+

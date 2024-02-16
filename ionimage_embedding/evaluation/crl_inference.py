@@ -154,3 +154,4 @@ def crl_latent_inference(train_latent_coloc, ion_labels: torch.Tensor,
         return pd.DataFrame(out, 
                             columns=sorted_ion_labels, 
                             index=sorted_ion_labels), not_inferred_fraction
+
