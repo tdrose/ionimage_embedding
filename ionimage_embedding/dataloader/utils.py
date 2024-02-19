@@ -7,7 +7,7 @@ import os
 import uuid
 import pickle
 
-from .constants import ION_IMAGE_DATA, DATASET_DATA, COLOC_NET_DISCRETE_DATA
+from ..constants import ION_IMAGE_DATA, DATASET_DATA, COLOC_NET_DISCRETE_DATA
 
 
 def size_adaption(image_dict: Dict[str, np.ndarray]):
@@ -256,19 +256,3 @@ def run_knn(features: np.ndarray, k: int = 10):
     for i in range(len(idx)):
         adj[i, idx[i]] = 1
     return make_symmetric(adj)
-
-
-def create_edgelist(edges: Optional[np.ndarray], i: int, top_k: int,
-                                top_k_idx: np.ndarray) -> np.ndarray:
-                
-    new_edges = np.stack([np.repeat(i, top_k), 
-                          top_k_idx], axis=0).transpose()
-
-    # Make undirected
-    new_edges = np.vstack([new_edges, new_edges[:, ::-1]])
-
-    if edges is None:
-        return np.unique(new_edges, axis=0)
-    else:
-        tmp = np.vstack([new_edges, edges])
-        return np.unique(tmp, axis=0)

@@ -8,7 +8,7 @@ import torchvision.transforms as T
 import torch
 
 from .utils import pairwise_same_elements, run_knn, get_data
-from .mzImageDataset import mzImageDataset
+from ..torch_datasets.mzImageDataset import mzImageDataset
 
 
 class IonImagedata_random:

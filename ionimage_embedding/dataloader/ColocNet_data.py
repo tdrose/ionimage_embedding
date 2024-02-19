@@ -7,10 +7,10 @@ import torch
 from torch_geometric.loader import DataLoader
 
 from .IonImage_data import IonImagedata_random
-from ..coloc.coloc import ColocModel
+from .get_coloc_model import get_coloc_model
 from .utils import cache_hashing
-from .constants import COLOC_NET_DISCRETE_DATA
-from .ColocNetDiscreteDataset import ColocNetDiscreteDataset
+from ..constants import COLOC_NET_DISCRETE_DATA
+from ..torch_datasets.ColocNetDiscreteDataset import ColocNetDiscreteDataset
 
 
 class ColocNetData_discrete:
@@ -83,7 +83,7 @@ class ColocNetData_discrete:
                 cache_folder=cache_folder,
                 min_images=min_images, maxzero=maxzero)
         
-            colocs = ColocModel(iidata)
+            colocs = get_coloc_model(iidata)
 
             # Extract the list of unique ion labels from the colocs
             
@@ -244,7 +244,7 @@ class MeanColocNetData_discrete:
             cache_folder=cache_folder,
             min_images=min_images, maxzero=maxzero)
     
-        colocs = ColocModel(iidata)
+        colocs = get_coloc_model(iidata)
 
         # Extract the list of unique ion labels from the colocs
         ion_labels = iidata.full_dataset.ion_labels
