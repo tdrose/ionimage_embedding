@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Literal, Union
+from typing import Literal, Union, Tuple
 from sklearn.metrics import silhouette_score
 
 from ..dataloader.ColocNet_data import ColocNetData_discrete
@@ -7,10 +7,10 @@ from ..coloc.coloc import ColocModel
 from ..models import CRL, BioMedCLIP, CVAE
 from ._metrics import coloc_mse, coloc_top_acc, accuracy, f1score, precision, sensitivity
 from ._utils import randomize_df
-from .iid_utils import get_colocs
+from .utils_iid import get_colocs
 
 def coloc_mse_gnn(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
-                 data: ColocNetData_discrete):
+                 data: ColocNetData_discrete) -> Tuple[float, float, float]:
     
     ground_truth = {k: v.copy() for k, v in data.dataset.coloc_dict.items() 
                     if k in data.get_test_dsids()}
@@ -19,7 +19,7 @@ def coloc_mse_gnn(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
 
 
 def coloc_mse_gnn_random(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
-                 data: ColocNetData_discrete):
+                 data: ColocNetData_discrete) -> Tuple[float, float, float]:
     
     ground_truth = {k: v.copy() for k, v in data.dataset.coloc_dict.items() 
                     if k in data.get_test_dsids()}
@@ -28,7 +28,7 @@ def coloc_mse_gnn_random(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
 
 
 def coloc_mse_iid(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
-                  colocs: ColocModel):
+                  colocs: ColocModel) -> Tuple[float, float, float]:
     
     ground_truth = get_colocs(colocs, origin='test')
 
@@ -36,7 +36,7 @@ def coloc_mse_iid(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
 
 
 def coloc_mse_iid_random(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
-                         colocs: ColocModel):
+                         colocs: ColocModel) -> Tuple[float, float, float]:
 
     ground_truth = get_colocs(colocs, origin='test')
 
@@ -44,7 +44,7 @@ def coloc_mse_iid_random(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
 
 
 def coloc_top_acc_gnn(latent: pd.DataFrame, data: ColocNetData_discrete,
-                       agg_coloc_pred: pd.DataFrame, top: int=5):
+                      agg_coloc_pred: pd.DataFrame, top: int=5) -> Tuple[float, float, float]:
     
     ground_truth = {k: v.copy() for k, v in data.dataset.coloc_dict.items() 
                     if k in data.get_test_dsids()}
@@ -53,7 +53,8 @@ def coloc_top_acc_gnn(latent: pd.DataFrame, data: ColocNetData_discrete,
 
 
 def coloc_top_acc_gnn_random(latent: pd.DataFrame, data: ColocNetData_discrete,
-                                agg_coloc_pred: pd.DataFrame, top: int=5):
+                             agg_coloc_pred: pd.DataFrame, 
+                             top: int=5) -> Tuple[float, float, float]:
         
         ground_truth = {k: v.copy() for k, v in data.dataset.coloc_dict.items() 
                         if k in data.get_test_dsids()}
@@ -62,14 +63,15 @@ def coloc_top_acc_gnn_random(latent: pd.DataFrame, data: ColocNetData_discrete,
 
 
 def coloc_top_acc_iid(latent: pd.DataFrame, colocs: ColocModel,
-                        agg_coloc_pred: pd.DataFrame, top: int=5):
+                      agg_coloc_pred: pd.DataFrame, top: int=5) -> Tuple[float, float, float]:
         
         ground_truth = get_colocs(colocs, origin='test')
     
         return coloc_top_acc(latent, ground_truth, agg_coloc_pred, top)
 
 def coloc_top_acc_iid_random(latent: pd.DataFrame, colocs: ColocModel,
-                                agg_coloc_pred: pd.DataFrame, top: int=5):
+                             agg_coloc_pred: pd.DataFrame, 
+                             top: int=5) -> Tuple[float, float, float]:
         
         ground_truth = get_colocs(colocs, origin='test')
     

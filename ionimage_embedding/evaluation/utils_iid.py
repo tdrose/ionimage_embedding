@@ -10,7 +10,7 @@ import torch
 from ..coloc.coloc import ColocModel
 from ..coloc.utils import torch_cosine
 from ..models import CRL, BioMedCLIP, CVAE
-from ..dataloader.mzImageDataset import mzImageDataset
+from ..torch_datasets.mzImageDataset import mzImageDataset
 from ._utils import compute_umap
 
 
@@ -106,18 +106,6 @@ def latent_centroids(model: Union[CRL, BioMedCLIP, CVAE],
             centroid_labels.append(i)
             
     return np.stack(ion_centroids), np.array(centroid_labels)
-
-def latent_centroids_df(model: Union[CRL, BioMedCLIP, CVAE], 
-                        origin: Literal['train', 'val', 'test']='train') -> pd.DataFrame:
-    # Call the latent_centroids function and create a dataframe of the results 
-    # by using the centroid labels as the index
-    centroids, labels = latent_centroids(model=model, origin=origin)
-    df = pd.DataFrame(centroids, index=labels)
-    df.index.name = 'ion'
-    # sort the dataframe by the index
-    df = df.sort_index(inplace=False)
-
-    return df
 
 def cluster_latent(model: Union[CRL, BioMedCLIP, CVAE], n_clusters: int=10, plot: bool=False, device='cpu',
                    origin: Literal['train', 'val', 'test']='train'):
