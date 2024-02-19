@@ -1,7 +1,6 @@
-from .IonImage_data import (
-    IonImagedata_random, 
-    IonImagedata_leaveOutDataSet, 
-    IonImagedata_transitivity
+from . import (
+    ColocNet_data, 
+    IonImage_data, 
+    utils,
+    get_coloc_model
 )
-
-__all__ = ['IonImagedata_random', 'IonImagedata_leaveOutDataSet', 'IonImagedata_transitivity']
