@@ -8,7 +8,7 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from torch_geometric.data import Data
 
 from ...dataloader.ColocNet_data import ColocNetData_discrete
-from ...dataloader.ColocNetDiscreteDataset import ColocNetDiscreteDataset
+from ...torch_datasets.ColocNetDiscreteDataset import ColocNetDiscreteDataset
 from .gnnDiscreteModel import gnnDiscreteModel
 from .utils import compute_union_graph
 from ..constants import VALIDATION_LOSS
