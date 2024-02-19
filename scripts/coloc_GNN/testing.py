@@ -20,17 +20,7 @@ import numpy as np
 import pickle
 import os.path as osp
 
-from ionimage_embedding.datasets import KIDNEY_LARGE
-from ionimage_embedding.dataloader.ColocNet_data import ColocNetData_discrete
-from ionimage_embedding.dataloader.constants import CACHE_FOLDER
-from ionimage_embedding.models import gnnDiscrete
-from ionimage_embedding.evaluation.scoring import latent_colocinference
-from ionimage_embedding.evaluation.gnn import (
-    mean_coloc_test,
-    latent_gnn,
-    coloc_ion_labels,
-    closest_accuracy_latent_ds
-    )
+import ionimage_embedding as iie
 
 # %%
 # #####################
@@ -45,7 +35,7 @@ val = 3
 # accuracy top-k
 top_acc = 3
 # Dataset
-DSID = KIDNEY_LARGE
+DSID = iie.datasets.KIDNEY_LARGE
 # Number of bootstraps
 N_BOOTSTRAPS = 100
 
@@ -61,8 +51,8 @@ lr = 0.005945
 
 
 # %%
-dat = ColocNetData_discrete(KIDNEY_LARGE, test=test, val=val, 
-                    cache_images=True, cache_folder=CACHE_FOLDER,
+dat = iie.dataloader.ColocNet_data.ColocNetData_discrete(DSID, test=test, val=val, 
+                    cache_images=True, cache_folder=iie.constants.CACHE_FOLDER,
                     colocml_preprocessing=True, 
                     fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
                     top_k=top_k, bottom_k=bottom_k, random_network=False
@@ -80,7 +70,7 @@ for i in range(N_BOOTSTRAPS):
     print(f'# Iteration {i}')
     dat.sample_sets()
 
-    model = gnnDiscrete(data=dat, 
+    model = iie.models.gnn.gnnd.gnnDiscrete(data=dat, 
                         latent_dims=latent_size, 
                         encoding = encoding, # type: ignore
                         embedding_dims=40,
@@ -99,12 +89,16 @@ for i in range(N_BOOTSTRAPS):
     # ##########
     # Evaluation
     # ##########
-    pred_mc, _ = mean_coloc_test(dat)
+    pred_mc, _ = iie.evaluation.utils_gnn.mean_coloc_test(dat)
     
-    pred_gnn_t = latent_gnn(model, dat, graph='training')
-    coloc_gnn_t = latent_colocinference(pred_gnn_t, coloc_ion_labels(dat, dat._test_set))
+    pred_gnn_t = iie.evaluation.latent.latent_gnn(model, dat, graph='training')
+    coloc_gnn_t = iie.evaluation.latent.latent_colocinference(
+        pred_gnn_t, 
+        iie.evaluation.utils_gnn.coloc_ion_labels(dat, dat._test_set)
+        )
 
-    avail, trans, _ = closest_accuracy_latent_ds(coloc_gnn_t, dat, pred_mc, top=top_acc)
+    avail, trans, _ = iie.evaluation.metrics.coloc_top_acc_gnn(coloc_gnn_t, 
+                                                               dat, pred_mc, top=top_acc)
     
     trans_l.append(trans)
     avail_l.append(avail)

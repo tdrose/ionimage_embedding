@@ -18,25 +18,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from ionimage_embedding.models import gnnDiscrete
-from ionimage_embedding.dataloader.ColocNet_data import ColocNetData_discrete
-from ionimage_embedding.dataloader.IonImage_data import IonImagedata_random
-from ionimage_embedding.coloc.coloc import ColocModel
-
-from ionimage_embedding.dataloader.constants import CACHE_FOLDER
-from ionimage_embedding.datasets import KIDNEY_SMALL, KIDNEY_LARGE
-from ionimage_embedding.evaluation.gnn import (
-    closest_accuracy_aggcoloc_ds, 
-    closest_accuracy_latent_ds, 
-    closest_accuracy_random_ds,
-    mean_coloc_test,
-    coloc_umap_ds,
-    latent_gnn,
-    coloc_ion_labels
-    )
-import ionimage_embedding.evaluation.scoring as scoring
-
-from ionimage_embedding.logger import DictLogger
+import ionimage_embedding as iie
 
 
 
@@ -60,7 +42,7 @@ val = 1
 # accuracy top-k
 top_acc = 3
 # Dataset
-DSID = KIDNEY_LARGE
+DSID = iie.datasets.KIDNEY_LARGE
 # Number of bootstraps
 N_BOOTSTRAPS = 50
 
@@ -102,7 +84,11 @@ frac_l = []
 
 RANDOM_NETWORK = False
 
-
+# %%
+acc_perf = iie.logger.PerformanceLogger(scenario='Scenario',metric='Accuracy', 
+                                        evaluation='Evaluation', fraction='Fraction')
+mse_perf = iie.logger.PerformanceLogger(scenario='Scenario',metric='MSE',
+                                        evaluation='Evaluation', fraction='Fraction')
 
 # %%
 for i in range(N_BOOTSTRAPS):
@@ -111,16 +97,17 @@ for i in range(N_BOOTSTRAPS):
     print('# #######')
 
     # II Data
-    iidata = IonImagedata_random(KIDNEY_LARGE, test=.1, val=.1, transformations=None, fdr=.1,
-                                min_images=min_images, maxzero=.9, batch_size=10, 
-                                colocml_preprocessing=True, cache=True)
+    iidata = iie.dataloader.IonImage_data.IonImagedata_random(
+        DSID, test=.1, val=.1, transformations=None, fdr=.1,
+        min_images=min_images, maxzero=.9, batch_size=10, 
+        colocml_preprocessing=True, cache=True)
 
-    colocs = ColocModel(iidata)
+    colocs = iie.dataloader.get_coloc_model.get_coloc_model(iidata)
 
     # ColocNet Data
-    dat = ColocNetData_discrete([""], 
+    dat = iie.dataloader.ColocNet_data.ColocNetData_discrete([""], 
                         test=test, val=val, 
-                        cache_images=True, cache_folder=CACHE_FOLDER,
+                        cache_images=True, cache_folder=iie.constants.CACHE_FOLDER,
                         colocml_preprocessing=True, 
                         fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
                         top_k=hyperparams['top_k'], bottom_k=hyperparams['bottom_k'], 
@@ -135,10 +122,10 @@ for i in range(N_BOOTSTRAPS):
                         force_reload=True,
                         )
 
-    mylogger = DictLogger()
+    mylogger = iie.logger.DictLogger()
 
     # Define model
-    model = gnnDiscrete(data=dat, latent_dims=hyperparams['latent_size'], 
+    model = iie.models.gnn.gnnd.gnnDiscrete(data=dat, latent_dims=hyperparams['latent_size'], 
                             encoding = hyperparams['encoding'], embedding_dims=40,
                             lr=hyperparams['lr'], training_epochs=130, 
                             early_stopping_patience=hyperparams['early_stopping_patience'],
@@ -150,57 +137,105 @@ for i in range(N_BOOTSTRAPS):
 
     pred_mc = colocs.test_mean_coloc
 
-    coloc_embedding = scoring.coloc_umap(colocs, k=3, n_components=5)
-    umap_coloc_inferred = scoring.latent_colocinference(coloc_embedding, colocs.data.test_dataset.ion_labels)
-    avail, trans, fraction = scoring.closest_accuracy_latent(umap_coloc_inferred, colocs, 
-                                                            aggcoloc=pred_mc, top=top_acc)
-    scenario_l.append('UMAP')
-    acc_l.append(avail)
-    eval_l.append('Available')
-    frac_l.append(fraction)
-    scenario_l.append('UMAP')
-    acc_l.append(trans)
-    eval_l.append('Transitivity')
-    frac_l.append(fraction)
+    coloc_embedding = iie.evaluation.latent.coloc_umap_iid(colocs, k=3, n_components=5)
+    coloc_cu = iie.evaluation.latent.latent_colocinference(
+        coloc_embedding, 
+        colocs.test_dataset.ion_labels)
+    
+    pred_gnn_t = iie.evaluation.latent.latent_gnn(model, dat, graph='training')
+    coloc_gnn_t = iie.evaluation.latent.latent_colocinference(pred_gnn_t, colocs.test_dataset.ion_labels)
+    
+    
+    # Accuracy
+    avail, trans, _ = iie.evaluation.metrics.coloc_top_acc_iid(latent=pred_mc,
+                                                               agg_coloc_pred=pred_mc,
+                                                               colocs=colocs, 
+                                                               top=top_acc)
+    acc_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Available', 1)
+    acc_perf.add_result(iie.constants.MEAN_COLOC, trans, 'Transitivity', 0)
 
-    perf = scoring.closest_accuracy_aggcoloc(colocs, top=top_acc)
-    scenario_l.append('Mean coloc')
-    acc_l.append(perf)
-    eval_l.append('Available')
-    frac_l.append(fraction)
+    avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_cu,
+                                                                      agg_coloc_pred=pred_mc,
+                                                                      colocs=colocs, 
+                                                                      top=top_acc)
+    acc_perf.add_result(iie.constants.UMAP, avail, 'Available', fraction)
+    acc_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction)
 
+    avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_gnn_t, 
+                                                                      agg_coloc_pred=pred_mc,
+                                                                      colocs=colocs, 
+                                                                      top=top_acc)
+    acc_perf.add_result(iie.constants.GNN, avail, 'Available', fraction)
+    acc_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction)
 
-    pred_gnn_t = latent_gnn(model, dat, graph='training')
-    gnn_coloc_inferred = scoring.latent_colocinference(pred_gnn_t, colocs.data.test_dataset.ion_labels)
-    avail, trans, fraction = scoring.closest_accuracy_latent(gnn_coloc_inferred, colocs, 
-                                                            aggcoloc=pred_mc, top=top_acc)
-    scenario_l.append('GNN training')
-    acc_l.append(avail)
-    eval_l.append('Available')
-    frac_l.append(fraction)
-    scenario_l.append('GNN training')
-    acc_l.append(trans)
-    eval_l.append('Transitivity')
-    frac_l.append(fraction)
+    avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid_random(pred_mc, 
+                                                                             agg_coloc_pred=pred_mc,
+                                                                             colocs=colocs, 
+                                                                             top=top_acc) 
+    acc_perf.add_result(iie.constants.RANDOM, avail, 'Available', fraction)
+    acc_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
+    
+    # MSE
+    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(pred_mc, pred_mc, colocs)
+    mse_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Available', 1)
+
+    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(coloc_cu, pred_mc, colocs)
+    mse_perf.add_result(iie.constants.UMAP, avail, 'Available', fraction)
+    mse_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction)
+
+    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(coloc_gnn_t, pred_mc, colocs)
+    mse_perf.add_result(iie.constants.GNN, avail, 'Available', fraction)
+    mse_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction)
+
+    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid_random(coloc_gnn_t, pred_mc, colocs)
+    mse_perf.add_result(iie.constants.RANDOM, avail, 'Available', fraction)
+    mse_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
+
 
 # %%
-df = pd.DataFrame({'Scenario': scenario_l, 'Accuracy': acc_l, 
-                   'Evaluation': eval_l, 'Fraction': frac_l})
+    
+
+# Accuracy 
+df = acc_perf.get_df()
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-sns.violinplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='Accuracy', ax=ax1)
+sns.violinplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='Accuracy', ax=ax1, 
+               palette=iie.constants.MODEL_PALLETE)
 ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
                                                                             hyperparams['bottom_k'],
                                                                             hyperparams['encoding']))
 ax1.set_ylabel(f'Top-{top_acc} Accuracy (Available)')
 ax1.set_ylim(0, 1)
 
-sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2)
-frac = 1-df[df['Evaluation']=='Transitivity']['Fraction'].mean()
+sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2,
+               palette=iie.constants.MODEL_PALLETE)
+frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
 ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
 ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 ax2.set_ylim(0, 1)
 
 fig.suptitle('Activation: {}'.format(hyperparams['activation']))
+plt.show()
+
 # %%
+# MSE
+df = mse_perf.get_df()
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+sns.violinplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='MSE', ax=ax1,
+               palette=iie.constants.MODEL_PALLETE)
+ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
+                                                                            hyperparams['bottom_k'],
+                                                                            hyperparams['encoding']))
+ax1.set_ylabel(f'MSE (Available)')
+
+sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='MSE', ax=ax2,
+               palette=iie.constants.MODEL_PALLETE)
+frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
+ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
+ax2.set_ylabel(f'MSE (Transitivity)')
+
+fig.suptitle('Activation: {}'.format(hyperparams['activation']))
+plt.show()

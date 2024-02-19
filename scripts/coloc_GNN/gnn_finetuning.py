@@ -19,20 +19,13 @@ import pandas as pd
 import seaborn as sns
 from typing import Literal
 
-from ionimage_embedding.dataloader.constants import CACHE_FOLDER
+from ionimage_embedding.constants import CACHE_FOLDER
 from ionimage_embedding.dataloader.ColocNet_data import ColocNetData_discrete
 from ionimage_embedding.datasets import KIDNEY_SMALL, KIDNEY_LARGE
 from ionimage_embedding.models import gnnDiscrete
-from ionimage_embedding.evaluation.scoring import latent_colocinference
-from ionimage_embedding.evaluation.gnn import (
-    closest_accuracy_aggcoloc_ds, 
-    closest_accuracy_latent_ds, 
-    closest_accuracy_random_ds,
-    mean_coloc_test,
-    coloc_umap_ds,
-    latent_gnn,
-    coloc_ion_labels
-    )
+import ionimage_embedding.evaluation.latent as latent
+import ionimage_embedding.evaluation.utils_gnn as utils_gnn
+import ionimage_embedding.evaluation.metrics as metrics
 from ionimage_embedding.logger import DictLogger
 
 # %%
@@ -76,29 +69,29 @@ model = gnnDiscrete(data=dat, latent_dims=20,
 
 mylogger = model.train()
 
-pred_mc, pred_fraction = mean_coloc_test(dat)
+pred_mc, pred_fraction = utils_gnn.mean_coloc_test(dat)
 
 
-pred_cu = coloc_umap_ds(dat, k=3, n_components=10)
+pred_cu = latent.coloc_umap_gnn(dat, k=3, n_components=10)
 
 
-coloc_cu = latent_colocinference(pred_cu, coloc_ion_labels(dat, dat._test_set))
+coloc_cu = latent.latent_colocinference(pred_cu, utils_gnn.coloc_ion_labels(dat, dat._test_set))
 
 
-pred_gnn_t = latent_gnn(model, dat, graph='training')
-coloc_gnn_t = latent_colocinference(pred_gnn_t, coloc_ion_labels(dat, dat._test_set))
+pred_gnn_t = latent.latent_gnn(model, dat, graph='training')
+coloc_gnn_t = latent.latent_colocinference(pred_gnn_t, utils_gnn.coloc_ion_labels(dat, dat._test_set))
 
 scenario_l = []
 acc_l = []
 eval_l = []
 frac_l = []
 
-acc_l.append(closest_accuracy_aggcoloc_ds(pred_mc, dat, top=top_acc))
+acc_l.append(metrics.coloc_top_acc_gnn(pred_mc, dat, pred_mc, top=top_acc))
 scenario_l.append('Mean coloc')
 eval_l.append('Available')
 frac_l.append(pred_fraction)
 
-avail, trans, fraction = closest_accuracy_latent_ds(coloc_cu, dat, pred_mc, top=top_acc)
+avail, trans, fraction = metrics.coloc_top_acc_gnn(coloc_cu, dat, pred_mc, top=top_acc)
 scenario_l.append('UMAP')
 acc_l.append(avail)
 eval_l.append('Available')
@@ -108,7 +101,7 @@ acc_l.append(trans)
 eval_l.append('Transitivity')
 frac_l.append(fraction)
 
-avail, trans, fraction = closest_accuracy_latent_ds(coloc_gnn_t, dat, pred_mc, top=top_acc)
+avail, trans, fraction = metrics.coloc_top_acc_gnn(coloc_gnn_t, dat, pred_mc, top=top_acc)
 scenario_l.append('GNN training')
 acc_l.append(avail)
 eval_l.append('Available')
@@ -118,7 +111,7 @@ acc_l.append(trans)
 eval_l.append('Transitivity')
 frac_l.append(fraction)
 
-acc_l.append(closest_accuracy_random_ds(coloc_gnn_t, dat, top=top_acc))
+acc_l.append(metrics.coloc_top_acc_gnn_random(coloc_gnn_t, dat, pred_mc, top=top_acc))
 scenario_l.append('Random')
 eval_l.append('Available')
 frac_l.append(fraction)
@@ -157,29 +150,29 @@ dat_finetune = dat.updated_k_data(top_k=9, bottom_k=9)
 
 mylogger = model.fine_tune(dat_finetune, training_epochs=50)
 
-pred_mc, pred_fraction = mean_coloc_test(dat)
+pred_mc, pred_fraction = utils_gnn.mean_coloc_test(dat)
 
 
-pred_cu = coloc_umap_ds(dat, k=3, n_components=10)
+pred_cu = latent.coloc_umap_gnn(dat, k=3, n_components=10)
 
 
-coloc_cu = latent_colocinference(pred_cu, coloc_ion_labels(dat, dat._test_set))
+coloc_cu = latent.latent_colocinference(pred_cu, utils_gnn.coloc_ion_labels(dat, dat._test_set))
 
 
-pred_gnn_t = latent_gnn(model, dat, graph='training')
-coloc_gnn_t = latent_colocinference(pred_gnn_t, coloc_ion_labels(dat, dat._test_set))
+pred_gnn_t = latent.latent_gnn(model, dat, graph='training')
+coloc_gnn_t = latent.latent_colocinference(pred_gnn_t, utils_gnn.coloc_ion_labels(dat, dat._test_set))
 
 scenario_l = []
 acc_l = []
 eval_l = []
 frac_l = []
 
-acc_l.append(closest_accuracy_aggcoloc_ds(pred_mc, dat, top=top_acc))
+acc_l.append(metrics.coloc_top_acc_gnn(pred_mc, dat, pred_mc, top=top_acc))
 scenario_l.append('Mean coloc')
 eval_l.append('Available')
 frac_l.append(pred_fraction)
 
-avail, trans, fraction = closest_accuracy_latent_ds(coloc_cu, dat, pred_mc, top=top_acc)
+avail, trans, fraction = metrics.coloc_top_acc_gnn(coloc_cu, dat, pred_mc, top=top_acc)
 scenario_l.append('UMAP')
 acc_l.append(avail)
 eval_l.append('Available')
@@ -189,7 +182,7 @@ acc_l.append(trans)
 eval_l.append('Transitivity')
 frac_l.append(fraction)
 
-avail, trans, fraction = closest_accuracy_latent_ds(coloc_gnn_t, dat, pred_mc, top=top_acc)
+avail, trans, fraction = metrics.coloc_top_acc_gnn(coloc_gnn_t, dat, pred_mc, top=top_acc)
 scenario_l.append('GNN training')
 acc_l.append(avail)
 eval_l.append('Available')
@@ -199,7 +192,7 @@ acc_l.append(trans)
 eval_l.append('Transitivity')
 frac_l.append(fraction)
 
-acc_l.append(closest_accuracy_random_ds(coloc_gnn_t, dat, top=top_acc))
+acc_l.append(metrics.coloc_top_acc_gnn(coloc_gnn_t, dat, pred_mc, top=top_acc))
 scenario_l.append('Random')
 eval_l.append('Available')
 frac_l.append(fraction)
