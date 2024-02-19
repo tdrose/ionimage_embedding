@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch_geometric.data import Data, InMemoryDataset
 
-from .constants import COLOC_NET_DISCRETE_DATA
+from ..constants import COLOC_NET_DISCRETE_DATA
 from .utils import create_edgelist
 
 

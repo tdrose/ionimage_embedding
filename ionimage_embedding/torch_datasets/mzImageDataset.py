@@ -3,7 +3,6 @@ from torch.utils.data import Dataset
 import torchvision.transforms as T
 from torch.utils.data import DataLoader
 import numpy as np
-from typing import Any
 
 
 class mzImageDataset(Dataset):
