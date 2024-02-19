@@ -4,26 +4,38 @@ from typing import Tuple, Dict
 import torch
 import torch.nn.functional as f
 
-from ..dataloader.IonImage_data import IonImagedata_random
 from .utils import torch_cosine, quantile_sets
+from ..torch_datasets.mzImageDataset import mzImageDataset
 
 class ColocModel:
-    def __init__(self, data: IonImagedata_random, device='cpu') -> None:
-        self.data = data
+    def __init__(self, 
+                 full_dataset: mzImageDataset, 
+                 train_dataset: mzImageDataset,
+                 test_dataset: mzImageDataset,
+                 val_dataset: mzImageDataset, 
+                 device: str='cpu') -> None:
+
+        self.full_dataset = full_dataset
+        self.train_dataset = train_dataset
+        self.test_dataset = test_dataset
+        self.val_dataset = val_dataset
+
         self.device = device
 
         # Compute full data cossine
-        self.full_coloc = self.compute_ds_coloc(self.data.full_dataset)
+        self.full_coloc = self.compute_ds_coloc(full_dataset)
 
         # Compute train data cosine
-        self.train_coloc = self.compute_ds_coloc(self.data.train_dataset)
+        self.train_coloc = self.compute_ds_coloc(train_dataset)
 
-        self.test_coloc = self.compute_ds_coloc(self.data.test_dataset)
-        self.val_coloc = self.compute_ds_coloc(self.data.val_dataset)
+        self.test_coloc = self.compute_ds_coloc(test_dataset)
+        self.val_coloc = self.compute_ds_coloc(val_dataset)
 
         # Compute test data mean/median cosine
-        self.test_mean_coloc, self.test_mean_ni = self.inference(self.data.test_dataset.ion_labels, agg='mean')
-        self.test_median_coloc, self.test_median_ni = self.inference(self.data.test_dataset.ion_labels, agg='median')
+        self.test_mean_coloc, self.test_mean_ni = self.inference(test_dataset.ion_labels, 
+                                                                 agg='mean')
+        self.test_median_coloc, self.test_median_ni = self.inference(test_dataset.ion_labels, 
+                                                                     agg='median')
     
     @staticmethod
     def quantile_eval(test_il: torch.Tensor, test_dsl: torch.Tensor, 
