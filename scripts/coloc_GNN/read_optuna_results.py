@@ -73,3 +73,5 @@ p2 = optuna_results('/scratch/trose/slurm_optuna_tuning_.46919848.out').sort_val
 
 # %%
 p3 = optuna_results('/scratch/trose/slurm_optuna_tuning_.47302355.out').sort_values('score')
+
+# %%
