@@ -17,8 +17,6 @@ except ImportError:
 
 
 import numpy as np
-import pickle
-import os.path as osp
 
 import ionimage_embedding as iie
 
@@ -45,6 +43,7 @@ top_acc = 3
 DSID = iie.datasets.KIDNEY_LARGE
 # Number of bootstraps
 N_BOOTSTRAPS = 100
+
 # Random network
 RANDOM_NETWORK = False
 
@@ -63,7 +62,21 @@ hyperparams_avail = {
     'activation': 'none' # 'softmax', 'relu', 'sigmoid', 'none'
 }
 
-hyperparams = hyperparams_avail
+hyperparams_transitivity = {
+    'latent_size': 23,
+    'top_k': 3,
+    'bottom_k':  7,
+    'encoding': 'onehot', # 'recon', 'coloc'
+    'early_stopping_patience': 10,
+    'gnn_layer_type': 'GCNConv', # 'GCNConv', 'GATv2Conv', 'GraphConv'
+    'loss_type': 'coloc',
+    'num_layers': 1,
+    'lr': 0.009140,
+    'activation': 'none' # 'softmax', 'relu', 'sigmoid', 'none'
+}
+
+
+hyperparams = hyperparams_transitivity
 
 
 # %%
@@ -117,7 +130,9 @@ pred_mc, _ = iie.evaluation.utils_gnn.mean_coloc_test(dat)
 
 pred_gnn_t = iie.evaluation.latent.latent_gnn(model, dat, graph='training')
 coloc_gnn_t = iie.evaluation.latent.latent_colocinference(
-    pred_gnn_t, iie.evaluation.utils_gnn.coloc_ion_labels(dat, dat._test_set))
+    pred_gnn_t, 
+    iie.evaluation.utils_gnn.coloc_ion_labels(dat, dat._test_set)
+    )
 
 avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_gnn(coloc_gnn_t, 
                                                                   dat, pred_mc, top=top_acc)
@@ -228,6 +243,129 @@ for i, ion in enumerate(sample_ions):
         axs[i, j].imshow(iidata.full_dataset.images[idx])
 
 fig.suptitle('Leiden cluster: {}'.format(LEIDEN_CLUSTER))
+
+plt.show()
+
+
+
+# %% Latent variance
+import pandas as pd
+from typing import Literal
+from sklearn.metrics.pairwise import euclidean_distances, cosine_similarity
+
+def predict_centroid_var(model: iie.models.gnn.gnnd.gnnDiscrete, 
+                         data: iie.dataloader.ColocNet_data.ColocNetData_discrete,
+                         distance: Literal['cosine', 'euclidean'] = 'cosine') -> pd.Series:
+
+    # get training data
+    training_data = data.dataset.index_select(data._train_set)
+
+    # Get all predictions
+    pred_dict = model.predict_multiple(training_data) # type: ignore
+
+    # Get set of ion labels from all data objects
+    ion_labels = []
+    for i in range(len(training_data)):
+        ion_labels.extend(list(training_data[i].x.detach().cpu().numpy())) # type: ignore
+    ion_labels = list(set(ion_labels))
+
+    # Get the variance for each prediction
+    var_dict = {}
+    for i in ion_labels:
+        tmp = []
+        for dsid, pred in pred_dict.items():
+            if i in training_data[dsid].x: # type: ignore
+                tmp.append(pred[training_data[dsid].x == i].detach().cpu().numpy()[0]) # type: ignore
+        if len(tmp) > 1:
+            a = np.stack(tmp)
+            if distance == 'cosine':
+                sim = cosine_similarity(a)
+                mask = np.ones(sim.shape, dtype=bool)
+                np.fill_diagonal(mask, 0)
+                var_dict[i] = np.var(sim[mask])
+            elif distance == 'euclidean':
+                sim = euclidean_distances(a)
+                mask = np.ones(sim.shape, dtype=bool)
+                np.fill_diagonal(mask, 0)
+                var_dict[i] = np.var(sim[mask])
+        elif len(tmp) == 1:
+            var_dict[i] = 0
+
+    return pd.Series(var_dict)
+
+# %%
+latent_var = predict_centroid_var(model, dat, distance='euclidean')
+
+mean_var, _ = iie.evaluation.utils_gnn.mean_coloc_train(dat, agg='var')
+mean_var[mean_var==0] = np.nan
+
+var_df = pd.DataFrame({'latent': latent_var, 'mean': mean_var.apply(np.nanmax)})
+var_df=var_df.dropna()
+
+import seaborn as sns
+ax = sns.regplot(data=var_df, x='latent', y='mean', order=1, ci=None)
+#ax.set_xlim(-0.0001, 0.01)
+
+# %%
+import statsmodels.api as sm
+
+X2 = sm.add_constant(var_df[['latent']])
+est = sm.OLS(var_df[['mean']], X2)
+est2 = est.fit()
+print(est2.summary())
+
+
+
+
+# %%
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+
+latent_centroid = iie.evaluation.latent.latent_gnn(model, dat, graph='training')
+
+scaler = StandardScaler()
+latent_scaled = scaler.fit_transform(latent_centroid)
+
+pca = PCA(n_components=2)
+pca.fit(latent_scaled)
+
+latent_pca = pca.transform(latent_scaled)
+
+pca_df = pd.DataFrame(latent_pca, columns=['PC1', 'PC2'], index=latent_centroid.index)
+
+# Transform each dataset to PCA space
+training_data = dat.dataset.index_select(dat._train_set)
+latent_dict = model.predict_multiple(training_data) # type: ignore
+
+pca_ds = []
+for i in range(len(training_data)):
+    x = training_data[i]
+    dsid = int(x.ds_label[0]) # type: ignore
+    v = latent_dict[i]
+    index = x.x.detach().cpu().numpy() # type: ignore
+    tmp = pd.DataFrame(pca.transform(scaler.transform(v.detach().cpu().numpy())), 
+                       columns=['PC1', 'PC2'], index=index)
+    
+    pca_ds.append(tmp)
+
+train_df = pd.concat(pca_ds)
+
+# %%
+fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+
+for i in pca_df.index:
+    tmp = train_df.loc[i, :]
+    if tmp.shape[0] > 1 and type(tmp) == pd.DataFrame:
+        # select a random color
+        color = np.random.rand(3,)
+        for j in range(tmp.shape[0]):
+            # Draw a line between the centroid and the dataset
+            ax.plot([pca_df.loc[i, 'PC1'], tmp.iloc[j]['PC1']], 
+                    [pca_df.loc[i, 'PC2'], tmp.iloc[j]['PC2']], 
+                    color=color, alpha=0.1)
+
+sns.scatterplot(data=pca_df, x='PC1', y='PC2', s=15, color='black', ax=ax)
 
 plt.show()
 # %%
