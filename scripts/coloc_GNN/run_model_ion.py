@@ -151,44 +151,43 @@ for i in range(N_BOOTSTRAPS):
                                                                agg_coloc_pred=pred_mc,
                                                                colocs=colocs, 
                                                                top=top_acc)
-    acc_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Available', 1)
-    acc_perf.add_result(iie.constants.MEAN_COLOC, trans, 'Transitivity', 0)
+    acc_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1)
 
     avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_cu,
                                                                       agg_coloc_pred=pred_mc,
                                                                       colocs=colocs, 
                                                                       top=top_acc)
-    acc_perf.add_result(iie.constants.UMAP, avail, 'Available', fraction)
+    acc_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction)
     acc_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction)
 
     avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_gnn_t, 
                                                                       agg_coloc_pred=pred_mc,
                                                                       colocs=colocs, 
                                                                       top=top_acc)
-    acc_perf.add_result(iie.constants.GNN, avail, 'Available', fraction)
+    acc_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction)
     acc_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction)
 
     avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid_random(pred_mc, 
                                                                              agg_coloc_pred=pred_mc,
                                                                              colocs=colocs, 
                                                                              top=top_acc) 
-    acc_perf.add_result(iie.constants.RANDOM, avail, 'Available', fraction)
+    acc_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction)
     acc_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
     
     # MSE
     avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(pred_mc, pred_mc, colocs)
-    mse_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Available', 1)
+    mse_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1)
 
     avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(coloc_cu, pred_mc, colocs)
-    mse_perf.add_result(iie.constants.UMAP, avail, 'Available', fraction)
+    mse_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction)
     mse_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction)
 
     avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(coloc_gnn_t, pred_mc, colocs)
-    mse_perf.add_result(iie.constants.GNN, avail, 'Available', fraction)
+    mse_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction)
     mse_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction)
 
     avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid_random(coloc_gnn_t, pred_mc, colocs)
-    mse_perf.add_result(iie.constants.RANDOM, avail, 'Available', fraction)
+    mse_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction)
     mse_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
 
 
@@ -200,12 +199,12 @@ df = acc_perf.get_df()
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-sns.violinplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='Accuracy', ax=ax1, 
+sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='Accuracy', ax=ax1, 
                palette=iie.constants.MODEL_PALLETE)
 ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
                                                                             hyperparams['bottom_k'],
                                                                             hyperparams['encoding']))
-ax1.set_ylabel(f'Top-{top_acc} Accuracy (Available)')
+ax1.set_ylabel(f'Top-{top_acc} Accuracy (Co-detected)')
 ax1.set_ylim(0, 1)
 
 sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2,
@@ -224,12 +223,12 @@ df = mse_perf.get_df()
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-sns.violinplot(data=df[df['Evaluation']=='Available'], x='Scenario', y='MSE', ax=ax1,
+sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='MSE', ax=ax1,
                palette=iie.constants.MODEL_PALLETE)
 ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
                                                                             hyperparams['bottom_k'],
                                                                             hyperparams['encoding']))
-ax1.set_ylabel(f'MSE (Available)')
+ax1.set_ylabel(f'MSE (Co-detected)')
 
 sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='MSE', ax=ax2,
                palette=iie.constants.MODEL_PALLETE)
