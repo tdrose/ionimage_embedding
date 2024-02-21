@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Literal
+
 import torch
-import torch.nn.functional as f
+
 
 from .utils import torch_cosine, quantile_sets
 from ..torch_datasets.mzImageDataset import mzImageDataset
@@ -108,13 +109,14 @@ class ColocModel:
 
         return out_dict
     
-    def inference(self, ion_labels: torch.Tensor, agg: str='mean') -> Tuple[pd.DataFrame, float]:
+    def inference(self, ion_labels: torch.Tensor, 
+                  agg: Literal['mean', 'median', 'var']='mean') -> Tuple[pd.DataFrame, float]:
 
         return self._inference(ion_labels, self.train_coloc, agg=agg)
     
     @staticmethod
     def _inference(ion_labels: torch.Tensor, ds_colocs: Dict[int, pd.DataFrame], 
-                   agg: str='mean') -> Tuple[pd.DataFrame, float]:
+                   agg: Literal['mean', 'median', 'var']='mean') -> Tuple[pd.DataFrame, float]:
 
         # Create torch matrix to fill
         numpy_ion_labels = ion_labels.cpu().detach().numpy()
@@ -127,6 +129,8 @@ class ColocModel:
             agg_f = np.median
         elif agg == 'mean':
             pass
+        elif agg == 'var':
+            agg_f = np.var
         else:
             raise ValueError('Aggregation function not available')
         
