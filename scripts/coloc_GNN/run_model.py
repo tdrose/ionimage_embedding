@@ -41,6 +41,7 @@ val = 3
 top_acc = 7
 # Dataset
 DSID = iie.datasets.KIDNEY_LARGE
+DS_NAME = 'KIDNEY_LARGE'
 # Number of bootstraps
 N_BOOTSTRAPS = 100
 
@@ -188,9 +189,6 @@ fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
 sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='Accuracy', ax=ax1, 
                palette=my_pal, cut=0)
-ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
-                                                                            hyperparams['bottom_k'],
-                                                                            hyperparams['encoding']))
 ax1.set_ylabel(f'Top-{top_acc} Accuracy (Co-detected)')
 ax1.set_ylim(0, 1)
 
@@ -201,7 +199,7 @@ ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
 ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 ax2.set_ylim(0, 1)
 
-fig.suptitle('Activation: {}'.format(hyperparams['activation']))
+fig.suptitle(f'{DS_NAME}, Leave out datasets')
 plt.show()
 
 # %%
@@ -212,9 +210,7 @@ fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
 sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='MSE', ax=ax1,
                palette=my_pal, cut=0)
-ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
-                                                                            hyperparams['bottom_k'],
-                                                                            hyperparams['encoding']))
+
 ax1.set_ylabel(f'MSE (Co-detected)')
 
 sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='MSE', ax=ax2,
@@ -223,7 +219,7 @@ frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
 ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
 ax2.set_ylabel(f'MSE (Transitivity)')
 
-fig.suptitle('Activation: {}'.format(hyperparams['activation']))
+fig.suptitle(f'{DS_NAME}, Leave out datasets')
 plt.show()
 
 

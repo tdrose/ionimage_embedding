@@ -15,7 +15,6 @@ except ImportError:
     pass
 
 import matplotlib.pyplot as plt
-import pandas as pd
 import seaborn as sns
 
 import ionimage_embedding as iie
@@ -43,6 +42,7 @@ val = 1
 top_acc = 3
 # Dataset
 DSID = iie.datasets.KIDNEY_LARGE
+DS_NAME = 'KIDNEY_LARGE'
 # Number of bootstraps
 N_BOOTSTRAPS = 50
 
@@ -90,19 +90,21 @@ acc_perf = iie.logger.PerformanceLogger(scenario='Scenario',metric='Accuracy',
 mse_perf = iie.logger.PerformanceLogger(scenario='Scenario',metric='MSE',
                                         evaluation='Evaluation', fraction='Fraction')
 
+# II Data
+iidata = iie.dataloader.IonImage_data.IonImagedata_random(
+    DSID, test=.1, val=.1, transformations=None, fdr=.1,
+    min_images=min_images, maxzero=.9, batch_size=10, 
+    colocml_preprocessing=True, cache=True)
+
 # %%
 for i in range(N_BOOTSTRAPS):
     print('# #######')
     print(f'# Iteration {i}')
     print('# #######')
 
-    # II Data
-    iidata = iie.dataloader.IonImage_data.IonImagedata_random(
-        DSID, test=.1, val=.1, transformations=None, fdr=.1,
-        min_images=min_images, maxzero=.9, batch_size=10, 
-        colocml_preprocessing=True, cache=True)
+    iidata.sample_sets()
 
-    colocs = iie.dataloader.get_coloc_model.get_coloc_model(iidata)
+    colocs = iie.dataloader.get_coloc_model.get_coloc_model(iidata, device='cuda')
 
     # ColocNet Data
     dat = iie.dataloader.ColocNet_data.ColocNetData_discrete([""], 
@@ -200,21 +202,18 @@ df = acc_perf.get_df()
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
 sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='Accuracy', ax=ax1, 
-               palette=iie.constants.MODEL_PALLETE)
-ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
-                                                                            hyperparams['bottom_k'],
-                                                                            hyperparams['encoding']))
+               palette=iie.constants.MODEL_PALLETE, cut=0)
 ax1.set_ylabel(f'Top-{top_acc} Accuracy (Co-detected)')
 ax1.set_ylim(0, 1)
 
 sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2,
-               palette=iie.constants.MODEL_PALLETE)
+               palette=iie.constants.MODEL_PALLETE, cut=0)
 frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
 ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
 ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 ax2.set_ylim(0, 1)
 
-fig.suptitle('Activation: {}'.format(hyperparams['activation']))
+fig.suptitle(f'{DS_NAME}, Leave out datasets')
 plt.show()
 
 # %%
@@ -224,17 +223,16 @@ df = mse_perf.get_df()
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
 sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='MSE', ax=ax1,
-               palette=iie.constants.MODEL_PALLETE)
-ax1.set_title('KIDNEY_LARGE (top-k: {}, bottom-k: {}, encoding: {})'.format(hyperparams['top_k'],
-                                                                            hyperparams['bottom_k'],
-                                                                            hyperparams['encoding']))
+               palette=iie.constants.MODEL_PALLETE, cut=0)
 ax1.set_ylabel(f'MSE (Co-detected)')
 
 sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='MSE', ax=ax2,
-               palette=iie.constants.MODEL_PALLETE)
+               palette=iie.constants.MODEL_PALLETE, cut=0)
 frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
 ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
 ax2.set_ylabel(f'MSE (Transitivity)')
 
-fig.suptitle('Activation: {}'.format(hyperparams['activation']))
+fig.suptitle(f'{DS_NAME}, Leave out datasets')
 plt.show()
+
+# %%

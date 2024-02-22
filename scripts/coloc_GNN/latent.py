@@ -143,6 +143,10 @@ print('Fraction: ', fraction)
 
 
 # %%
+# ####################
+# Latent Visualization
+# ####################
+
 
 import scanpy as sc
 import pandas as pd
@@ -248,7 +252,11 @@ plt.show()
 
 
 
-# %% Latent variance
+# %%
+# ###############
+# Latent variance
+# ###############
+
 import pandas as pd
 from typing import Literal
 from sklearn.metrics.pairwise import euclidean_distances, cosine_similarity
