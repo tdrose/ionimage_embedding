@@ -99,6 +99,7 @@ class ColocModel:
                 ion_sorting_mask = torch.argsort(ions)
                 imgs = imgs[ion_sorting_mask]
                 # Compute coloc matrix (in correct order)
+                imgs = imgs.to(self.device)
                 cos = torch_cosine(imgs)
                 out_dict[dsid] = pd.DataFrame(cos.cpu().detach().numpy(), 
                                               columns=ions[ion_sorting_mask].cpu().detach().numpy(),

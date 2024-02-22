@@ -80,7 +80,11 @@ class IonImagedata_random:
                                            transform=None)
         
         if maindata_class:
-            # check if val and test data proportions contain at least a few images
+            self.sample_sets()
+            self.check_dataexists()
+    
+    def sample_sets(self):
+        # check if val and test data proportions contain at least a few images
             self.check_val_test_proportions(val=self.val, test=self.test, 
                                             min_images=self.min_images)
             
@@ -136,9 +140,7 @@ class IonImagedata_random:
                                                width=self.width,
                                                index=test_index,
                                                transform=self.transformations)
-            
-            self.check_dataexists()
-    
+
     def split_data(self, mask, data, dsl, ill):
         
         reverse_mask = ~mask
@@ -212,7 +214,8 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
         if test < 1:
             raise ValueError('CLRlods (leave datasets out) class requires value for test larger '
                              'than 1 (number of datasets excluded from training)')
-            
+        self.ds_test = test
+
         super().__init__(dataset_ids=dataset_ids, test=.1, val=val, transformations=transformations, 
                          maindata_class=False,
                          db=db, fdr=fdr, scale_intensity=scale_intensity, 
@@ -222,12 +225,17 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                          maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
                          force_size=force_size)
         
+        self.sample_sets()
+        
+        self.check_dataexists()
+
+    def sample_sets(self):
         # Train test split
-        if len(self.dataset_ids) <= test:
+        if len(self.dataset_ids) <= self.ds_test:
             raise ValueError('Cannot assing more datasets for testing that loaded datasets')
         
         test_dsid = np.random.choice(torch.unique(self.full_dataset.dataset_labels).numpy(), 
-                                     size=test, replace=False)
+                                     size=self.ds_test, replace=False)
         tmp_mask = np.ones(len(self.full_dataset.images), bool)
         for ds in test_dsid:
             tmp_mask[self.full_dataset.dataset_labels==ds] = 0
@@ -275,8 +283,6 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                                            index=test_index,
                                            transform=self.transformations)
         
-        self.check_dataexists()
-        
         
 class IonImagedata_transitivity(IonImagedata_random):
     
@@ -300,12 +306,18 @@ class IonImagedata_transitivity(IonImagedata_random):
                          force_size=force_size)
         
         self.min_codetection=min_codetection
+        self.transitivity_test = test
         
+        self.sample_sets()
+
+        self.check_dataexists()
+    
+    def sample_sets(self):
         # Train test split
         index_dict = self.codetection_index(ill=self.full_dataset.ion_labels, 
                                             dsl=self.full_dataset.dataset_labels, 
                                             min_codetection=self.min_codetection)
-        tmp_mask = self.codetection_mask(idx_dict=index_dict, test_fraction=test, 
+        tmp_mask = self.codetection_mask(idx_dict=index_dict, test_fraction=self.transitivity_test, 
                                          ill=self.full_dataset.ion_labels, 
                                          dsl=self.full_dataset.dataset_labels)
         tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, 
@@ -351,9 +363,8 @@ class IonImagedata_transitivity(IonImagedata_random):
                                            width=self.width,
                                            index=test_index,
                                            transform=self.transformations)
-        
-        self.check_dataexists()
     
+
     @staticmethod
     def codetection_index(ill, dsl, min_codetection=2):
         
