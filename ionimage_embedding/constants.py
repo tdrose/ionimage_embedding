@@ -19,6 +19,6 @@ RANDOM : Final[str] = 'Random'
 MODEL_PALLETE : Final[Dict[str, str]] = {
     MEAN_COLOC: 'darkgrey',
     UMAP: 'gray',
-    GNN: 'green',
+    GNN: '#1aae54ff',
     RANDOM: 'white'
 }

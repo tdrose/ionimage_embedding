@@ -14,6 +14,7 @@ except ImportError:
     # Not in IPython, continue with normal Python code
     pass
 
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -107,9 +108,9 @@ mylogger = iie.logger.DictLogger()
 
 # %%
     
-acc_perf = iie.logger.PerformanceLogger(scenario='Scenario',metric='Accuracy', 
+acc_perf = iie.logger.PerformanceLogger(scenario='Model',metric='Accuracy', 
                                         evaluation='Evaluation', fraction='Fraction')
-mse_perf = iie.logger.PerformanceLogger(scenario='Scenario',metric='MSE',
+mse_perf = iie.logger.PerformanceLogger(scenario='Model',metric='MSE',
                                         evaluation='Evaluation', fraction='Fraction')
 # Training
 for i in range(N_BOOTSTRAPS):
@@ -179,20 +180,50 @@ for i in range(N_BOOTSTRAPS):
     mse_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
 
 
-# %%
-    
+# %% Plotting parameter
+
+XXSMALLER_SIZE = 5
+XSMALLER_SIZE = 6
+SMALLER_SIZE = 8
+SMALL_SIZE = 10
+MEDIUM_SIZE = 12
+BIGGER_SIZE = 18
+XBIGGER_SIZE = 20
+XXBIGGER_SIZE = 28
+
+cm = 1/2.54
+
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=XBIGGER_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=XBIGGER_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=XBIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=XBIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=XBIGGER_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=XBIGGER_SIZE)  # fontsize of the figure title
+plt.rcParams.update({'text.color': "595a5cff",
+                     'axes.labelcolor': "595a5cff",
+                     'xtick.color': "595a5cff",
+                     'ytick.color': "595a5cff",})
+
 my_pal = iie.constants.MODEL_PALLETE
+
+
+
+# %%
 # Accuracy 
 df = acc_perf.get_df()
+df = df.rename(columns={'Scenario': 'Model'})
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='Accuracy', ax=ax1, 
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+
+sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Model', y='Accuracy', ax=ax1, 
                palette=my_pal, cut=0)
 ax1.set_ylabel(f'Top-{top_acc} Accuracy (Co-detected)')
 ax1.set_ylim(0, 1)
 
-sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2,
+sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Model', y='Accuracy', ax=ax2,
                palette=my_pal, cut=0)
 frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
 ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
@@ -205,23 +236,24 @@ plt.show()
 # %%
 # MSE
 df = mse_perf.get_df()
+df = df.rename(columns={'Scenario': 'Model'})
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
 
-sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='MSE', ax=ax1,
+sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Model', y='MSE', ax=ax1,
                palette=my_pal, cut=0)
-
+sns.despine(offset=5, trim=False, ax=ax1)
 ax1.set_ylabel(f'MSE (Co-detected)')
 
-sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='MSE', ax=ax2,
+sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Model', y='MSE', ax=ax2,
                palette=my_pal, cut=0)
 frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
-ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
+ax2.set_title('Transitivity fraction: {:.1%}'.format(frac))
 ax2.set_ylabel(f'MSE (Transitivity)')
+sns.despine(offset=5, trim=False, ax=ax2)
 
-fig.suptitle(f'{DS_NAME}, Leave out datasets')
-plt.show()
-
+#plt.show()
+plt.savefig('/g/alexandr/tim/tmp/mse_df_fig.pdf', bbox_inches='tight')
 
 # %%
 plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')
