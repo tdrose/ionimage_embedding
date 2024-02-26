@@ -5,6 +5,7 @@ from typing import Literal, Optional, Union, List
 
 import torch.nn.functional as functional
 import lightning.pytorch as pl
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
 from .cae import CAE
 from .selfContrastModel import selfContrastModel
@@ -14,6 +15,7 @@ from .infoNCEModel import infoNCEModel
 
 from ...dataloader.IonImage_data import IonImagedata_random
 from ...logger import DictLogger
+from ..constants import VALIDATION_LOSS
 
 
 class CRL:
@@ -45,6 +47,7 @@ class CRL:
                                                      'IMAGENET1K_SWAG_LINEAR_V1']] = None,
                  clip_gradients: Optional[float] = None,
                  overweight_cae: float = 1000,
+                 early_stopping_patience: int = 5,
                  cnn_dropout: float = 0.1,
                  weight_decay: float = 1e-4,
                  cae: bool = True):
@@ -75,6 +78,7 @@ class CRL:
         self.overweight_cae = overweight_cae
         self.cnn_dropout = cnn_dropout
         self.weight_decay = weight_decay
+        self.early_stopping_patience = early_stopping_patience
 
         self.loss_type: Literal['selfContrast', 'colocContrast', 
                                 'regContrast', 'infoNCE'] = loss_type
@@ -156,7 +160,11 @@ class CRL:
         
         dictlogger = DictLogger()
         trainer = pl.Trainer(devices=1, accelerator=self.lightning_device, 
-                             max_epochs=self.training_epochs, logger=dictlogger)
+                             enable_checkpointing=False,
+                             max_epochs=self.training_epochs, logger=dictlogger,
+                             callbacks=[EarlyStopping(monitor=VALIDATION_LOSS, 
+                                                      mode="min", 
+                                                      patience=self.early_stopping_patience)])
         trainer.fit(self.crl, self.train_dataloader, self.val_dataloader)
         
         return dictlogger
