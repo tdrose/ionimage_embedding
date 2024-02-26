@@ -142,6 +142,50 @@ print('Fraction: ', fraction)
 
 
 
+# %% Plotting parameter
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+XXSMALLER_SIZE = 5
+XSMALLER_SIZE = 6
+SMALLER_SIZE = 8
+SMALL_SIZE = 10
+MEDIUM_SIZE = 12
+BIGGER_SIZE = 18
+XBIGGER_SIZE = 20
+XXBIGGER_SIZE = 28
+
+cm = 1/2.54
+
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=XBIGGER_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=XBIGGER_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=XBIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=XBIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=XBIGGER_SIZE)  # fontsize of the figure title
+plt.rcParams.update({'text.color': "595a5cff",
+                     'axes.labelcolor': "595a5cff",
+                     'xtick.color': "595a5cff",
+                     'ytick.color': "595a5cff",})
+
+def draw_umapaxis(ax, length_mul=.1, yoffset=0.):
+    xlims = ax.get_xlim()
+    ylims = ax.get_ylim()
+    
+    deltax = xlims[1] - xlims[0]
+    deltay = ylims[1] - ylims[0]
+    
+    # X-Annotation
+    ax.annotate('', xy=(xlims[0]+length_mul*deltax, ylims[0]+yoffset), xytext=(xlims[0], ylims[0]+yoffset), 
+                arrowprops=dict(arrowstyle='->', color='black'))
+    ax.annotate('UMAP1', (xlims[0]+length_mul*deltax, ylims[0]+yoffset), ha='left', va='center', fontsize=XSMALLER_SIZE)
+    
+    ax.annotate('', xy=(xlims[0], ylims[0]+length_mul*deltay+yoffset), xytext=(xlims[0], ylims[0]+yoffset), 
+                arrowprops=dict(arrowstyle='->', color='black'))
+    ax.annotate('UMAP2', (xlims[0], ylims[0]+length_mul*deltay+yoffset), ha='center', va='bottom', fontsize=XSMALLER_SIZE)
+
 # %%
 # ####################
 # Latent Visualization
@@ -206,49 +250,55 @@ sc.pl.pca(adata, color='sub_class', dimensions=[0, 1], size=80.)
 sc.pl.umap(adata, color='class', size=80.)
 
 # %%
-sc.pl.umap(adata, color='leiden', size=80.)
+fig, ax = plt.subplots(1, 1, figsize=(6, 6))
 
+pos_umap = adata.obs.reset_index().join(
+    pd.DataFrame(adata.obsm['X_umap']).rename(columns={0: 'x', 1: 'y'})).rename(columns={'leiden': 'Leiden cluster'})
 
+sns.scatterplot(data=pos_umap, x='x', y='y', hue='Leiden cluster', s=25, ax=ax)
+
+ax.axis('off')
+ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='Leiden cluster')
+
+draw_umapaxis(ax, length_mul=.1, yoffset=0.1)
+plt.savefig('/g/alexandr/tim/tmp/latent_umap.pdf', bbox_inches='tight')
 
 
 
 # %%
-import matplotlib.pyplot as plt
+for LEIDEN_CLUSTER in range(len(adata.obs['leiden'].unique())):
+    N_MOLS = 5
+    N_SAMPLES = 5
 
-LEIDEN_CLUSTER = 9
-N_MOLS = 5
-N_SAMPLES = 5
+    ion_labels = iidata.full_dataset.ion_labels
 
-ion_labels = iidata.full_dataset.ion_labels
+    tmp = adata.obs[adata.obs['leiden']==str(LEIDEN_CLUSTER)].reset_index()
 
-tmp = adata.obs[adata.obs['leiden']==str(LEIDEN_CLUSTER)].reset_index()
+    # Sample ions
+    sample_ions = np.random.choice(tmp['ion'].values.astype(int), N_MOLS, replace=False)
 
-# Sample ions
-sample_ions = np.random.choice(tmp['ion'].values.astype(int), N_MOLS, replace=False)
+    # Create figure grid
+    fig, axs = plt.subplots(N_MOLS, N_SAMPLES, figsize=(5, 5))
 
-# Create figure grid
-fig, axs = plt.subplots(N_MOLS, N_SAMPLES, figsize=(5, 5))
+    for ax in axs.flatten():
+        ax.axis('off')
 
-for ax in axs.flatten():
-    ax.axis('off')
+    for i, ion in enumerate(sample_ions):
+        # Mask the ions
+        mask = iidata.full_dataset.ion_labels == ion
 
-for i, ion in enumerate(sample_ions):
-    # Mask the ions
-    mask = iidata.full_dataset.ion_labels == ion
+        image_idx = np.arange(len(ion_labels))[mask]
 
-    image_idx = np.arange(len(ion_labels))[mask]
+        # Shuffle image_idx
+        np.random.shuffle(image_idx)
 
-    # Shuffle image_idx
-    np.random.shuffle(image_idx)
+        image_idx = image_idx[:N_SAMPLES]
 
-    image_idx = image_idx[:N_SAMPLES]
+        for j, idx in enumerate(image_idx):
+            axs[i, j].imshow(iidata.full_dataset.images[idx])
 
-    for j, idx in enumerate(image_idx):
-        axs[i, j].imshow(iidata.full_dataset.images[idx])
+    plt.savefig(f'/g/alexandr/tim/tmp/latent_cluster_vis_{LEIDEN_CLUSTER}.pdf', bbox_inches='tight')
 
-fig.suptitle('Leiden cluster: {}'.format(LEIDEN_CLUSTER))
-
-plt.show()
 
 
 
@@ -360,7 +410,7 @@ for i in range(len(training_data)):
 train_df = pd.concat(pca_ds)
 
 # %%
-fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+fig, ax = plt.subplots(1, 1, figsize=(6, 6))
 
 for i in pca_df.index:
     tmp = train_df.loc[i, :]
@@ -375,5 +425,6 @@ for i in pca_df.index:
 
 sns.scatterplot(data=pca_df, x='PC1', y='PC2', s=15, color='black', ax=ax)
 
-plt.show()
+sns.despine(offset=5, trim=False, ax=ax)
+plt.savefig('/g/alexandr/tim/tmp/latent_variance.pdf', bbox_inches='tight')
 # %%
