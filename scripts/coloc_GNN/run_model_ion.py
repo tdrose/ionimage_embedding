@@ -85,9 +85,9 @@ frac_l = []
 RANDOM_NETWORK = False
 
 # %%
-acc_perf = iie.logger.PerformanceLogger(scenario='Scenario',metric='Accuracy', 
+acc_perf = iie.logger.PerformanceLogger(scenario='Model',metric='Accuracy', 
                                         evaluation='Evaluation', fraction='Fraction')
-mse_perf = iie.logger.PerformanceLogger(scenario='Scenario',metric='MSE',
+mse_perf = iie.logger.PerformanceLogger(scenario='Model', metric='MSE',
                                         evaluation='Evaluation', fraction='Fraction')
 
 # II Data
@@ -192,47 +192,154 @@ for i in range(N_BOOTSTRAPS):
     mse_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction)
     mse_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
 
+    acc_perf.get_df().to_csv('/g/alexandr/tim/GNN_perf_acc.csv')
+    mse_perf.get_df().to_csv('/g/alexandr/tim/GNN_perf_mse.csv')
+
+
+
+
+
+
+
+
+
+
+
+
 
 # %%
-    
 
+import pandas as pd
+from typing import Final, Dict
+
+acc_perf_df = pd.concat([pd.read_csv('/g/alexandr/tim/GNN_perf_acc.csv').rename(columns={'Scenario': 'Model'}),
+                         pd.read_csv('/g/alexandr/tim/CLR_perf_acc.csv')])
+mse_perf_df = pd.concat([pd.read_csv('/g/alexandr/tim/GNN_perf_mse.csv').rename(columns={'Scenario': 'Model'}),
+                         pd.read_csv('/g/alexandr/tim/CLR_perf_mse.csv')])
+
+
+# Exclude the rows selfContrast, colocContrast, and regContrast from the dataframe
+acc_perf_df = acc_perf_df[~acc_perf_df['Model'].isin(['selfContrast', 'colocContrast', 'regContrast'])]
+mse_perf_df = mse_perf_df[~mse_perf_df['Model'].isin(['selfContrast', 'colocContrast', 'regContrast'])]
+
+acc_perf_df = acc_perf_df.replace('BMC', 'BioMedCLIP')
+acc_perf_df = acc_perf_df.replace('infoNCE', 'infoNCE CNN')
+
+mse_perf_df = mse_perf_df.replace('BMC', 'BioMedCLIP')
+mse_perf_df = mse_perf_df.replace('infoNCE', 'infoNCE CNN')
+
+
+# %% Plotting parameter
+
+XXSMALLER_SIZE = 5
+XSMALLER_SIZE = 6
+SMALLER_SIZE = 8
+SMALL_SIZE = 10
+MEDIUM_SIZE = 12
+BIGGER_SIZE = 18
+XBIGGER_SIZE = 20
+XXBIGGER_SIZE = 28
+
+cm = 1/2.54
+
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=XBIGGER_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=XBIGGER_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=XBIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=XBIGGER_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=XBIGGER_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=XBIGGER_SIZE)  # fontsize of the figure title
+plt.rcParams.update({'text.color': "595a5cff",
+                     'axes.labelcolor': "595a5cff",
+                     'xtick.color': "595a5cff",
+                     'ytick.color': "595a5cff",})
+
+MEAN_COLOC : Final[str] = 'Mean Coloc'
+UMAP : Final[str] = 'UMAP'
+GNN : Final[str] = 'GNN'
+RANDOM : Final[str] = 'Random'
+BMC : Final[str] = 'BioMedCLIP'
+INFO_NCE : Final[str] = 'infoNCE CNN'
+
+# Colors
+MODEL_PALLETE : Final[Dict[str, str]] = {
+    MEAN_COLOC: 'darkgrey',
+    UMAP: 'gray',
+    GNN: '#1aae54ff',
+    RANDOM: 'white',
+    BMC: '#229cefff',
+    INFO_NCE: '#22efecff'
+}
+
+plot_order = [MEAN_COLOC, GNN, UMAP, BMC, INFO_NCE, RANDOM]
+# %%
 # Accuracy 
-df = acc_perf.get_df()
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-
-sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='Accuracy', ax=ax1, 
-               palette=iie.constants.MODEL_PALLETE, cut=0)
+data_df = acc_perf_df[acc_perf_df['Evaluation']=='Co-detected']
+sns.violinplot(data=data_df, 
+               x='Model', y='Accuracy', ax=ax1, palette=MODEL_PALLETE,
+               order=[x for x in plot_order if x in data_df['Model'].unique()],
+               cut=0)
 ax1.set_ylabel(f'Top-{top_acc} Accuracy (Co-detected)')
 ax1.set_ylim(0, 1)
+sns.despine(offset=5, trim=False, ax=ax1)
+ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right')
+ticks = ax1.get_yticklabels()
+ticks[-1].set_weight('bold')
 
-sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='Accuracy', ax=ax2,
-               palette=iie.constants.MODEL_PALLETE, cut=0)
-frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
-ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
+data_df = acc_perf_df[acc_perf_df['Evaluation']=='Transitivity'].dropna()
+sns.violinplot(data=data_df, 
+               x='Model', y='Accuracy', ax=ax2, palette=MODEL_PALLETE, 
+               order=[x for x in plot_order if x in data_df['Model'].unique()],
+               cut=0)
+frac = data_df['Fraction'].mean()
 ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 ax2.set_ylim(0, 1)
+sns.despine(offset=5, trim=False, ax=ax2)
+ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45, ha='right', va='top')
+ticks = ax2.get_yticklabels()
+ticks[-1].set_weight('bold')
 
-fig.suptitle(f'{DS_NAME}, Leave out datasets')
-plt.show()
+plt.tight_layout()
+
+plt.savefig('/g/alexandr/tim/tmp/acc_ion_fig.pdf', bbox_inches='tight')
 
 # %%
 # MSE
-df = mse_perf.get_df()
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
-sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Scenario', y='MSE', ax=ax1,
-               palette=iie.constants.MODEL_PALLETE, cut=0)
+data_df = mse_perf_df[mse_perf_df['Evaluation']=='Co-detected']
+sns.violinplot(data=data_df, 
+               x='Model', y='MSE', ax=ax1, palette=MODEL_PALLETE,
+               order=[x for x in plot_order if x in data_df['Model'].unique()],
+               cut=0)
 ax1.set_ylabel(f'MSE (Co-detected)')
+sns.despine(offset=5, trim=False, ax=ax1)
+ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right', va='top')
+ticks = ax1.get_yticklabels()
+ax1.set_ylim(0, .5)
+ticks[0].set_weight('bold')
 
-sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Scenario', y='MSE', ax=ax2,
-               palette=iie.constants.MODEL_PALLETE, cut=0)
-frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
+data_df = mse_perf_df[mse_perf_df['Evaluation']=='Transitivity'].dropna()
+sns.violinplot(data=data_df, 
+               x='Model', y='MSE', ax=ax2, palette=MODEL_PALLETE,
+               order=[x for x in plot_order if x in data_df['Model'].unique()],
+               cut=0)
+frac = data_df['Fraction'].mean()
 ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
 ax2.set_ylabel(f'MSE (Transitivity)')
+sns.despine(offset=5, trim=False, ax=ax2)
+ax2.set_ylim(0, .5)
+# Rotate x-axis labels by 45 degrees
+ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45, ha='right', va='top')
+ticks = ax2.get_yticklabels()
+ticks[0].set_weight('bold')
+ax2.set_yticklabels(ticks)
+plt.tight_layout()
 
-fig.suptitle(f'{DS_NAME}, Leave out datasets')
-plt.show()
+plt.savefig('/g/alexandr/tim/tmp/mse_ion_fig.pdf', bbox_inches='tight')
 
 # %%
