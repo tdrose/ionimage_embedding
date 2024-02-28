@@ -384,13 +384,13 @@ latent_centroid = iie.evaluation.latent.latent_gnn(model, dat, graph='training')
 
 scaler = StandardScaler()
 latent_scaled = scaler.fit_transform(latent_centroid)
-
-pca = PCA(n_components=2)
+N_COMP = 2
+pca = PCA(n_components=N_COMP)
 pca.fit(latent_scaled)
 
 latent_pca = pca.transform(latent_scaled)
 
-pca_df = pd.DataFrame(latent_pca, columns=['PC1', 'PC2'], index=latent_centroid.index)
+pca_df = pd.DataFrame(latent_pca, columns=[f'PC{x}' for x in range(1, N_COMP+1)], index=latent_centroid.index)
 
 # Transform each dataset to PCA space
 training_data = dat.dataset.index_select(dat._train_set)
@@ -403,11 +403,16 @@ for i in range(len(training_data)):
     v = latent_dict[i]
     index = x.x.detach().cpu().numpy() # type: ignore
     tmp = pd.DataFrame(pca.transform(scaler.transform(v.detach().cpu().numpy())), 
-                       columns=['PC1', 'PC2'], index=index)
+                       columns=[f'PC{x}' for x in range(1, N_COMP+1)], index=index)
     
     pca_ds.append(tmp)
 
 train_df = pd.concat(pca_ds)
+
+
+pca_dfl = pca_df.copy().reset_index()
+pca_dfl['Cluster'] = adata.obs.reset_index()['leiden']
+
 
 # %%
 fig, ax = plt.subplots(1, 1, figsize=(6, 6))
@@ -423,8 +428,62 @@ for i in pca_df.index:
                     [pca_df.loc[i, 'PC2'], tmp.iloc[j]['PC2']], 
                     color=color, alpha=0.1)
 
-sns.scatterplot(data=pca_df, x='PC1', y='PC2', s=15, color='black', ax=ax)
+sns.scatterplot(data=pca_dfl, x='PC1', y='PC2', s=15, color='black', ax=ax)
 
 sns.despine(offset=5, trim=False, ax=ax)
 plt.savefig('/g/alexandr/tim/tmp/latent_variance.pdf', bbox_inches='tight')
+
+
+# %%
+
+
+sns.scatterplot(data=pca_dfl, x='PC1', y='PC2', s=15, hue='Cluster')
+
+
+
+
+
+
+# %%
+from sklearn.cluster import KMeans
+
+kmeans = KMeans(n_clusters=10, n_init="auto").fit(pca_df)
+
+pca_dfc = pca_df.copy()
+pca_dfc['cluster'] = kmeans.labels_
+sns.scatterplot(data=pca_dfc, x='PC1', y='PC2', s=15, hue='cluster')
+# %%
+for CLUSTER in range(len(pca_dfc['cluster'].unique())):
+    N_MOLS = 5
+    N_SAMPLES = 5
+
+    ion_labels = iidata.full_dataset.ion_labels
+
+    tmp = pca_dfc[pca_dfc['cluster']==CLUSTER].reset_index()
+
+    # Sample ions
+    if tmp.shape[0] < N_MOLS:
+        sample_ions = tmp['ion'].values
+    else:
+        sample_ions = np.random.choice(tmp['ion'].values.astype(int), N_MOLS, replace=False)
+
+    # Create figure grid
+    fig, axs = plt.subplots(N_MOLS, N_SAMPLES, figsize=(5, 5))
+
+    for ax in axs.flatten():
+        ax.axis('off')
+
+    for i, ion in enumerate(sample_ions):
+        # Mask the ions
+        mask = iidata.full_dataset.ion_labels == ion
+
+        image_idx = np.arange(len(ion_labels))[mask]
+
+        # Shuffle image_idx
+        np.random.shuffle(image_idx)
+
+        image_idx = image_idx[:N_SAMPLES]
+
+        for j, idx in enumerate(image_idx):
+            axs[i, j].imshow(iidata.full_dataset.images[idx])
 # %%
