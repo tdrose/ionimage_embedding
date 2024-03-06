@@ -203,7 +203,7 @@ class IonImagedata_random:
 class IonImagedata_leaveOutDataSet(IonImagedata_random):
     
     def __init__(self, dataset_ids, test=1, val=0.1, 
-                 transformations=T.RandomRotation(degrees=(0, 360)),
+                 transformations: Optional[torch.nn.Module]=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,
@@ -287,7 +287,7 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
 class IonImagedata_transitivity(IonImagedata_random):
     
     def __init__(self, dataset_ids, test=.3, val=0.1, 
-                 transformations=T.RandomRotation(degrees=(0, 360)),
+                 transformations: Optional[torch.nn.Module]=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, batch_size=128,

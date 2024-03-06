@@ -80,7 +80,6 @@ hyperparams = hyperparams_transitivity
 
 
 # %%
-# %%
 iidata = iie.dataloader.IonImage_data.IonImagedata_random(DSID, test=.1, val=.1, transformations=None, fdr=.1,
                              min_images=min_images, maxzero=.9, batch_size=10, 
                              colocml_preprocessing=True, cache=True)
