@@ -33,7 +33,7 @@ os.system('nvidia-smi')
 
 # %%
 iidata = iie.dataloader.IonImage_data.IonImagedata_transitivity(iie.datasets.KIDNEY_SMALL, 
-                        test=0.002, val=0.1, 
+                        test=0.01, val=0.1, 
                         cache=True, cache_folder='/scratch/model_testing',
                         colocml_preprocessing=True, 
                         fdr=.1, batch_size=40, 
@@ -49,6 +49,7 @@ print('Number of NaNs:', num_nan)
 print('Fraction of NaNs:', frac_nan)
 print('Train size: ', [x.shape[0] for x in colocs.train_coloc.values()])
 print('Test size: ', [x.shape[0] for x in colocs.test_coloc.values()])
+print('Val size: ', [x.shape[0] for x in colocs.val_coloc.values()])
 
 
 
