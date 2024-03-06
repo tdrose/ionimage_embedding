@@ -61,28 +61,23 @@ class DictLogger(Logger):
         # finishes goes here
         pass
 
+
 class PerformanceLogger:
     
-    def __init__(self, scenario: str='Scenario',metric: str='Accuracy', 
-                 evaluation: str='Evaluation', fraction: str='Fraction'):
-        self.scenario_l = []
-        self.metric_l = []
-        self.eval_l = []
-        self.frac_l = []
+    def __init__(self, *args):
 
-        self.scenario = scenario
-        self.metric = metric
-        self.evaluation = evaluation
-        self.fraction = fraction
+        self.keys = args
+        
+        self.data = {k: [] for k in self.keys}
 
-    def add_result(self, scenario: str, metric: float, evaluation: str, fraction: float):
-        self.scenario_l.append(scenario)
-        self.metric_l.append(metric)
-        self.eval_l.append(evaluation)
-        self.frac_l.append(fraction)
+    def add_result(self, *args):
+        if len(args) != len(self.keys):
+            raise ValueError('Number of arguments does not match number of keys')
+        for i, k in enumerate(self.keys):
+            self.data[k].append(args[i])
+
+    def get_keys(self):
+        return self.keys
 
     def get_df(self):
-        return pd.DataFrame({self.scenario: self.scenario_l, 
-                             self.metric: self.metric_l, 
-                             self.evaluation: self.eval_l, 
-                             self.fraction: self.frac_l})
+        return pd.DataFrame(self.data)

@@ -85,10 +85,10 @@ frac_l = []
 RANDOM_NETWORK = False
 
 # %%
-acc_perf = iie.logger.PerformanceLogger(scenario='Model',metric='Accuracy', 
-                                        evaluation='Evaluation', fraction='Fraction')
-mse_perf = iie.logger.PerformanceLogger(scenario='Model', metric='MSE',
-                                        evaluation='Evaluation', fraction='Fraction')
+acc_perf = iie.logger.PerformanceLogger('Model','Accuracy', 
+                                        'Evaluation', 'Fraction')
+mse_perf = iie.logger.PerformanceLogger('Model', 'MSE',
+                                        'Evaluation', 'Fraction')
 
 # II Data
 iidata = iie.dataloader.IonImage_data.IonImagedata_random(

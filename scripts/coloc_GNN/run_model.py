@@ -108,10 +108,10 @@ mylogger = iie.logger.DictLogger()
 
 # %%
     
-acc_perf = iie.logger.PerformanceLogger(scenario='Model',metric='Accuracy', 
-                                        evaluation='Evaluation', fraction='Fraction')
-mse_perf = iie.logger.PerformanceLogger(scenario='Model',metric='MSE',
-                                        evaluation='Evaluation', fraction='Fraction')
+acc_perf = iie.logger.PerformanceLogger('Model','Accuracy', 
+                                        'Evaluation', 'Fraction')
+mse_perf = iie.logger.PerformanceLogger('Model','MSE',
+                                        'Evaluation', 'Fraction')
 # Training
 for i in range(N_BOOTSTRAPS):
     print('# #######')
