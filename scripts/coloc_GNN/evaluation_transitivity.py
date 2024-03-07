@@ -1,34 +1,9 @@
-# %%
-# Load autoreload framework when running in ipython interactive session
-try:
-    import IPython
-    # Check if running in IPython
-    if IPython.get_ipython(): # type: ignore 
-        ipython = IPython.get_ipython()  # type: ignore 
-
-        # Run IPython-specific commands
-        ipython.run_line_magic('load_ext','autoreload')  # type: ignore 
-        ipython.run_line_magic('autoreload','2')  # type: ignore 
-    print('Running in IPython, auto-reload enabled!')
-except ImportError:
-    # Not in IPython, continue with normal Python code
-    pass
-
-import matplotlib.pyplot as plt
-import seaborn as sns
+import sys
 import numpy as np
 
 import ionimage_embedding as iie
 
 
-
-
-# %%
-import os
-os.system('nvidia-smi')
-
-
-# %%
 # Hyperparameters
 # #####################
 # Hyperparameters
@@ -44,8 +19,7 @@ top_acc = 3
 # Dataset
 DSID = iie.datasets.KIDNEY_LARGE
 DS_NAME = 'KIDNEY_LARGE'
-# Number of bootstraps
-N_BOOTSTRAPS = 50
+
 
 
 hyperparams_avail = {
@@ -76,21 +50,21 @@ hyperparams_transitivity = {
 
 
 hyperparams = hyperparams_transitivity
-
-
 RANDOM_NETWORK = False
 
-# %%
 acc_perf = iie.logger.PerformanceLogger('Model','Accuracy', 'Evaluation', 'Fraction', 
                                         '#NaN', 'fraction NaN', 'Test fraction')
 mse_perf = iie.logger.PerformanceLogger('Model', 'MSE',     'Evaluation', 'Fraction', 
                                         '#NaN', 'fraction NaN', 'Test fraction')
 
-acc_file = '/g/alexandr/tim/GNN_transitivity_acc.csv'
-mse_file = '/g/alexandr/tim/GNN_transitivity_mse.csv'
 
-# %%
-for count, test_value in enumerate(np.linspace(0.001, 0.01, N_BOOTSTRAPS)):
+# RUN ID
+RUN_ID = str(sys.argv[1])
+
+acc_file = f'/g/alexandr/tim/ACC_trans_GNN_{RUN_ID}.csv'
+mse_file = f'/g/alexandr/tim/MSE_trans_GNN_{RUN_ID}.csv'
+
+for count, test_value in enumerate(np.linspace(0.001, 0.08, 80)):
     print('# #######')
     print(f'# Iteration {count}')
     print('# #######')
@@ -211,123 +185,3 @@ for count, test_value in enumerate(np.linspace(0.001, 0.01, N_BOOTSTRAPS)):
 
     acc_perf.get_df().to_csv(acc_file)
     mse_perf.get_df().to_csv(mse_file)
-
-
-# %%
-
-import pandas as pd
-from typing import Final, Dict
-
-acc_perf_df  = acc_perf.get_df()
-mse_perf_df  = mse_perf.get_df()
-
-
-
-# %% Plotting parameter
-
-XXSMALLER_SIZE = 5
-XSMALLER_SIZE = 6
-SMALLER_SIZE = 8
-SMALL_SIZE = 10
-MEDIUM_SIZE = 12
-BIGGER_SIZE = 18
-XBIGGER_SIZE = 20
-XXBIGGER_SIZE = 28
-
-cm = 1/2.54
-
-
-plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-plt.rc('axes', titlesize=XBIGGER_SIZE)     # fontsize of the axes title
-plt.rc('axes', labelsize=XBIGGER_SIZE)    # fontsize of the x and y labels
-plt.rc('xtick', labelsize=XBIGGER_SIZE)    # fontsize of the tick labels
-plt.rc('ytick', labelsize=XBIGGER_SIZE)    # fontsize of the tick labels
-plt.rc('legend', fontsize=XBIGGER_SIZE)    # legend fontsize
-plt.rc('figure', titlesize=XBIGGER_SIZE)  # fontsize of the figure title
-plt.rcParams.update({'text.color': "595a5cff",
-                     'axes.labelcolor': "595a5cff",
-                     'xtick.color': "595a5cff",
-                     'ytick.color': "595a5cff",})
-
-MEAN_COLOC : Final[str] = 'Mean Coloc'
-UMAP : Final[str] = 'UMAP'
-GNN : Final[str] = 'GNN'
-RANDOM : Final[str] = 'Random'
-BMC : Final[str] = 'BioMedCLIP'
-INFO_NCE : Final[str] = 'infoNCE CNN'
-
-# Colors
-MODEL_PALLETE : Final[Dict[str, str]] = {
-    MEAN_COLOC: 'darkgrey',
-    UMAP: 'gray',
-    GNN: '#1aae54ff',
-    RANDOM: 'white',
-    BMC: '#229cefff',
-    INFO_NCE: '#22efecff'
-}
-
-plot_order = [MEAN_COLOC, GNN, UMAP, BMC, INFO_NCE, RANDOM]
-# %%
-# Accuracy 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-
-data_df = acc_perf_df[acc_perf_df['Evaluation']=='Co-detected']
-sns.scatterplot(data=data_df, 
-               x='Fraction', y='Accuracy', ax=ax1, hue='Model',
-               # order=[x for x in plot_order if x in data_df['Model'].unique()],
-               )
-ax1.set_ylabel(f'Top-{top_acc} Accuracy (Co-detected)')
-ax1.set_ylim(0, 1)
-sns.despine(offset=5, trim=False, ax=ax1)
-ticks = ax1.get_yticklabels()
-ticks[-1].set_weight('bold')
-
-data_df = acc_perf_df[acc_perf_df['Evaluation']=='Transitivity'].dropna()
-sns.scatterplot(data=data_df, 
-               x='Fraction', y='Accuracy', ax=ax2, hue='Model',
-               #order=[x for x in plot_order if x in data_df['Model'].unique()],
-               )
-frac = data_df['Fraction'].mean()
-ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
-ax2.set_ylim(0, 1)
-sns.despine(offset=5, trim=False, ax=ax2)
-ticks = ax2.get_yticklabels()
-ticks[-1].set_weight('bold')
-
-plt.tight_layout()
-
-# plt.savefig('/g/alexandr/tim/tmp/acc_ion_fig.pdf', bbox_inches='tight')
-
-# %%
-# MSE
-
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-
-data_df = mse_perf_df[acc_perf_df['Evaluation']=='Co-detected']
-sns.scatterplot(data=data_df, 
-               x='Fraction', y='MSE', ax=ax1, hue='Model',
-               # order=[x for x in plot_order if x in data_df['Model'].unique()],
-               )
-ax1.set_ylabel(f'MSE (Co-detected)')
-ax1.set_ylim(0, 1)
-sns.despine(offset=5, trim=False, ax=ax1)
-ticks = ax1.get_yticklabels()
-ticks[-1].set_weight('bold')
-
-data_df = mse_perf_df[acc_perf_df['Evaluation']=='Transitivity'].dropna()
-sns.scatterplot(data=data_df, 
-               x='Fraction', y='MSE', ax=ax2, hue='Model',
-               #order=[x for x in plot_order if x in data_df['Model'].unique()],
-               )
-
-ax2.set_ylabel(f'MSE (Transitivity)')
-ax2.set_ylim(0, 1)
-sns.despine(offset=5, trim=False, ax=ax2)
-ticks = ax2.get_yticklabels()
-ticks[-1].set_weight('bold')
-
-plt.tight_layout()
-
-# plt.savefig('/g/alexandr/tim/tmp/mse_ion_fig.pdf', bbox_inches='tight')
-
-# %%
