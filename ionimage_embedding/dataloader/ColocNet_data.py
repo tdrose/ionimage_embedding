@@ -80,7 +80,7 @@ class ColocNetData_discrete:
                 scale_intensity=scale_intensity, 
                 colocml_preprocessing=colocml_preprocessing,
                 batch_size=batch_size, cache=cache_images, 
-                cache_folder=cache_folder,
+                cache_folder=cache_folder, knn=False,
                 min_images=min_images, maxzero=maxzero)
         
             colocs = get_coloc_model(iidata)
@@ -241,7 +241,7 @@ class MeanColocNetData_discrete:
             scale_intensity=scale_intensity, 
             colocml_preprocessing=colocml_preprocessing,
             batch_size=batch_size, cache=cache_images, 
-            cache_folder=cache_folder,
+            cache_folder=cache_folder, knn=False,
             min_images=min_images, maxzero=maxzero)
     
         colocs = get_coloc_model(iidata)

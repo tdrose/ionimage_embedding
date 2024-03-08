@@ -18,7 +18,7 @@ class IonImagedata_random:
                  maindata_class: bool=True,
                  db: Tuple[str, str]=('HMDB', 'v4'), fdr: float=0.2, scale_intensity: str='TIC', 
                  colocml_preprocessing: bool=True,
-                 k: int=10, batch_size: int=128,
+                 k: int=10, knn: bool=True, batch_size: int=128,
                  cache: bool=False, cache_folder: str='/scratch/model_testing', min_images: int=5, 
                  maxzero: float=.95, vitb16_compatible: bool=False, force_size: Optional[int]=None
                 ):
@@ -29,8 +29,10 @@ class IonImagedata_random:
         self.val = val
         self.test = test
         self.k=k
+        self.knn=knn
         self.batch_size=batch_size
         self.min_images=min_images
+        self.knn_adj: Optional[torch.Tensor] = None
         
         # Get data
         data, dataset_labels, ion_labels = get_data(dataset_ids=dataset_ids, cache=cache, 
@@ -110,8 +112,9 @@ class IonImagedata_random:
             train_data, train_dls, train_ill, train_idx, val_data, val_dls, val_ill, val_idx = tmp
             
             # compute KNN and ion_label_mat (For combined train/val data)
-            self.knn_adj: torch.Tensor = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], 
-                                                                                -1)), k=self.k))
+            if self.knn:
+                self.knn_adj = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], 
+                                                                                    -1)), k=self.k))
             
             self.ion_label_mat: torch.Tensor = torch.tensor(pairwise_same_elements(tmp_ill
                                                                                    ).astype(int))
@@ -206,7 +209,7 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                  transformations: Optional[torch.nn.Module]=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
-                 k=10, batch_size=128,
+                 k=10, knn: bool=True, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', min_images=5, 
                  maxzero: float=.95, vitb16_compatible: bool=False, force_size: Optional[int]=None
                 ):
@@ -220,7 +223,7 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                          maindata_class=False,
                          db=db, fdr=fdr, scale_intensity=scale_intensity, 
                          colocml_preprocessing=colocml_preprocessing,
-                         k=k, batch_size=batch_size,
+                         k=k, knn=knn, batch_size=batch_size,
                          cache=cache, cache_folder=cache_folder, min_images=min_images, 
                          maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
                          force_size=force_size)
@@ -254,7 +257,9 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
         train_data, train_dls, train_ill, train_index, val_data, val_dls, val_ill, val_index = tmp
 
         # compute KNN and ion_label_mat (For combined train/val data)
-        self.knn_adj = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), k=self.k))
+        if self.knn:
+            self.knn_adj = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), 
+                                                k=self.k))
 
         self.ion_label_mat = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
 
@@ -290,7 +295,7 @@ class IonImagedata_transitivity(IonImagedata_random):
                  transformations: Optional[torch.nn.Module]=T.RandomRotation(degrees=(0, 360)),
                  # Download parameters:
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
-                 k=10, batch_size=128,
+                 k=10, knn: bool=True, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', 
                  min_images=5, min_codetection=2, maxzero: float=.95, vitb16_compatible: bool=False, 
                  force_size: Optional[int]=None
@@ -300,7 +305,7 @@ class IonImagedata_transitivity(IonImagedata_random):
                          transformations=transformations, maindata_class=False,
                          db=db, fdr=fdr, scale_intensity=scale_intensity, 
                          colocml_preprocessing=colocml_preprocessing,
-                         k=k, batch_size=batch_size,
+                         k=k, knn=knn, batch_size=batch_size,
                          cache=cache, cache_folder=cache_folder, min_images=min_images, 
                          maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
                          force_size=force_size)
@@ -335,7 +340,9 @@ class IonImagedata_transitivity(IonImagedata_random):
         train_data, train_dls, train_ill, train_index, val_data, val_dls, val_ill, val_index = tmp
 
         # compute KNN and ion_label_mat (For combined train/val data)
-        self.knn_adj = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), k=self.k))
+        if self.knn:
+            self.knn_adj = torch.tensor(run_knn(tmp_data.reshape((tmp_data.shape[0], -1)), 
+                                                k=self.k))
 
         self.ion_label_mat = torch.tensor(pairwise_same_elements(tmp_ill).astype(int))
 
