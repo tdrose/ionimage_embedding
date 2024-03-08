@@ -36,7 +36,7 @@ iidata = iie.dataloader.IonImage_data.IonImagedata_transitivity(iie.datasets.KID
                         test=0.01, val=0.1, 
                         cache=True, cache_folder='/scratch/model_testing',
                         colocml_preprocessing=True, 
-                        fdr=.1, batch_size=40, 
+                        fdr=.1, batch_size=40, knn=False,
                         transformations=None, # T.RandomRotation(degrees=(0, 360)) 
                         maxzero=.9, min_codetection=2)
 
@@ -66,7 +66,7 @@ for i in np.linspace(0.01, 0.1, 10):
                                                                         test=i, val=0.1, 
                         cache=True, cache_folder='/scratch/model_testing',
                         colocml_preprocessing=True, 
-                        fdr=.1, batch_size=40, 
+                        fdr=.1, batch_size=40, knn=False,
                         transformations=None, # T.RandomRotation(degrees=(0, 360)) 
                         maxzero=.9, min_codetection=2)
 
