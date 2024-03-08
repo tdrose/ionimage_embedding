@@ -43,7 +43,7 @@ def pseudo_labeling(ub: Union[float, torch.Tensor], lb: Union[float, torch.Tenso
                     sim: torch.Tensor,
                     index: np.ndarray,
                     ion_label_mat: torch.Tensor,
-                    knn: bool, knn_adj: torch.Tensor,
+                    knn: bool, knn_adj: Optional[torch.Tensor],
                     dataset_ub: torch.Tensor,
                     dataset_lb: torch.Tensor,
                     dataset_specific_percentiles: bool = False,
@@ -71,6 +71,9 @@ def pseudo_labeling(ub: Union[float, torch.Tensor], lb: Union[float, torch.Tenso
 
     # Align images within KNN
     if knn:
+        if knn_adj is None:
+            raise ValueError('KNN adjacency matrix is None, but knn is True.' 
+                             'Make sure to compute KNN when loading the data.')
         knn_submat = knn_adj[index, :][:, index]
         # Todo: Not 100% sure with this one, should be checked again
         pos_loc = torch.maximum(pos_loc, knn_submat)

@@ -23,7 +23,7 @@ class colocContrastModel(pl.LightningModule):
                  width,
                  num_cluster,
                  ion_label_mat: torch.Tensor,
-                 knn_adj: torch.Tensor,
+                 knn_adj: Optional[torch.Tensor],
                  activation: Literal['softmax', 'relu', 'sigmoid']='softmax',
                  encoder_dim=7,
                  initial_upper: float = 98.,
@@ -53,7 +53,7 @@ class colocContrastModel(pl.LightningModule):
         
         # KNN
         self.KNN = knn
-        self.knn_adj = knn_adj
+        self.knn_adj: Optional[torch.Tensor] = knn_adj
         
         # Trainig related
         self.weight_decay = weight_decay
@@ -195,7 +195,7 @@ class colocContrastModel(pl.LightningModule):
         
         train_x, index, train_datasets, train_ions, untransformed_images = batch
         
-        self.knn_adj = self.knn_adj.to(self.device)
+        # self.knn_adj = self.knn_adj.to(self.device)
         self.ion_label_mat = self.ion_label_mat.to(self.device)
         
         train_datasets = train_datasets.reshape(-1)
@@ -231,7 +231,7 @@ class colocContrastModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         val_x, index, val_datasets, val_ions, untransformed_images = batch
         
-        self.knn_adj = self.knn_adj.to(self.device)
+        # self.knn_adj = self.knn_adj.to(self.device)
         self.ion_label_mat = self.ion_label_mat.to(self.device)
         
         val_datasets = val_datasets.reshape(-1)

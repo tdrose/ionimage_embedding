@@ -106,6 +106,10 @@ class CRL:
                              f'upper_iteration, lower_iteration, '
                              f'or training_epochs parameters.')
 
+        if knn and data.knn_adj is None:
+                raise ValueError('KNN adjacency matrix is None, but knn is True.' 
+                                'Make sure to compute KNN when loading the data.')
+        
         self.knn_adj = data.knn_adj            
         self.ion_label_mat = data.ion_label_mat
 
