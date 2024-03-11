@@ -200,7 +200,7 @@ plt.show()
 # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
 data_df = mse_perf_df[acc_perf_df['Evaluation']=='Co-detected']
-x = 'Fraction'
+x = 'Test fraction'
 y = 'MSE'
 hue = 'Model'
 
