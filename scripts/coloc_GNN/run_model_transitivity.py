@@ -33,8 +33,6 @@ os.system('nvidia-smi')
 # #####################
 # Hyperparameters
 # #####################
-# min_images
-min_images = 11
 # test
 test = 1
 # val
@@ -76,7 +74,8 @@ hyperparams_transitivity = {
 
 
 hyperparams = hyperparams_transitivity
-
+# min_images
+min_images = hyperparams['top_k'] + hyperparams['bottom_k'] + 1
 
 RANDOM_NETWORK = False
 
@@ -90,127 +89,139 @@ acc_file = '/g/alexandr/tim/GNN_transitivity_acc.csv'
 mse_file = '/g/alexandr/tim/GNN_transitivity_mse.csv'
 
 # %%
-for count, test_value in enumerate(np.linspace(0.001, 0.01, N_BOOTSTRAPS)):
-    print('# #######')
-    print(f'# Iteration {count}')
-    print('# #######')
+N_iterations = 20
+for count, test_value in enumerate(np.linspace(0.001, 0.08, N_iterations)):
 
-    # II Data
-    iidata = iie.dataloader.IonImage_data.IonImagedata_transitivity(
-        DSID, test=test_value, val=.1, transformations=None, fdr=.1,
-        min_images=min_images, maxzero=.9, batch_size=10, knn=False,
-        colocml_preprocessing=True, cache=True)
+    for i in range(N_BOOTSTRAPS):
+        print('# #######')
+        print(f'# Iteration {count}')
+        print('# #######')
 
-    iidata.sample_sets()
+        try:
+            # II Data
+            iidata = iie.dataloader.IonImage_data.IonImagedata_transitivity(
+                DSID, test=test_value, val=.1, transformations=None, fdr=.1,
+                min_images=min_images, maxzero=.9, batch_size=10, knn=False,
+                colocml_preprocessing=True, cache=True)
 
-    colocs = iie.dataloader.get_coloc_model.get_coloc_model(iidata, device='cuda')
+            iidata.sample_sets()
 
-    # Transitivity info
-    num_nan = np.isnan(colocs.test_mean_coloc).sum().sum()
-    frac_nan =  num_nan / (colocs.test_mean_coloc.shape[0] * colocs.test_mean_coloc.shape[1])
+            colocs = iie.dataloader.get_coloc_model.get_coloc_model(iidata, device='cuda')
 
-    # ColocNet Data
-    dat = iie.dataloader.ColocNet_data.ColocNetData_discrete([""], 
-                        test=test, val=val, 
-                        cache_images=True, cache_folder=iie.constants.CACHE_FOLDER,
-                        colocml_preprocessing=True, 
-                        fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
-                        top_k=hyperparams['top_k'], bottom_k=hyperparams['bottom_k'], 
-                        random_network=RANDOM_NETWORK,
-                        use_precomputed=True,
-                        ds_labels=iidata.train_dataset.dataset_labels,
-                        ion_labels=iidata.train_dataset.ion_labels,
-                        coloc=colocs.train_coloc,
-                        dsl_int_mapper=iidata.dsl_int_mapper,
-                        ion_int_mapper=iidata.ion_int_mapper,
-                        n_ions=int(iidata.full_dataset.ion_labels.max().numpy())+1,
-                        force_reload=True,
-                        )
+            # Transitivity info
+            num_nan = np.isnan(colocs.test_mean_coloc).sum().sum()
+            frac_nan =  num_nan / (colocs.test_mean_coloc.shape[0] * colocs.test_mean_coloc.shape[1])
 
-    mylogger = iie.logger.DictLogger()
+            # ColocNet Data
+            dat = iie.dataloader.ColocNet_data.ColocNetData_discrete([""], 
+                                test=test, val=val, 
+                                cache_images=True, cache_folder=iie.constants.CACHE_FOLDER,
+                                colocml_preprocessing=True, 
+                                fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
+                                top_k=hyperparams['top_k'], bottom_k=hyperparams['bottom_k'], 
+                                random_network=RANDOM_NETWORK,
+                                use_precomputed=True,
+                                ds_labels=iidata.train_dataset.dataset_labels,
+                                ion_labels=iidata.train_dataset.ion_labels,
+                                coloc=colocs.train_coloc,
+                                dsl_int_mapper=iidata.dsl_int_mapper,
+                                ion_int_mapper=iidata.ion_int_mapper,
+                                n_ions=int(iidata.full_dataset.ion_labels.max().numpy())+1,
+                                force_reload=True,
+                                )
 
-    # Define model
-    model = iie.models.gnn.gnnd.gnnDiscrete(data=dat, latent_dims=hyperparams['latent_size'], 
-                            encoding = hyperparams['encoding'], embedding_dims=40,
-                            lr=hyperparams['lr'], training_epochs=130, 
-                            early_stopping_patience=hyperparams['early_stopping_patience'],
-                            lightning_device='gpu', loss=hyperparams['loss_type'],
-                            activation=hyperparams['activation'], num_layers=hyperparams['num_layers'],
-                            gnn_layer_type=hyperparams['gnn_layer_type'])
+            mylogger = iie.logger.DictLogger()
 
-    mylogger = model.train()
+            # Define model
+            model = iie.models.gnn.gnnd.gnnDiscrete(data=dat, latent_dims=hyperparams['latent_size'], 
+                                    encoding = hyperparams['encoding'], embedding_dims=40,
+                                    lr=hyperparams['lr'], training_epochs=130, 
+                                    early_stopping_patience=hyperparams['early_stopping_patience'],
+                                    lightning_device='gpu', loss=hyperparams['loss_type'],
+                                    activation=hyperparams['activation'], num_layers=hyperparams['num_layers'],
+                                    gnn_layer_type=hyperparams['gnn_layer_type'])
 
-    pred_mc = colocs.test_mean_coloc
+            mylogger = model.train()
 
-    coloc_embedding = iie.evaluation.latent.coloc_umap_iid(colocs, k=3, n_components=5)
-    coloc_cu = iie.evaluation.latent.latent_colocinference(
-        coloc_embedding, 
-        colocs.test_dataset.ion_labels)
-    
-    pred_gnn_t = iie.evaluation.latent.latent_gnn(model, dat, graph='training')
-    coloc_gnn_t = iie.evaluation.latent.latent_colocinference(pred_gnn_t, colocs.test_dataset.ion_labels)
-    
-    
-    # Accuracy
-    avail, trans, _ = iie.evaluation.metrics.coloc_top_acc_iid(latent=pred_mc,
-                                                               agg_coloc_pred=pred_mc,
-                                                               colocs=colocs, 
-                                                               top=top_acc)
-    acc_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1, 
-                        num_nan, frac_nan, test_value)
+            pred_mc = colocs.test_mean_coloc
 
-    avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_cu,
-                                                                      agg_coloc_pred=pred_mc,
-                                                                      colocs=colocs, 
-                                                                      top=top_acc)
-    acc_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction, 
-                        num_nan, frac_nan, test_value)
-    acc_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction, 
-                        num_nan, frac_nan, test_value)
+            coloc_embedding = iie.evaluation.latent.coloc_umap_iid(colocs, k=3, n_components=5)
+            coloc_cu = iie.evaluation.latent.latent_colocinference(
+                coloc_embedding, 
+                colocs.test_dataset.ion_labels)
+            
+            pred_gnn_t = iie.evaluation.latent.latent_gnn(model, dat, graph='training')
+            coloc_gnn_t = iie.evaluation.latent.latent_colocinference(pred_gnn_t, colocs.test_dataset.ion_labels)
+            
+            
+            # Accuracy
+            
 
-    avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_gnn_t, 
-                                                                      agg_coloc_pred=pred_mc,
-                                                                      colocs=colocs, 
-                                                                      top=top_acc)
-    acc_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction, 
-                        num_nan, frac_nan, test_value)
-    acc_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction, 
-                        num_nan, frac_nan, test_value)
+            avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_cu,
+                                                                            agg_coloc_pred=pred_mc,
+                                                                            colocs=colocs, 
+                                                                            top=top_acc)
+            acc_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction, 
+                                num_nan, frac_nan, test_value)
+            acc_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction, 
+                                num_nan, frac_nan, test_value)
+            
+            avail, trans, _ = iie.evaluation.metrics.coloc_top_acc_iid(latent=pred_mc,
+                                                                    agg_coloc_pred=pred_mc,
+                                                                    colocs=colocs, 
+                                                                    top=top_acc)
+            acc_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 
+                                fraction, # We use the fraction as computeed by methods with a latent space
+                                num_nan, frac_nan, test_value)
 
-    avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid_random(pred_mc, 
-                                                                             agg_coloc_pred=pred_mc,
-                                                                             colocs=colocs, 
-                                                                             top=top_acc) 
-    acc_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction, 
-                        num_nan, frac_nan, test_value)
-    acc_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction, 
-                        num_nan, frac_nan, test_value)
-    
-    # MSE
-    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(pred_mc, pred_mc, colocs)
-    mse_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1, 
-                        num_nan, frac_nan, test_value)
+            avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_gnn_t, 
+                                                                            agg_coloc_pred=pred_mc,
+                                                                            colocs=colocs, 
+                                                                            top=top_acc)
+            acc_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction, 
+                                num_nan, frac_nan, test_value)
+            acc_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction, 
+                                num_nan, frac_nan, test_value)
 
-    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(coloc_cu, pred_mc, colocs)
-    mse_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction, 
-                        num_nan, frac_nan, test_value)
-    mse_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction, 
-                        num_nan, frac_nan, test_value)
+            avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid_random(pred_mc, 
+                                                                                    agg_coloc_pred=pred_mc,
+                                                                                    colocs=colocs, 
+                                                                                    top=top_acc) 
+            acc_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction, 
+                                num_nan, frac_nan, test_value)
+            acc_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction, 
+                                num_nan, frac_nan, test_value)
+            
+            # MSE
+            avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(pred_mc, pred_mc, colocs)
+            mse_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1, 
+                                num_nan, frac_nan, test_value)
 
-    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(coloc_gnn_t, pred_mc, colocs)
-    mse_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction, 
-                        num_nan, frac_nan, test_value)
-    mse_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction, 
-                        num_nan, frac_nan, test_value)
+            avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(coloc_cu, pred_mc, colocs)
+            mse_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction, 
+                                num_nan, frac_nan, test_value)
+            mse_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction, 
+                                num_nan, frac_nan, test_value)
 
-    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid_random(coloc_gnn_t, pred_mc, colocs)
-    mse_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction, 
-                        num_nan, frac_nan, test_value)
-    mse_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction, 
-                        num_nan, frac_nan, test_value)
+            avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid(coloc_gnn_t, pred_mc, colocs)
+            mse_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction, 
+                                num_nan, frac_nan, test_value)
+            mse_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction, 
+                                num_nan, frac_nan, test_value)
 
-    acc_perf.get_df().to_csv(acc_file)
-    mse_perf.get_df().to_csv(mse_file)
+            avail, trans, fraction = iie.evaluation.metrics.coloc_mse_iid_random(coloc_gnn_t, pred_mc, colocs)
+            mse_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction, 
+                                num_nan, frac_nan, test_value)
+            mse_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction, 
+                                num_nan, frac_nan, test_value)
+
+            acc_perf.get_df().to_csv(acc_file)
+            mse_perf.get_df().to_csv(mse_file)
+        
+        except ValueError:
+            print('##############################################')
+            print('failed for test value: ', test_value)
+            print('##############################################')
 
 
 # %%

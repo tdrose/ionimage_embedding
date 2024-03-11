@@ -2,15 +2,15 @@
 #SBATCH -J eval_Trans                                          # job name
 #SBATCH -A alexandr                                            # group to which you belong
 #SBATCH -N 1                                                   # number of nodes
-#SBATCH -n 8                                                   # number of cores
+#SBATCH -n 4                                                   # number of cores
 #SBATCH -p gpu-el8                                             # GPU partition
 #SBATCH -C gaming                                              # GPU type                         
 #SBATCH --gpus 1                                               # number of GPUs
 #SBATCH --ntasks-per-gpu 1                                     # number of tasks per GPU
 #SBATCH --cpus-per-gpu 8                                       # number of CPU cores per GPU
-#SBATCH --mem-per-gpu 24G                                      # memory pool for each GPU          
+#SBATCH --mem-per-gpu 16G                                      # memory pool for each GPU          
 #SBATCH -t 0-80:00:00                                          # runtime limit (D-HH:MM:SS)
-#SBATCH --array=1-10  # Adjust the range according to your datasets
+#SBATCH --array=1-20  # Adjust the range according to your datasets
 #SBATCH -o /scratch/trose/slurm_eval_Trans_.%j.out             # STDOUT
 #SBATCH -e /scratch/trose/slurm_eval_Trans_.%j.err             # STDERR
 #SBATCH --mail-type=END,FAIL                                   # notifications for job done & fail
