@@ -1,3 +1,4 @@
+# %%
 import sys
 import numpy as np
 
@@ -8,8 +9,8 @@ import ionimage_embedding as iie
 # #####################
 # Hyperparameters
 # #####################
-# min_images
-min_images = 11
+
+# %%
 # test
 test = 1
 # val
@@ -51,6 +52,9 @@ hyperparams_transitivity = {
 
 hyperparams = hyperparams_transitivity
 RANDOM_NETWORK = False
+
+# min_images
+min_images = hyperparams['top_k'] + hyperparams['bottom_k'] + 1
 
 acc_perf = iie.logger.PerformanceLogger('Model','Accuracy', 'Evaluation', 'Fraction', 
                                         '#NaN', 'fraction NaN', 'Test fraction')
@@ -126,12 +130,7 @@ for count, test_value in enumerate(np.linspace(0.001, 0.08, 80)):
     
     
     # Accuracy
-    avail, trans, _ = iie.evaluation.metrics.coloc_top_acc_iid(latent=pred_mc,
-                                                               agg_coloc_pred=pred_mc,
-                                                               colocs=colocs, 
-                                                               top=top_acc)
-    acc_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1, 
-                        num_nan, frac_nan, test_value)
+    
 
     avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_cu,
                                                                       agg_coloc_pred=pred_mc,
@@ -140,6 +139,14 @@ for count, test_value in enumerate(np.linspace(0.001, 0.08, 80)):
     acc_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction, 
                         num_nan, frac_nan, test_value)
     acc_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction, 
+                        num_nan, frac_nan, test_value)
+    
+    avail, trans, _ = iie.evaluation.metrics.coloc_top_acc_iid(latent=pred_mc,
+                                                               agg_coloc_pred=pred_mc,
+                                                               colocs=colocs, 
+                                                               top=top_acc)
+    acc_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 
+                        fraction, # We use the fraction as computeed by methods with a latent space
                         num_nan, frac_nan, test_value)
 
     avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_iid(latent=coloc_gnn_t, 
@@ -185,3 +192,5 @@ for count, test_value in enumerate(np.linspace(0.001, 0.08, 80)):
 
     acc_perf.get_df().to_csv(acc_file)
     mse_perf.get_df().to_csv(mse_file)
+
+# %%
