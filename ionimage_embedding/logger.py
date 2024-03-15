@@ -64,9 +64,10 @@ class DictLogger(Logger):
 
 class PerformanceLogger:
     
-    def __init__(self, *args):
+    def __init__(self, *args, verbose: bool=False):
 
         self.keys = args
+        self.verbose = verbose
         
         self.data = {k: [] for k in self.keys}
 
@@ -75,9 +76,18 @@ class PerformanceLogger:
             raise ValueError('Number of arguments does not match number of keys')
         for i, k in enumerate(self.keys):
             self.data[k].append(args[i])
+        
+        if self.verbose:
+            print('Added result:')
+            self.print_last()
+            print('')
 
     def get_keys(self):
         return self.keys
 
     def get_df(self):
         return pd.DataFrame(self.data)
+    
+    def print_last(self):
+        for k in self.data:
+            print(f'{k}: {self.data[k][-1]}')
