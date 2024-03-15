@@ -261,7 +261,7 @@ ax2.set_ylabel(f'MSE (Transitivity)')
 sns.despine(offset=5, trim=False, ax=ax2)
 
 #plt.show()
-plt.savefig('/g/alexandr/tim/tmp/mse_df_fig.pdf', bbox_inches='tight')
+# plt.savefig('/g/alexandr/tim/tmp/mse_df_fig.pdf', bbox_inches='tight')
 
 # %%
 plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')
