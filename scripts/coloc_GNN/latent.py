@@ -17,7 +17,7 @@ except ImportError:
 
 
 import numpy as np
-
+import mlflow
 import ionimage_embedding as iie
 
 
@@ -138,6 +138,51 @@ avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_gnn(coloc_gnn_t,
 print('Available: ', avail)
 print('Transitivity: ', trans)
 print('Fraction: ', fraction)
+
+# %%
+# saving model with mlflow
+
+mlflow.set_tracking_uri(uri="file:///scratch/model_testing/mlruns")
+
+mlflow.set_experiment('latent_test_1')
+
+
+# %%
+with mlflow.start_run() as run:
+    artifact_uri = run.info.artifact_uri
+    # Log the model
+    model_info = mlflow.pytorch.log_model(model.model, "GNNmodel")
+
+    mlflow.log_dict({int(k): v for k, v in dat.dsl_int_mapper.items()}, "dsl_int_mapper.json")
+    mlflow.log_dict({int(k): v for k, v in dat.ion_int_mapper.items()}, "ion_int_mapper.json")
+
+# %%
+# Load model & mapper
+loaded_model = mlflow.pytorch.load_model(model_info.model_uri)
+dsl_int_mapper = mlflow.artifacts.load_dict(artifact_uri + "/dsl_int_mapper.json")
+ion_int_mapper = mlflow.artifacts.load_dict(artifact_uri + "/ion_int_mapper.json")
+
+model.model = loaded_model
+
+# %%
+# ##########
+# Evaluation
+# ##########
+pred_mc, _ = iie.evaluation.utils_gnn.mean_coloc_test(dat)
+
+pred_gnn_t = iie.evaluation.latent.latent_gnn(model, dat, graph='training')
+coloc_gnn_t = iie.evaluation.latent.latent_colocinference(
+    pred_gnn_t, 
+    iie.evaluation.utils_gnn.coloc_ion_labels(dat, dat._test_set)
+    )
+
+avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_gnn(coloc_gnn_t, 
+                                                                  dat, pred_mc, top=top_acc)
+print('Available: ', avail)
+print('Transitivity: ', trans)
+print('Fraction: ', fraction)
+
+
 
 
 
