@@ -1,3 +1,7 @@
+# This file contains code from the following repository:
+# https://github.com/tdrose/deep_mzClustering, 2023, MIT License
+# Specifically from the file: mz_clustering/pseudo_labeling.py (commit: 8a4ffcb)
+
 import torch
 import torch.nn as nn
 from typing import Tuple, Optional, Union

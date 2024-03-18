@@ -1,3 +1,7 @@
+# This file contains code from the following repository:
+# https://github.com/DanGuo1223/mzClustering, 2022, MIT License
+# Specifically from the file: python/mz_clustering/clustering.py (commit: 3208c61)
+
 from typing import Optional, Literal, List, Union
 
 import torch
