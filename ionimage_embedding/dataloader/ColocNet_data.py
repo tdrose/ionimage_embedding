@@ -35,7 +35,8 @@ class ColocNetData_discrete:
                  ion_int_mapper: Optional[Dict[int, str]]=None,
                  atom_mapper: Optional[Dict[str, int]]=None,
                  n_ions: Optional[int]=None,
-                 force_reload: bool=False
+                 force_reload: bool=False,
+                 scale_atomcounts: bool=True
                 ) -> None:
         
         if min_images < top_k + bottom_k:
@@ -54,6 +55,7 @@ class ColocNetData_discrete:
         self.min_images = min_images
         self.maxzero = maxzero
         self.random_network = random_network
+        self.scale_atomcounts = scale_atomcounts
 
 
         cache_hex = cache_hashing(dataset_ids, colocml_preprocessing, db, fdr, scale_intensity,
@@ -83,7 +85,7 @@ class ColocNetData_discrete:
                 colocml_preprocessing=colocml_preprocessing,
                 batch_size=batch_size, cache=cache_images, 
                 cache_folder=cache_folder, knn=False,
-                min_images=min_images, maxzero=maxzero)
+                min_images=min_images, maxzero=maxzero, scale_atomcounts=self.scale_atomcounts)
         
             colocs = get_coloc_model(iidata)
 
