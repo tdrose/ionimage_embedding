@@ -17,6 +17,7 @@
 #SBATCH --mail-user=tim.rose@embl.de                           # send-to address
 
 module load CUDA/12.2.0
+module load GCC/13.2.0
 module load Anaconda3
 conda_path=$(which conda)
 conda_dir=$(dirname $conda_path)
