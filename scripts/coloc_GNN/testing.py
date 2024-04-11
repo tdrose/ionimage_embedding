@@ -103,8 +103,8 @@ lr = 0.005945
 dat = iie.dataloader.ColocNet_data.ColocNetData_discrete(DSID, test=test, val=val, 
                     cache_images=True, cache_folder=iie.constants.CACHE_FOLDER,
                     colocml_preprocessing=True, 
-                    fdr=.1, batch_size=1, min_images=min_images, maxzero=.9,
-                    top_k=top_k, bottom_k=bottom_k, random_network=False
+                    fdr=.1, batch_size=1, min_images=min_images, maxzero=.9, force_reload=False,
+                    top_k=top_k, bottom_k=bottom_k, random_network=False, scale_atomcounts=False
                     )
 
 
