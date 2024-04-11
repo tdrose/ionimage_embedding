@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as T
 import torch
 
-from .utils import pairwise_same_elements, run_knn, get_data
+from .utils import pairwise_same_elements, run_knn, get_data, get_atom_counts, get_atom_mapper
 from ..torch_datasets.mzImageDataset import mzImageDataset
 
 
@@ -20,7 +20,8 @@ class IonImagedata_random:
                  colocml_preprocessing: bool=True,
                  k: int=10, knn: bool=True, batch_size: int=128,
                  cache: bool=False, cache_folder: str='/scratch/model_testing', min_images: int=5, 
-                 maxzero: float=.95, vitb16_compatible: bool=False, force_size: Optional[int]=None
+                 maxzero: float=.95, vitb16_compatible: bool=False, force_size: Optional[int]=None,
+                 scale_atomcounts: bool=True
                 ):
         
         self.dataset_ids = dataset_ids
@@ -35,14 +36,15 @@ class IonImagedata_random:
         self.knn_adj: Optional[torch.Tensor] = None
         
         # Get data
-        data, dataset_labels, ion_labels = get_data(dataset_ids=dataset_ids, cache=cache, 
-                                                    cache_folder=cache_folder, db=db, fdr=fdr, 
-                                                    scale_intensity=scale_intensity, 
-                                                    colocml_preprocessing=colocml_preprocessing,
-                                                    maxzero=maxzero, 
-                                                    vitb16_compatible=vitb16_compatible, 
-                                                    force_size=force_size, min_images=min_images)
+        tmp = get_data(dataset_ids=dataset_ids, cache=cache, 
+                       cache_folder=cache_folder, db=db, fdr=fdr, 
+                       scale_intensity=scale_intensity, 
+                       colocml_preprocessing=colocml_preprocessing,
+                       maxzero=maxzero, 
+                       vitb16_compatible=vitb16_compatible, 
+                       force_size=force_size, min_images=min_images)
         
+        data, dataset_labels, ion_labels, ion_composition = tmp
         # Normalize images
         data = self.image_normalization(data)
         
@@ -67,7 +69,13 @@ class IonImagedata_random:
             idx = np.arange(len(ion_labels))[mask][0]
             self.ion_int_mapper[ill_int.detach().cpu().numpy()[idx]] = ionid
         
+
+        # Encoding for ion composition
+        self.atom_mapper = get_atom_mapper(ion_composition)
+        atom_counts = torch.tensor(get_atom_counts(ion_composition, self.atom_mapper, 
+                                   scale=scale_atomcounts))
         
+
         # self.data = data
         print(data.shape)
         self.height = data.shape[1]
@@ -76,6 +84,7 @@ class IonImagedata_random:
         self.full_dataset = mzImageDataset(images=data, 
                                            dataset_labels=dsl_int,
                                            ion_labels=ill_int,
+                                           ion_composition=atom_counts,
                                            height=self.height,
                                            width=self.width,
                                            index=np.arange(len(data)),
@@ -99,8 +108,10 @@ class IonImagedata_random:
             tmp_mask[test_mask] = 0
             tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, 
                                   dsl=self.full_dataset.dataset_labels, 
-                                  ill=self.full_dataset.ion_labels)
-            tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
+                                  ill=self.full_dataset.ion_labels, 
+                                  comp=self.full_dataset.ion_composition)
+            (tmp_data, tmp_dls, tmp_ill, tmp_index, tmp_comp, 
+             test_data, test_dls, test_ill, test_index, test_comp) = tmp
             
             # Train val split
             val_mask = np.random.choice(tmp_data.shape[0], 
@@ -108,8 +119,10 @@ class IonImagedata_random:
                                         replace=False)
             train_mask = np.ones(len(tmp_data), bool)
             train_mask[val_mask] = 0
-            tmp = self.split_data(mask=train_mask, data=tmp_data, dsl=tmp_dls, ill=tmp_ill)
-            train_data, train_dls, train_ill, train_idx, val_data, val_dls, val_ill, val_idx = tmp
+            tmp = self.split_data(mask=train_mask, data=tmp_data, 
+                                  dsl=tmp_dls, ill=tmp_ill, comp=tmp_comp)
+            (train_data, train_dls, train_ill, train_idx, train_comp, 
+             val_data, val_dls, val_ill, val_idx, val_comp) = tmp
             
             # compute KNN and ion_label_mat (For combined train/val data)
             if self.knn:
@@ -123,6 +136,7 @@ class IonImagedata_random:
             self.train_dataset = mzImageDataset(images=train_data, 
                                                 dataset_labels=train_dls,
                                                 ion_labels=train_ill,
+                                                ion_composition=train_comp,
                                                 height=self.height,
                                                 width=self.width,
                                                 index=train_idx,
@@ -131,6 +145,7 @@ class IonImagedata_random:
             self.val_dataset = mzImageDataset(images=val_data, 
                                               dataset_labels=val_dls,
                                               ion_labels=val_ill,
+                                              ion_composition=val_comp,
                                               height=self.height,
                                               width=self.width,
                                               index=val_idx,
@@ -139,12 +154,13 @@ class IonImagedata_random:
             self.test_dataset = mzImageDataset(images=test_data, 
                                                dataset_labels=test_dls,
                                                ion_labels=test_ill,
+                                               ion_composition=test_comp,
                                                height=self.height,
                                                width=self.width,
                                                index=test_index,
                                                transform=self.transformations)
 
-    def split_data(self, mask, data, dsl, ill):
+    def split_data(self, mask, data, dsl, ill, comp):
         
         reverse_mask = ~mask
         n_samples = len(data)
@@ -152,15 +168,17 @@ class IonImagedata_random:
         split1_data = data[mask]
         split1_dls = dsl[mask]
         split1_ill = ill[mask]
+        split1_comp = comp[mask]
         split1_index = np.arange(n_samples)[mask]
         
         split2_data = data[reverse_mask]
         split2_dls = dsl[reverse_mask]
         split2_ill = ill[reverse_mask]
+        split2_comp = comp[reverse_mask]
         split2_index = np.arange(n_samples)[reverse_mask]
         
-        return (split1_data, split1_dls, split1_ill, split1_index, split2_data, 
-                split2_dls, split2_ill, split2_index)
+        return (split1_data, split1_dls, split1_ill, split1_index, split1_comp, split2_data, 
+                split2_dls, split2_ill, split2_index, split2_comp)
     
     def get_train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, 
@@ -211,7 +229,8 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                  db=('HMDB', 'v4'), fdr=0.2, scale_intensity='TIC', colocml_preprocessing=False,
                  k=10, knn: bool=True, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', min_images=5, 
-                 maxzero: float=.95, vitb16_compatible: bool=False, force_size: Optional[int]=None
+                 maxzero: float=.95, vitb16_compatible: bool=False, force_size: Optional[int]=None,
+                 scale_atomcounts: bool=True
                 ):
         
         if test < 1:
@@ -226,7 +245,7 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                          k=k, knn=knn, batch_size=batch_size,
                          cache=cache, cache_folder=cache_folder, min_images=min_images, 
                          maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
-                         force_size=force_size)
+                         force_size=force_size, scale_atomcounts=scale_atomcounts)
         
         self.sample_sets()
         
@@ -244,8 +263,10 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
             tmp_mask[self.full_dataset.dataset_labels==ds] = 0
         tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, 
                               dsl=self.full_dataset.dataset_labels, 
-                              ill=self.full_dataset.ion_labels)
-        tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
+                              ill=self.full_dataset.ion_labels, 
+                              comp=self.full_dataset.ion_composition)
+        (tmp_data, tmp_dls, tmp_ill, tmp_index, tmp_comp, 
+         test_data, test_dls, test_ill, test_index, test_comp) = tmp
     
         
         # Train val split
@@ -253,8 +274,10 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
                                                                        self.val), replace=False)
         train_mask = np.ones(len(tmp_data), bool)
         train_mask[val_mask] = 0
-        tmp = self.split_data(mask=train_mask, data=tmp_data, dsl=tmp_dls, ill=tmp_ill)
-        train_data, train_dls, train_ill, train_index, val_data, val_dls, val_ill, val_index = tmp
+        tmp = self.split_data(mask=train_mask, data=tmp_data, 
+                              dsl=tmp_dls, ill=tmp_ill, comp=tmp_comp)
+        (train_data, train_dls, train_ill, train_index, train_comp, 
+         val_data, val_dls, val_ill, val_index, val_comp) = tmp
 
         # compute KNN and ion_label_mat (For combined train/val data)
         if self.knn:
@@ -267,6 +290,7 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
         self.train_dataset = mzImageDataset(images=train_data, 
                                             dataset_labels=train_dls,
                                             ion_labels=train_ill,
+                                            ion_composition=train_comp,
                                             height=self.height,
                                             width=self.width,
                                             index=train_index,
@@ -275,6 +299,7 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
         self.val_dataset = mzImageDataset(images=val_data, 
                                           dataset_labels=val_dls,
                                           ion_labels=val_ill,
+                                          ion_composition=val_comp,
                                           height=self.height,
                                           width=self.width,
                                           index=val_index,
@@ -283,6 +308,7 @@ class IonImagedata_leaveOutDataSet(IonImagedata_random):
         self.test_dataset = mzImageDataset(images=test_data, 
                                            dataset_labels=test_dls,
                                            ion_labels=test_ill,
+                                           ion_composition=test_comp,
                                            height=self.height,
                                            width=self.width,
                                            index=test_index,
@@ -298,7 +324,7 @@ class IonImagedata_transitivity(IonImagedata_random):
                  k=10, knn: bool=True, batch_size=128,
                  cache=False, cache_folder='/scratch/model_testing', 
                  min_images=5, min_codetection=2, maxzero: float=.95, vitb16_compatible: bool=False, 
-                 force_size: Optional[int]=None
+                 force_size: Optional[int]=None, scale_atomcounts: bool=True
                 ):
             
         super().__init__(dataset_ids=dataset_ids, test=.3, val=val, 
@@ -308,7 +334,7 @@ class IonImagedata_transitivity(IonImagedata_random):
                          k=k, knn=knn, batch_size=batch_size,
                          cache=cache, cache_folder=cache_folder, min_images=min_images, 
                          maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
-                         force_size=force_size)
+                         force_size=force_size, scale_atomcounts=scale_atomcounts)
         
         self.min_codetection=min_codetection
         self.transitivity_test = test
@@ -327,8 +353,10 @@ class IonImagedata_transitivity(IonImagedata_random):
                                          dsl=self.full_dataset.dataset_labels)
         tmp = self.split_data(mask=tmp_mask, data=self.full_dataset.images, 
                               dsl=self.full_dataset.dataset_labels, 
-                              ill=self.full_dataset.ion_labels)
-        tmp_data, tmp_dls, tmp_ill, tmp_index, test_data, test_dls, test_ill, test_index = tmp
+                              ill=self.full_dataset.ion_labels, 
+                              comp=self.full_dataset.ion_composition)
+        (tmp_data, tmp_dls, tmp_ill, tmp_index, tmp_comp, 
+         test_data, test_dls, test_ill, test_index, test_comp) = tmp
     
         
         # Train val split
@@ -336,8 +364,10 @@ class IonImagedata_transitivity(IonImagedata_random):
                                                                        self.val), replace=False)
         train_mask = np.ones(len(tmp_data), bool)
         train_mask[val_mask] = 0
-        tmp = self.split_data(mask=train_mask, data=tmp_data, dsl=tmp_dls, ill=tmp_ill)
-        train_data, train_dls, train_ill, train_index, val_data, val_dls, val_ill, val_index = tmp
+        tmp = self.split_data(mask=train_mask, data=tmp_data, 
+                              dsl=tmp_dls, ill=tmp_ill, comp=tmp_comp)
+        (train_data, train_dls, train_ill, train_index, train_comp, 
+         val_data, val_dls, val_ill, val_index, val_comp) = tmp
 
         # compute KNN and ion_label_mat (For combined train/val data)
         if self.knn:
@@ -350,6 +380,7 @@ class IonImagedata_transitivity(IonImagedata_random):
         self.train_dataset = mzImageDataset(images=train_data, 
                                             dataset_labels=train_dls,
                                             ion_labels=train_ill,
+                                            ion_composition=train_comp,
                                             height=self.height,
                                             width=self.width,
                                             index=train_index,
@@ -358,6 +389,7 @@ class IonImagedata_transitivity(IonImagedata_random):
         self.val_dataset = mzImageDataset(images=val_data, 
                                           dataset_labels=val_dls,
                                           ion_labels=val_ill,
+                                          ion_composition=val_comp,
                                           height=self.height,
                                           width=self.width,
                                           index=val_index,
@@ -366,6 +398,7 @@ class IonImagedata_transitivity(IonImagedata_random):
         self.test_dataset = mzImageDataset(images=test_data, 
                                            dataset_labels=test_dls,
                                            ion_labels=test_ill,
+                                           ion_composition=test_comp,
                                            height=self.height,
                                            width=self.width,
                                            index=test_index,

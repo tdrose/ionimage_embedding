@@ -189,7 +189,7 @@ class infoNCEModel(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         
-        train_x, index, train_datasets, train_ions, untransformed_images = batch
+        train_x, index, train_datasets, train_ions, untransformed_images, _ = batch
 
         
         # self.knn_adj = self.knn_adj.to(self.device)
@@ -228,7 +228,7 @@ class infoNCEModel(pl.LightningModule):
             return loss
     
     def validation_step(self, batch, batch_idx):
-        val_x, index, val_datasets, val_ions, untransformed_images = batch
+        val_x, index, val_datasets, val_ions, untransformed_images, _ = batch
         
         # self.knn_adj = self.knn_adj.to(self.device)
         self.ion_label_mat = self.ion_label_mat.to(self.device)

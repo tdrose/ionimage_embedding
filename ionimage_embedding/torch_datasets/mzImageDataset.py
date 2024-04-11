@@ -13,6 +13,7 @@ class mzImageDataset(Dataset):
                  images,
                  dataset_labels,
                  ion_labels,
+                 ion_composition,
                  height, width,
                  index,
                  # Rotate images
@@ -26,6 +27,7 @@ class mzImageDataset(Dataset):
         self.width = width
         self.transform = transform
         self.index = index
+        self.ion_composition = ion_composition
 
     def __len__(self):
         return len(self.images)
@@ -35,6 +37,7 @@ class mzImageDataset(Dataset):
         transformed_image = torch.Tensor(self.images[idx]).reshape((1, self.height, self.width))
         dataset_label = np.array([self.dataset_labels[idx]])
         ion_label = np.array([self.ion_labels[idx]])
+        ion_comp = np.array(self.ion_composition[idx])
         sample_id = np.array(self.index[idx])
         
         if self.transform is not None:
@@ -42,12 +45,13 @@ class mzImageDataset(Dataset):
 
         untransformed_images = torch.Tensor(self.images[idx]).reshape((1, self.height, self.width))
         
-        return transformed_image, sample_id, dataset_label, ion_label, untransformed_images
+        return transformed_image, sample_id, dataset_label, ion_label, untransformed_images, ion_comp
 
 
 def get_iid_dataloader(images: np.ndarray,
                        dataset_labels: np.ndarray,
                        ion_labels: np.ndarray,
+                       ion_composition,
                        height,
                        width,
                        index,
@@ -60,6 +64,7 @@ def get_iid_dataloader(images: np.ndarray,
     dataset = mzImageDataset(images=images, 
                              dataset_labels=dataset_labels,
                              ion_labels=ion_labels,
+                             ion_composition=ion_composition,
                              height=height,
                              width=width,
                              index=index,

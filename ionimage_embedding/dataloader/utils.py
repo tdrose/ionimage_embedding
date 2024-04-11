@@ -1,11 +1,13 @@
 from metaspace import SMInstance
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import StandardScaler
 from scipy import ndimage
 from typing import Dict, Tuple, List, Optional
 import os
 import uuid
 import pickle
+from molmass import Formula
 
 from ..constants import ION_IMAGE_DATA, DATASET_DATA, COLOC_NET_DISCRETE_DATA
 
@@ -73,18 +75,49 @@ def size_adaption_symmetric(image_dict: Dict[str, np.ndarray],
 
     return out_dict
 
+def get_composition_dict(sumformula: str) -> Dict[str, int]:
+    """
+    Get a dictionary of the composition of an ion formula.
+    """
+    form = Formula(sumformula)
+    out = {}
+    for k in form.composition().keys():
+        out[k] = form.composition()[k].count
+
+    return out
+
+def get_atom_mapper(comps: np.ndarray) -> Dict[str, int]:
+    atoms = np.unique([k for x in comps for k in x.keys()])
+    atom_mapper = {a: i for i, a in enumerate(atoms)}
+    return atom_mapper
+
+def get_atom_counts(comps: np.ndarray, 
+                    atom_mapper: Dict[str, int], 
+                    scale: bool=True) -> np.ndarray:
+    atom_counts = np.zeros((len(comps), len(atom_mapper)))
+    for i, comp in enumerate(comps):
+        for k, v in comp.items():
+            atom_counts[i, atom_mapper[k]] = v
+
+    if scale:
+        atom_counts = StandardScaler().fit_transform(atom_counts)
+
+    return atom_counts
+
+
 def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: float=0.2, 
                   scale_intensity: str='TIC', 
                   colocml_preprocessing: bool=False, maxzero: float=.95, 
                   vitb16_compatible: bool=False, 
                   force_size: Optional[int]=None,
-                  min_images: int=5) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                  min_images: int=5, ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     
     sm = SMInstance()
     
     training_results = {}
     training_images = {}
     training_if = {}
+    training_ioncomposition = {}
     
     for k in ds_ids:
         ds = sm.dataset(id=k)
@@ -97,6 +130,7 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
         onsample = dict(zip(results['formula'].str.cat(results['adduct']), ~results['offSample']))
         formula = [x.formula+x.adduct for x in tmp if onsample[x.formula+x.adduct]]
         tmp = np.array([x._images[0] for x in tmp if onsample[x.formula+x.adduct]])
+        composition = [get_composition_dict(x) for x in formula]
 
         if colocml_preprocessing:
             a = ndimage.median_filter(tmp, size=(1,3,3))
@@ -107,6 +141,7 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
 
         training_images[k] = tmp
         training_if[k] = formula
+        training_ioncomposition[k] = composition
     
     # Transform all images to squares of the same size
     padding_images = size_adaption_symmetric(training_images, 
@@ -116,16 +151,19 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
     training_data = []
     training_datasets = [] 
     training_ions = []
+    training_composition = []
     
     for dsid, imgs in padding_images.items():
         if imgs.shape[0] >= min_images:
             training_data.append(imgs)
             training_datasets += [dsid] * imgs.shape[0]
             training_ions += training_if[dsid]
+            training_composition += training_ioncomposition[dsid]
         
     training_data = np.concatenate(training_data)
     training_datasets = np.array(training_datasets)
     training_ions = np.array(training_ions)
+    training_composition = np.array(training_composition)
 
     # Filter out images that are mainly zero
     imgsize = training_data.shape[1]*training_data.shape[2]
@@ -135,6 +173,7 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
     training_data = training_data[~zero_mask]
     training_datasets = training_datasets[~zero_mask]
     training_ions = training_ions[~zero_mask]
+    training_composition = training_composition[~zero_mask]
 
     # Remove images from datasets with less than min_images
     dataset_counts = np.unique(training_datasets, return_counts=True)
@@ -142,8 +181,10 @@ def download_data(ds_ids: List[str], db: Tuple[str, str]=("HMDB", "v4"), fdr: fl
     training_data = training_data[mask]
     training_datasets = training_datasets[mask]
     training_ions = training_ions[mask]
+    training_composition = training_composition[mask]
 
-    return training_data, training_datasets, training_ions
+    return training_data, training_datasets, training_ions, training_composition
+
 
 def cache_hashing(dataset_ids: List[str], colocml_preprocessing: bool,
                   db: Tuple[str, str], fdr: float, scale_intensity: str,
@@ -168,6 +209,7 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
              min_images: int=5,
              maxzero: float=.95, vitb16_compatible: bool=False) -> Tuple[np.ndarray,
                                                                          np.ndarray,
+                                                                         np.ndarray,
                                                                          np.ndarray]:
     if cache:
         # make hash of datasets
@@ -188,9 +230,9 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
                                 colocml_preprocessing=colocml_preprocessing, 
                                 maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
                                 force_size=force_size, min_images=min_images)
-            data, dataset_labels, ion_labels = tmp
+            data, dataset_labels, ion_labels, ion_composition = tmp
 
-            pickle.dump((data, dataset_labels, ion_labels), 
+            pickle.dump((data, dataset_labels, ion_labels, ion_composition), 
                         open(os.path.join(cache_folder, cache_file), "wb"))
             print('Saved file: {}'.format(os.path.join(cache_folder, cache_file)))      
         
@@ -198,15 +240,15 @@ def get_data(dataset_ids: List[str], cache: bool=True, cache_folder: str='cache'
         else:
             print('Loading cached data from: {}'.format(os.path.join(cache_folder, cache_file)))
             tmp = pickle.load(open(os.path.join(cache_folder, cache_file), "rb" ) )
-            data, dataset_labels, ion_labels = tmp
+            data, dataset_labels, ion_labels, ion_composition = tmp
     else:
         tmp = download_data(dataset_ids, db=db, fdr=fdr, scale_intensity=scale_intensity, 
                             colocml_preprocessing=colocml_preprocessing, 
                             maxzero=maxzero, vitb16_compatible=vitb16_compatible, 
                             force_size=force_size, min_images=min_images)
-        data, dataset_labels, ion_labels = tmp
+        data, dataset_labels, ion_labels, ion_composition = tmp
 
-    return data, dataset_labels, ion_labels
+    return data, dataset_labels, ion_labels, ion_composition
 
 
 def purge_cache(cache_folder: str='cache'):

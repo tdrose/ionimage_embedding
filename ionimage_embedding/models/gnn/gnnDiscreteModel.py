@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 import lightning.pytorch as pl
 import torch
@@ -86,19 +86,21 @@ class GCNEncoder(torch.nn.Module):
 class gnnDiscreteModel(pl.LightningModule):
 
     embedding_dims: int
+    gae: colocGAE
 
     def __init__(self, n_ions: int, latent_dims: int=10,
-                  encoding: Literal['onehot', 'learned']= 'onehot',
+                  encoding: Literal['onehot', 'learned', 'atom_composition']= 'onehot',
                   loss: Literal['recon', 'coloc'] = 'recon',
                   activation: Literal['softmax', 'relu', 'sigmoid', 'none']='none',
                   num_layers: int=2,
                   embedding_dims: int=10, lr=1e-3,
-                  gnn_layer_type: Literal['GCNConv', 'GATv2Conv', 'GraphConv'] = 'GCNConv'
+                  gnn_layer_type: Literal['GCNConv', 'GATv2Conv', 'GraphConv'] = 'GCNConv',
+                  hidden_factor: float=0.5
                   ):     
         super(gnnDiscreteModel, self).__init__()
 
         self.n_ions = n_ions
-        self.encoding: Literal['onehot', 'learned'] = encoding
+        self.encoding: Literal['onehot', 'learned', 'atom_composition'] = encoding
         self.latent_dims = latent_dims
         self.loss: Literal['recon', 'coloc'] = loss
         self.lr = lr
@@ -111,24 +113,29 @@ class gnnDiscreteModel(pl.LightningModule):
             self.embedding = torch.nn.Embedding(self.n_ions, embedding_dims, 
                                                 device=self.device)
             self.embedding_dims = embedding_dims
+        elif self.encoding == 'atom_composition':
+            self.embedding = self.atom_composition
+            self.embedding_dims = embedding_dims
         else:
             raise ValueError('encoding must be one of "onehot" or "learned"')
         
         # Set GAE model
-        hidden_channels = self.embedding_dims//2
-        if hidden_channels < latent_dims:
-            hidden_channels = latent_dims*2
+        hidden_channels = int(self.embedding_dims * hidden_factor)
         
         self.gae = colocGAE(GCNEncoder(in_channels=self.embedding_dims, 
-                                       hidden_channels=self.embedding_dims//2, 
+                                       hidden_channels=hidden_channels, 
                                        out_channels=self.latent_dims, 
                                        activation=activation, num_layers=num_layers, 
                                        gnn_layer_type=gnn_layer_type))
 
-    def onehot(self, x: torch.Tensor) -> torch.Tensor:
+    def onehot(self, x: torch.Tensor, ion_comp: torch.Tensor) -> torch.Tensor:
         return torch.nn.functional.one_hot(x, num_classes=self.n_ions).float().to(self.device)
     
-    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor) -> torch.Tensor:
+    def atom_composition(self, x: torch.Tensor, ion_comp: torch.Tensor) -> torch.Tensor:
+        return ion_comp.float().to(self.device)
+    
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, 
+                edge_attr: torch.Tensor, ion_comp: torch.Tensor) -> torch.Tensor:
         #print('x: ', x)
         #print('x.shape: ', x.shape)
         #print('edge_index: ', edge_index)
@@ -136,7 +143,7 @@ class gnnDiscreteModel(pl.LightningModule):
         #print('edge_attr: ', edge_attr)
         #print('edge_attr.shape: ', edge_attr.shape)
 
-        x = self.embedding(x)
+        x = self.embedding(x, ion_comp)
         #print('x: ', x)
         #print('x.shape: ', x.shape)
         return self.gae(x, edge_index, edge_attr)
@@ -153,7 +160,7 @@ class gnnDiscreteModel(pl.LightningModule):
                 raise ValueError('loss must be one of "recon" or "coloc"')
     
     def training_step(self, batch, batch_idx):
-        z = self.forward(batch.x, batch.edge_index, batch.edge_attr)
+        z = self.forward(batch.x, batch.edge_index, batch.edge_attr, batch.ion_comp)
         
         loss = self.get_loss(z, batch.edge_index, batch.neg_edge_index, 
                              batch.edge_attr, batch.neg_edge_weights)
@@ -164,7 +171,7 @@ class gnnDiscreteModel(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
-        z = self.forward(batch.x, batch.edge_index, batch.edge_attr)
+        z = self.forward(batch.x, batch.edge_index, batch.edge_attr, batch.ion_comp)
         
         loss = self.get_loss(z, batch.edge_index, batch.neg_edge_index, 
                              batch.edge_attr, batch.neg_edge_weights)

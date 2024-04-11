@@ -16,7 +16,8 @@ def get_GraphData(
         neg_edge_list: torch.Tensor,
         pos_edge_weights: torch.Tensor,
         neg_edge_weights: torch.Tensor,
-        ds_label: torch.Tensor
+        ds_label: torch.Tensor,
+        ion_comp: torch.Tensor
              ) -> Data:
     
     return Data(x=node_labels,
@@ -24,7 +25,8 @@ def get_GraphData(
                 neg_edge_index=neg_edge_list,
                 edge_attr=pos_edge_weights,
                 neg_edge_weights=neg_edge_weights,
-                ds_label=ds_label)
+                ds_label=ds_label,
+                ion_comp=ion_comp)
 
 
 
@@ -32,7 +34,8 @@ class ColocNetDiscreteDataset(InMemoryDataset):
     
     def __init__(self, path: str, name: str,
                  top_k: int, bottom_k: int, min_ion_count: int,
-                 ion_labels: torch.Tensor, ds_labels: torch.Tensor, 
+                 ion_labels: torch.Tensor, ds_labels: torch.Tensor,
+                 ion_composition: torch.Tensor, 
                  coloc: Dict[int, pd.DataFrame], random_network: bool=False) -> None:
         
         self.name = name
@@ -40,6 +43,7 @@ class ColocNetDiscreteDataset(InMemoryDataset):
         self.bottom_k = bottom_k
         self.ion_labels = ion_labels
         self.ds_labels = ds_labels
+        self.ion_composition = ion_composition
         self.coloc_dict = coloc
         self.min_ion_count = min_ion_count
         self.random_network = random_network
@@ -86,7 +90,12 @@ class ColocNetDiscreteDataset(InMemoryDataset):
                 # Convert to numpy
                 numpy_ion_labels = np.unique(masked_ill.cpu().detach().numpy())
                 # Sort ion labels
-                sorted_ion_labels = np.sort(numpy_ion_labels)
+                sorting = np.argsort(numpy_ion_labels)
+                sorted_ion_labels = numpy_ion_labels[sorting]
+
+                # Composition sorted in the same way as the ion labels
+                ion_comp = self.ion_composition[mask]
+                sorted_ion_comp = ion_comp[sorting]
                 
                 # Subset coloc to the correct datasets
                 carray = np.array(coloc.loc[sorted_ion_labels, sorted_ion_labels]) # type: ignore
@@ -123,11 +132,12 @@ class ColocNetDiscreteDataset(InMemoryDataset):
 
 
                 data = get_GraphData(node_labels=torch.tensor(sorted_ion_labels),
-                                    pos_edge_list=torch.tensor(pos_edges).transpose(0, 1),
-                                    neg_edge_list=torch.tensor(neg_edges).transpose(0, 1),
-                                    pos_edge_weights=torch.tensor(pos_edge_weights),
-                                    neg_edge_weights=torch.tensor(neg_edge_weights),
-                                    ds_label=torch.tensor([dsid]*len(sorted_ion_labels))
+                                     pos_edge_list=torch.tensor(pos_edges).transpose(0, 1),
+                                     neg_edge_list=torch.tensor(neg_edges).transpose(0, 1),
+                                     pos_edge_weights=torch.tensor(pos_edge_weights),
+                                     neg_edge_weights=torch.tensor(neg_edge_weights),
+                                     ds_label=torch.tensor([dsid]*len(sorted_ion_labels)),
+                                     ion_comp=torch.tensor(sorted_ion_comp)
                                     )
                 
                 data_list.append(data)

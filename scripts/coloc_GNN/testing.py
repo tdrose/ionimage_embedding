@@ -19,8 +19,57 @@ except ImportError:
 import numpy as np
 import pickle
 import os.path as osp
+from typing import Literal
 
 import ionimage_embedding as iie
+
+# %%
+import os
+os.system('nvidia-smi')
+
+
+# %%
+from molmass import Formula
+from metaspace import SMInstance
+from typing import Dict
+from sklearn.preprocessing import StandardScaler
+
+sm = SMInstance()
+
+ds = sm.dataset(id='2021-12-09_20h48m20s')
+results = ds.results().reset_index()
+ai = ds.all_annotation_images()
+
+# %%
+def get_composition_dict(sumformula: str) -> Dict[str, int]:
+    form = Formula(sumformula)
+    out = {}
+    for k in form.composition().keys():
+        out[k] = form.composition()[k].count
+
+    return out
+
+comps = np.array([get_composition_dict(x.formula+x.adduct) for x in ai])
+
+# Create mapper:
+def get_atom_mapper(comps):
+    atoms = np.unique([k for x in comps for k in x.keys()])
+    atom_mapper = {a: i for i, a in enumerate(atoms)}
+    return atom_mapper
+
+def get_atom_counts(comps, atom_mapper):
+    out = np.zeros((len(comps), len(atom_mapper)))
+    for i, comp in enumerate(comps):
+        for k, v in comp.items():
+            out[i, atom_mapper[k]] = v
+    return out
+
+atom_mapper = get_atom_mapper(comps)
+
+atom_counts = get_atom_counts(comps, atom_mapper)
+
+scaled_counts = StandardScaler().fit_transform(atom_counts)
+print(scaled_counts)
 
 # %%
 # #####################
@@ -37,12 +86,12 @@ top_acc = 3
 # Dataset
 DSID = iie.datasets.KIDNEY_LARGE
 # Number of bootstraps
-N_BOOTSTRAPS = 100
+N_BOOTSTRAPS = 10
 
 latent_size = 27
 top_k = 2
 bottom_k = 2
-encoding = 'onehot'
+encoding: Literal['onehot', 'learned', 'atom_composition'] = 'atom_composition'
 early_stopping_patience = 2
 gnn_layer_type = 'GATv2Conv'
 loss_type = 'coloc'
@@ -81,7 +130,8 @@ for i in range(N_BOOTSTRAPS):
                         loss=loss_type, # type: ignore
                         activation='none', 
                         num_layers=num_layers,
-                        gnn_layer_type=gnn_layer_type) # type: ignore
+                        gnn_layer_type=gnn_layer_type,
+                        hidden_factor=3) # type: ignore
 
 
     _ = model.train()

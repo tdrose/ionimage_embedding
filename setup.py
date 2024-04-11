@@ -38,7 +38,8 @@ setup(
         'umap-learn',
         'open_clip_torch>=2.23.0', # Known bug in model loading, fixed in version 0.23.0
         'torch_geometric',
-        'rdkit'
+        'rdkit',
+        'molmass'
     ],
     
     python_requires=">=3.8",

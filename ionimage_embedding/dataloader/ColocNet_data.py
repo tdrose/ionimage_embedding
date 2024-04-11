@@ -29,9 +29,11 @@ class ColocNetData_discrete:
                  use_precomputed: bool=False,
                  ion_labels: Optional[torch.Tensor]=None,
                  ds_labels: Optional[torch.Tensor]=None,
+                 ion_composition: Optional[torch.Tensor]=None,
                  coloc: Optional[Dict[int, pd.DataFrame]]=None,
                  dsl_int_mapper: Optional[Dict[int, str]]=None,
                  ion_int_mapper: Optional[Dict[int, str]]=None,
+                 atom_mapper: Optional[Dict[str, int]]=None,
                  n_ions: Optional[int]=None,
                  force_reload: bool=False
                 ) -> None:
@@ -87,33 +89,41 @@ class ColocNetData_discrete:
 
             # Extract the list of unique ion labels from the colocs
             
-
             ion_labels = iidata.full_dataset.ion_labels
             ds_labels = iidata.full_dataset.dataset_labels
+            ion_comp = iidata.full_dataset.ion_composition
             coloc = colocs.full_coloc
 
             self.dsl_int_mapper = iidata.dsl_int_mapper
             self.ion_int_mapper = iidata.ion_int_mapper
+            self.atom_mapper = iidata.atom_mapper
+
+            
             self.n_ions = ion_labels.unique().shape[0]
 
         else:
             if ion_labels is None or ds_labels is None or coloc is None or \
-                dsl_int_mapper is None or ion_int_mapper is None or n_ions is None:
+               dsl_int_mapper is None or ion_int_mapper is None or \
+               n_ions is None or atom_mapper is None or ion_composition is None:
                 
                 raise ValueError('If use_precomputed is True, ion_labels, '
-                                 'ds_labels and coloc must be provided.')
+                                 'ds_labels, coloc, atom_mapper, and ion_composition'
+                                 ' must be provided.')
 
             self.dsl_int_mapper = dsl_int_mapper
             self.ion_int_mapper = ion_int_mapper
+            self.atom_mapper = atom_mapper
             self.n_ions = n_ions
         
-
+        self.atom_dims = ion_comp.shape[1]
+        
         self.dataset = ColocNetDiscreteDataset(path=cache_folder,
                                                name=self.dataset_file,
                                                top_k=self.top_k, bottom_k=self.bottom_k,
                                                min_ion_count=min_images,
                                                ion_labels=ion_labels,
                                                ds_labels=ds_labels,
+                                               ion_composition=ion_comp,
                                                coloc=coloc, 
                                                random_network=random_network)
 
@@ -149,9 +159,11 @@ class ColocNetData_discrete:
             use_precomputed=True, # Important
             ion_labels=self.dataset.ion_labels,
             ds_labels=self.dataset.ds_labels,
+            ion_composition=self.dataset.ion_composition,
             coloc=self.dataset.coloc_dict,
             dsl_int_mapper=self.dsl_int_mapper,
-            ion_int_mapper=self.ion_int_mapper
+            ion_int_mapper=self.ion_int_mapper,
+            atom_mapper=self.atom_mapper
             )
         
         # Copy the sets

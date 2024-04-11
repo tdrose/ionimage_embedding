@@ -20,20 +20,21 @@ class gnnDiscrete:
     model: Optional[gnnDiscreteModel] = None
 
     def __init__(self, data: ColocNetData_discrete, latent_dims: int=10,
-                 lr=1e3, encoding: Literal['onehot', 'learned']= 'onehot',
+                 lr=1e3, encoding: Literal['onehot', 'learned', 'atom_composition']= 'onehot',
                  embedding_dims: int=10,
                  training_epochs: int = 11, early_stopping_patience: int = 5,
                  lightning_device: str = 'gpu',
                  loss: Literal['recon', 'coloc'] = 'recon',
                  activation: Literal['softmax', 'relu', 'sigmoid', 'none']='none',
-                 num_layers: int=2,
+                 num_layers: int=2, hidden_factor: float=0.5,
                  gnn_layer_type: Literal['GCNConv', 'GATv2Conv', 'GraphConv'] = 'GCNConv'
                  ) -> None:
         
         self.data = data
         self.latent_dims = latent_dims
-        self.encoding: Literal['onehot', 'learned'] = encoding
+        self.encoding: Literal['onehot', 'learned', 'atom_composition'] = encoding
         self.num_layers = num_layers
+        self.hidden_factor = hidden_factor
 
         self.training_epochs = training_epochs
         self.early_stopping_patience = early_stopping_patience
@@ -45,14 +46,20 @@ class gnnDiscrete:
         self.gnn_layer_type: Literal['GCNConv', 'GATv2Conv', 'GraphConv'] = gnn_layer_type
 
     def train(self) -> DictLogger:
+        if self.encoding == 'atom_composition':
+            embedding_dims = self.data.atom_dims
+        else:
+            embedding_dims = self.embedding_dims
+
         self.model = gnnDiscreteModel(n_ions=self.data.n_ions,
                                       latent_dims=self.latent_dims,
                                       encoding=self.encoding,
-                                      embedding_dims=self.embedding_dims,
+                                      embedding_dims=embedding_dims,
                                       lr=self.lr, loss=self.loss, 
                                       activation=self.activation,
                                       num_layers=self.num_layers,
-                                      gnn_layer_type=self.gnn_layer_type)
+                                      gnn_layer_type=self.gnn_layer_type,
+                                      hidden_factor=self.hidden_factor)
         
         dictlogger = DictLogger()
         trainer = pl.Trainer(max_epochs=self.training_epochs, accelerator=self.lightning_device, 
@@ -70,7 +77,7 @@ class gnnDiscrete:
         
     def predict(self, data: Data) -> torch.Tensor:
         self.check_model()
-        return self.model(data.x, data.edge_index, data.edge_attr) # type: ignore
+        return self.model(data.x, data.edge_index, data.edge_attr, data.ion_comp) # type: ignore
     
     def fine_tune(self, data: ColocNetData_discrete, training_epochs: int = 11) -> DictLogger:
         self.check_model()

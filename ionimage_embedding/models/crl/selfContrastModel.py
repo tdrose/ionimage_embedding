@@ -168,7 +168,7 @@ class selfContrastModel(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         
-        train_x, index, train_datasets, train_ions, untransformed_images = batch
+        train_x, index, train_datasets, train_ions, untransformed_images, _ = batch
 
         if self.knn_adj is not None:
             self.knn_adj = self.knn_adj.to(self.device)
@@ -205,7 +205,7 @@ class selfContrastModel(pl.LightningModule):
             return loss
     
     def validation_step(self, batch, batch_idx):
-        val_x, index, val_datasets, val_ions, untransformed_images = batch
+        val_x, index, val_datasets, val_ions, untransformed_images, _ = batch
         
         if self.knn_adj is not None:
             self.knn_adj = self.knn_adj.to(self.device)
