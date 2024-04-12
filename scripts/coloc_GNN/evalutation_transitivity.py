@@ -40,8 +40,8 @@ files = os.listdir('/g/alexandr/tim/')
 acc_files = [f for f in files if f.startswith(acc_file)]
 mse_files = [f for f in files if f.startswith(mse_file)]
 
-acc_perf_df = pd.concat([pd.read_csv(f'/g/alexandr/tim/{f}') for f in acc_files])
-mse_perf_df = pd.concat([pd.read_csv(f'/g/alexandr/tim/{f}') for f in mse_files])
+acc_perf_df = pd.concat([pd.read_csv(f'/g/alexandr/tim/{f}') for f in acc_files if 'encod' not in f])
+mse_perf_df = pd.concat([pd.read_csv(f'/g/alexandr/tim/{f}') for f in mse_files if 'encod' not in f])
 
 
 # %%
@@ -195,6 +195,9 @@ frac = data_df['Fraction'].mean()
 plt.ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 plt.ylim(0, 1)
 plt.show()
+
+
+
 # %%
 # MSE 
 # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
@@ -224,4 +227,21 @@ frac = data_df['Fraction'].mean()
 plt.ylabel(f'MSE (Transitivity)')
 # plt.ylim(0, 1)
 plt.show()
+
+# %%
+
+
+
+acc_file = f'ACC_trans_GNN_'
+mse_file = f'MSE_trans_GNN_'
+
+
+
+files = os.listdir('/g/alexandr/tim/')
+
+acc_files = [f for f in files if f.startswith(acc_file)]
+mse_files = [f for f in files if f.startswith(mse_file)]
+
+acc_perf_df = pd.concat([pd.read_csv(f'/g/alexandr/tim/{f}') for f in acc_files if 'encod' in f])
+mse_perf_df = pd.concat([pd.read_csv(f'/g/alexandr/tim/{f}') for f in mse_files if 'encod' in f])
 # %%
