@@ -110,8 +110,9 @@ class gnnDiscreteModel(pl.LightningModule):
             self.embedding = self.onehot
             self.embedding_dims = self.n_ions
         elif self.encoding == 'learned':
-            self.embedding = torch.nn.Embedding(self.n_ions, embedding_dims, 
-                                                device=self.device)
+            self.torch_embed = torch.nn.Embedding(self.n_ions, embedding_dims, 
+                                                  device=self.device)
+            self.embedding = self.embedding_wrapper
             self.embedding_dims = embedding_dims
         elif self.encoding == 'atom_composition':
             self.embedding = self.atom_composition
@@ -133,6 +134,9 @@ class gnnDiscreteModel(pl.LightningModule):
     
     def atom_composition(self, x: torch.Tensor, ion_comp: torch.Tensor) -> torch.Tensor:
         return ion_comp.float().to(self.device)
+    
+    def embedding_wrapper(self, x: torch.Tensor, ion_comp: torch.Tensor) -> torch.Tensor:
+        return self.torch_embed(x)
     
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, 
                 edge_attr: torch.Tensor, ion_comp: torch.Tensor) -> torch.Tensor:

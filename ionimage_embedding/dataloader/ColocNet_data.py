@@ -93,7 +93,7 @@ class ColocNetData_discrete:
             
             ion_labels = iidata.full_dataset.ion_labels
             ds_labels = iidata.full_dataset.dataset_labels
-            ion_comp = iidata.full_dataset.ion_composition
+            ion_composition = iidata.full_dataset.ion_composition
             coloc = colocs.full_coloc
 
             self.dsl_int_mapper = iidata.dsl_int_mapper
@@ -117,7 +117,7 @@ class ColocNetData_discrete:
             self.atom_mapper = atom_mapper
             self.n_ions = n_ions
         
-        self.atom_dims = ion_comp.shape[1]
+        self.atom_dims = ion_composition.shape[1]
 
         self.dataset = ColocNetDiscreteDataset(path=cache_folder,
                                                name=self.dataset_file,
@@ -125,7 +125,7 @@ class ColocNetData_discrete:
                                                min_ion_count=min_images,
                                                ion_labels=ion_labels,
                                                ds_labels=ds_labels,
-                                               ion_composition=ion_comp,
+                                               ion_composition=ion_composition,
                                                coloc=coloc, 
                                                random_network=random_network)
 
