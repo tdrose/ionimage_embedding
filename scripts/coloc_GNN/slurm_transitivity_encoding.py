@@ -100,12 +100,14 @@ for count, test_value in enumerate(np.linspace(0.001, 0.1, 50)):
                                 top_k=hyperparams['top_k'], bottom_k=hyperparams['bottom_k'], 
                                 random_network=RANDOM_NETWORK,
                                 use_precomputed=True,
-                                ds_labels=iidata.train_dataset.dataset_labels,
-                                ion_labels=iidata.train_dataset.ion_labels,
-                                coloc=colocs.train_coloc,
+                                ds_labels=iidata.full_dataset.dataset_labels,
+                                ion_labels=iidata.full_dataset.ion_labels,
+                                coloc=colocs.full_coloc,
                                 dsl_int_mapper=iidata.dsl_int_mapper,
                                 ion_int_mapper=iidata.ion_int_mapper,
+                                ion_composition=iidata.full_dataset.ion_composition,
                                 n_ions=int(iidata.full_dataset.ion_labels.max().numpy())+1,
+                                atom_mapper=iidata.atom_mapper,
                                 force_reload=True,
                                 )
 
@@ -207,3 +209,5 @@ for count, test_value in enumerate(np.linspace(0.001, 0.1, 50)):
         print('Data loading error at: ', test_value)
         print('#################################')
 
+
+# %%

@@ -28,4 +28,4 @@ conda activate torch-gpuCUDA12
 
 cd /home/trose/projects/deep_MultiData_mzClustering/scripts/coloc_GNN
 
-python3 -u slurm_transitivity_embedding.py $SLURM_ARRAY_TASK_ID
+python3 -u slurm_transitivity_encoding.py $SLURM_ARRAY_TASK_ID
