@@ -173,7 +173,7 @@ plt.tight_layout()
 # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
 data_df = acc_perf_df[acc_perf_df['Evaluation']=='Co-detected']
-x = 'Fraction'
+x = 'fraction NaN'
 y = 'Accuracy'
 hue = 'Model'
 
@@ -203,13 +203,13 @@ plt.show()
 # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
 data_df = mse_perf_df[acc_perf_df['Evaluation']=='Co-detected']
-x = 'Test fraction'
+x = 'fraction NaN'
 y = 'MSE'
 hue = 'Model'
 
 sns.lmplot(data=data_df, 
                x=x, y=y, hue=hue, palette=MODEL_PALLETE, order=2, col='Model',
-               facet_kws=dict(sharex=True, sharey=True), line_kws={'color': 'black'}
+               facet_kws=dict(sharex=True, sharey=False), line_kws={'color': 'black'}
                # order=[x for x in plot_order if x in data_df['Model'].unique()],
                )
 plt.ylabel(f'MSE (Co-detected)')
@@ -221,7 +221,7 @@ data_df = mse_perf_df[acc_perf_df['Evaluation']=='Transitivity'].dropna()
 sns.lmplot(data=data_df, 
                x=x, y=y, hue=hue, palette=MODEL_PALLETE, order=2, col='Model',
                #order=[x for x in plot_order if x in data_df['Model'].unique()],
-               facet_kws=dict(sharex=True, sharey=True), line_kws={'color': 'black'}
+               facet_kws=dict(sharex=True, sharey=False), line_kws={'color': 'black'}
                )
 frac = data_df['Fraction'].mean()
 plt.ylabel(f'MSE (Transitivity)')
