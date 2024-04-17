@@ -207,26 +207,33 @@ x = 'fraction NaN'
 y = 'MSE'
 hue = 'Model'
 
-sns.lmplot(data=data_df, 
+tmp = sns.lmplot(data=data_df, 
                x=x, y=y, hue=hue, palette=MODEL_PALLETE, order=2, col='Model',
                facet_kws=dict(sharex=True, sharey=False), line_kws={'color': 'black'}
                # order=[x for x in plot_order if x in data_df['Model'].unique()],
                )
-plt.ylabel(f'MSE (Co-detected)')
+tmp.facet_axis(0,0).set_ylabel(f'MSE (Co-detected)')
 # plt.ylim(0, 1)
 plt.show()
 
 data_df = mse_perf_df[acc_perf_df['Evaluation']=='Transitivity'].dropna()
 
-sns.lmplot(data=data_df, 
+tmp = sns.lmplot(data=data_df, 
                x=x, y=y, hue=hue, palette=MODEL_PALLETE, order=2, col='Model',
                #order=[x for x in plot_order if x in data_df['Model'].unique()],
                facet_kws=dict(sharex=True, sharey=False), line_kws={'color': 'black'}
                )
 frac = data_df['Fraction'].mean()
-plt.ylabel(f'MSE (Transitivity)')
+tmp.facet_axis(0,0).set_ylabel(f'MSE (Transitivity)')
 # plt.ylim(0, 1)
 plt.show()
+
+
+
+
+
+
+
 
 # %%
 
@@ -244,4 +251,136 @@ mse_files = [f for f in files if f.startswith(mse_file)]
 
 acc_perf_df = pd.concat([pd.read_csv(f'/g/alexandr/tim/{f}') for f in acc_files if 'encod' in f])
 mse_perf_df = pd.concat([pd.read_csv(f'/g/alexandr/tim/{f}') for f in mse_files if 'encod' in f])
+# %%
+# %%
+# Accuracy 
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+data_df = acc_perf_df[acc_perf_df['Evaluation']=='Co-detected']
+x = 'Test fraction'
+y = 'Accuracy'
+hue = 'Model'
+
+sns.scatterplot(data=data_df, 
+               x=x, y=y, ax=ax1, hue=hue, palette=MODEL_PALLETE,
+               # order=[x for x in plot_order if x in data_df['Model'].unique()],
+               )
+ax1.set_ylabel(f'Top-{top_acc} Accuracy (Co-detected)')
+ax1.set_ylim(0, 1)
+sns.despine(offset=5, trim=False, ax=ax1)
+ticks = ax1.get_yticklabels()
+ticks[-1].set_weight('bold')
+
+data_df = acc_perf_df[acc_perf_df['Evaluation']=='Transitivity'].dropna()
+
+sns.scatterplot(data=data_df, 
+               x=x, y=y, ax=ax2, hue=hue, palette=MODEL_PALLETE,
+               #order=[x for x in plot_order if x in data_df['Model'].unique()],
+               )
+frac = data_df['Fraction'].mean()
+ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
+ax2.set_ylim(0, 1)
+sns.despine(offset=5, trim=False, ax=ax2)
+ticks = ax2.get_yticklabels()
+ticks[-1].set_weight('bold')
+
+plt.tight_layout()
+
+# plt.savefig('/g/alexandr/tim/tmp/acc_ion_fig.pdf', bbox_inches='tight')
+
+# %%
+# MSE
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+data_df = mse_perf_df[acc_perf_df['Evaluation']=='Co-detected']
+x = 'Test fraction'
+y = 'MSE'
+hue = 'Model'
+
+sns.scatterplot(data=data_df, 
+               x=x, y=y, ax=ax1, hue=hue,
+               # order=[x for x in plot_order if x in data_df['Model'].unique()],
+               )
+ax1.set_ylabel(f'MSE (Co-detected)')
+ax1.set_ylim(0, 1)
+sns.despine(offset=5, trim=False, ax=ax1)
+ticks = ax1.get_yticklabels()
+ticks[-1].set_weight('bold')
+
+data_df = mse_perf_df[acc_perf_df['Evaluation']=='Transitivity'].dropna()
+sns.scatterplot(data=data_df, 
+               x=x, y=y, ax=ax2, hue=hue,
+               #order=[x for x in plot_order if x in data_df['Model'].unique()],
+               )
+
+ax2.set_ylabel(f'MSE (Transitivity)')
+ax2.set_ylim(0, 1)
+sns.despine(offset=5, trim=False, ax=ax2)
+ticks = ax2.get_yticklabels()
+ticks[-1].set_weight('bold')
+
+plt.tight_layout()
+
+
+# %%
+# %%
+# Accuracy 
+# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+data_df = acc_perf_df[acc_perf_df['Evaluation']=='Co-detected']
+x = 'fraction NaN'
+y = 'Accuracy'
+hue = 'Model'
+
+sns.lmplot(data=data_df, 
+               x=x, y=y, hue=hue, order=2,
+               # order=[x for x in plot_order if x in data_df['Model'].unique()],
+               )
+plt.ylabel(f'Top-{top_acc} Accuracy (Co-detected)')
+plt.ylim(0, 1)
+plt.show()
+
+data_df = acc_perf_df[acc_perf_df['Evaluation']=='Transitivity'].dropna()
+
+sns.lmplot(data=data_df, 
+               x=x, y=y, hue=hue, order=2,
+               #order=[x for x in plot_order if x in data_df['Model'].unique()],
+               )
+frac = data_df['Fraction'].mean()
+plt.ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
+plt.ylim(0, 1)
+plt.show()
+
+
+
+# %%
+# MSE 
+# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+data_df = mse_perf_df[acc_perf_df['Evaluation']=='Co-detected']
+x = 'fraction NaN'
+y = 'MSE'
+hue = 'Model'
+
+tmp = sns.lmplot(data=data_df, 
+               x=x, y=y, hue=hue, order=2, col='Model',
+               facet_kws=dict(sharex=True, sharey=False), line_kws={'color': 'black'}
+               # order=[x for x in plot_order if x in data_df['Model'].unique()],
+               )
+tmp.facet_axis(0,0).set_ylabel(f'MSE (Co-detected)')
+# plt.ylim(0, 1)
+plt.show()
+
+data_df = mse_perf_df[acc_perf_df['Evaluation']=='Transitivity'].dropna()
+
+tmp = sns.lmplot(data=data_df, 
+               x=x, y=y, hue=hue, order=2, col='Model',
+               #order=[x for x in plot_order if x in data_df['Model'].unique()],
+               facet_kws=dict(sharex=True, sharey=False), line_kws={'color': 'black'}
+               )
+frac = data_df['Fraction'].mean()
+tmp.facet_axis(0,0).set_ylabel(f'MSE (Transitivity)')
+# plt.ylim(0, 1)
+plt.show()
 # %%
