@@ -45,6 +45,26 @@ mse_perf_df = pd.concat([pd.read_csv(f'/g/alexandr/tim/{f}') for f in mse_files 
 
 
 # %%
+
+# fraction - Output from evaluation functions about fraction of co-detected
+# fraction_nan - Fraction of Actual NaNs in mean coloc matrix
+# Test fraction - Inserted fraction in Transitivity dataloader
+
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(9, 5))
+
+subset = acc_perf_df[acc_perf_df['Evaluation']=='Transitivity']
+
+sns.scatterplot(data=subset, 
+                x='Test fraction', y='fraction NaN', alpha=0.5, ax=ax1)
+sns.scatterplot(data=subset, 
+                x='Test fraction', y='Fraction', alpha=0.5, ax=ax2)
+
+sns.scatterplot(data=subset, 
+                x='fraction NaN', y='Fraction', alpha=0.5, ax=ax3)
+plt.show()
+
+
+# %%
 # %% Plotting parameter
 
 XXSMALLER_SIZE = 5
