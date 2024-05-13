@@ -14,7 +14,7 @@ from ._metrics import (
      sensitivity, 
      coloc_mae, 
      coloc_smape)
-from ._utils import randomize_df
+from ._utils import randomize_df, get_eval_df
 from .utils_iid import get_colocs
 
 def coloc_mse_gnn(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
@@ -152,6 +152,92 @@ def coloc_top_acc_iid_random(latent: pd.DataFrame, colocs: ColocModel,
         ground_truth = get_colocs(colocs, origin='test')
     
         return coloc_top_acc(randomize_df(latent), ground_truth, agg_coloc_pred, top)
+
+
+def evaluation_gnn(df: pd.DataFrame | None, 
+                   model_name: str, 
+                   latent: pd.DataFrame,
+                   data: ColocNetData_discrete,
+                   agg_coloc_pred: pd.DataFrame,
+                   top_acc: int=5,
+                   set_nanfraction: float=0,
+                   random: bool=False
+                   ) -> pd.DataFrame:
+     
+
+    df = get_eval_df(df)
+
+    # Compute all metrics
+    if not random:
+        acc_avail, acc_trans, fraction = coloc_top_acc_gnn(latent, data, agg_coloc_pred, 
+                                                           top=top_acc)
+        mse_avail, mse_trans, fraction = coloc_mse_gnn(latent, agg_coloc_pred, data)
+        mae_avail, mae_trans, fraction = coloc_mae_gnn(latent, agg_coloc_pred, data)
+        smape_avail, smape_trans, fraction = coloc_smape_gnn(latent, agg_coloc_pred, data)
+    else:
+        acc_avail, acc_trans, fraction = coloc_top_acc_gnn_random(latent, data, agg_coloc_pred, 
+                                                                  top=top_acc)
+        mse_avail, mse_trans, fraction = coloc_mse_gnn_random(latent, agg_coloc_pred, data)
+        mae_avail, mae_trans, fraction = coloc_mae_gnn_random(latent, agg_coloc_pred, data)
+        smape_avail, smape_trans, fraction = coloc_smape_gnn_random(latent, agg_coloc_pred, data)
+
+    # Add results to df
+    new_row = pd.DataFrame({'model': [model_name],
+                           'co-detection accuracy': [acc_avail],
+                           'transitivity accuracy': [acc_trans],
+                           'co-detection mse': [mse_avail],
+                           'transitivity mse': [mse_trans],
+                           'co-detection mae': [mae_avail],
+                           'transitivity mae': [mae_trans],
+                           'co-detection smape': [smape_avail],
+                           'transitivity smape': [smape_trans],
+                           'set_nanfraction': [set_nanfraction],
+                           'nan_fraction': [1.-fraction]})
+        
+    return pd.concat([df, new_row], ignore_index=True)
+
+
+def evaluation_iid(df: pd.DataFrame | None, 
+                   model_name: str, 
+                   latent: pd.DataFrame,
+                   colocs: ColocModel,
+                   agg_coloc_pred: pd.DataFrame,
+                   top_acc: int=5,
+                   set_nanfraction: float=0,
+                   random: bool=False
+                   ) -> pd.DataFrame:
+     
+
+    df = get_eval_df(df)
+
+    # Compute all metrics
+    if not random:
+        acc_avail, acc_trans, fraction = coloc_top_acc_iid(latent, colocs, agg_coloc_pred, 
+                                                           top=top_acc)
+        mse_avail, mse_trans, fraction = coloc_mse_iid(latent, agg_coloc_pred, colocs)
+        mae_avail, mae_trans, fraction = coloc_mae_iid(latent, agg_coloc_pred, colocs)
+        smape_avail, smape_trans, fraction = coloc_smape_iid(latent, agg_coloc_pred, colocs)
+    else:
+        acc_avail, acc_trans, fraction = coloc_top_acc_iid_random(latent, colocs, agg_coloc_pred, 
+                                                           top=top_acc)
+        mse_avail, mse_trans, fraction = coloc_mse_iid_random(latent, agg_coloc_pred, colocs)
+        mae_avail, mae_trans, fraction = coloc_mae_iid_random(latent, agg_coloc_pred, colocs)
+        smape_avail, smape_trans, fraction = coloc_smape_iid_random(latent, agg_coloc_pred, colocs)
+
+    # Add results to df
+    new_row = pd.DataFrame({'model': [model_name],
+                           'co-detection accuracy': [acc_avail],
+                           'transitivity accuracy': [acc_trans],
+                           'co-detection mse': [mse_avail],
+                           'transitivity mse': [mse_trans],
+                           'co-detection mae': [mae_avail],
+                           'transitivity mae': [mae_trans],
+                           'co-detection smape': [smape_avail],
+                           'transitivity smape': [smape_trans],
+                           'set_nanfraction': [set_nanfraction],
+                           'nan_fraction': [1.-fraction]})
+        
+    return pd.concat([df, new_row], ignore_index=True)
 
 
 

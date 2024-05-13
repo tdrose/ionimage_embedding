@@ -81,3 +81,26 @@ def coloc_knn(coloc_matrix: np.ndarray, k: int=30):
     return out_matrix
 
 
+def get_eval_df(df: pd.DataFrame | None) -> pd.DataFrame:
+
+    col_dict = {'model': [],
+                'co-detection accuracy': [],
+                'transitivity accuracy': [],
+                'co-detection mse': [],
+                'transitivity mse': [],
+                'co-detection mae': [],
+                'transitivity mae': [],
+                'co-detection smape': [],
+                'transitivity smape': [],
+                'set_nanfraction': [],
+                'nan_fraction': []}
+
+    if df is None:
+        df = pd.DataFrame(col_dict)
+    
+    else:
+        for col in col_dict.keys():
+            if col not in df.columns:
+                raise ValueError(f'Column `{col}` not in df.')
+    
+    return df
