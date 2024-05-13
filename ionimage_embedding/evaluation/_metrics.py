@@ -20,13 +20,107 @@ def precision(x: Dict) -> float:
     return x['tp'] / (x['tp'] + x['fp'])
 
 
+def coloc_mae(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame, 
+              true_df_dict: Dict[int, pd.DataFrame]) -> Tuple[float, float, float]:
+    # Loop over all elements of agg_coloc_pred using their column and index names
+    avail_total = 0
+    trans_total = 0
+    avail_error = 0.
+    trans_error = 0.
+
+    for ds, coloc_df in true_df_dict.items():
+        if coloc_df.shape[0] > 0:
+            
+            for r in coloc_df.index:
+                for c in coloc_df.columns:
+                    if r != c:
+                        if not pd.isna(latent.loc[r, c]):
+                            # Transitivity
+                            if pd.isna(agg_coloc_pred.loc[r, c]):
+                                trans_error += abs(coloc_df.loc[r, c] - 
+                                                latent.loc[r, c]) # type: ignore
+                                trans_total += 1
+                            # Availability
+                            else:
+                                avail_error += abs(coloc_df.loc[r, c] - 
+                                                latent.loc[r, c]) # type: ignore
+                                avail_total += 1
+
+    if avail_total == 0:
+        avail = np.nan
+    else:
+        avail = avail_error / avail_total
+
+    if trans_total == 0:
+        trans = np.nan
+    else:
+        trans = trans_error / trans_total
+
+    if np.isnan(avail) or np.isnan(trans):
+        fraction = np.nan
+    else:
+        fraction = avail_total/(trans_total+avail_total)
+    
+    return avail, trans, fraction
+
+
+def coloc_smape(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
+                    true_df_dict: Dict[int, pd.DataFrame]) -> Tuple[float, float, float]:
+    # Loop over all elements of agg_coloc_pred using their column and index names
+    avail_total = 0
+    trans_total = 0
+    avail_error = 0.
+    trans_error = 0.
+
+    for ds, coloc_df in true_df_dict.items():
+        if coloc_df.shape[0] > 0:
+            
+            for r in coloc_df.index:
+                for c in coloc_df.columns:
+                    if r != c:
+                        if not pd.isna(latent.loc[r, c]):
+                            # Transitivity
+                            denominator = abs(coloc_df.loc[r, c]) + abs(latent.loc[r, c]) # type: ignore
+
+                            if denominator == 0:
+                                trans_error += 0
+                                trans_total += 1
+                            else:
+                                if pd.isna(agg_coloc_pred.loc[r, c]):
+                                    trans_error += abs(coloc_df.loc[r, c] - 
+                                                    latent.loc[r, c]) / denominator # type: ignore
+                                    trans_total += 1
+                                # Availability
+                                else:
+                                    avail_error += abs(coloc_df.loc[r, c] - 
+                                                    latent.loc[r, c]) / denominator # type: ignore
+                                    avail_total += 1
+    
+    if avail_total == 0:
+        avail = np.nan
+    else:
+        avail = avail_error / avail_total
+
+    if trans_total == 0:
+        trans = np.nan
+    else:
+        trans = trans_error / trans_total
+
+    if np.isnan(avail) or np.isnan(trans):
+        fraction = np.nan
+    else:
+        fraction = avail_total/(trans_total+avail_total)
+    
+    return 200.*avail, 200.*trans, fraction
+
+
 def coloc_mse(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame, 
               true_df_dict: Dict[int, pd.DataFrame]) -> Tuple[float, float, float]:
     # Loop over all elements of agg_coloc_pred using their column and index names
     avail_total = 0
     trans_total = 0
-    avail_error = 0
-    trans_error = 0
+    avail_error = 0.
+    trans_error = 0.
 
     for ds, coloc_df in true_df_dict.items():
         if coloc_df.shape[0] > 0:
@@ -62,6 +156,7 @@ def coloc_mse(latent: pd.DataFrame, agg_coloc_pred: pd.DataFrame,
         fraction = avail_total/(trans_total+avail_total)
     
     return avail, trans, fraction
+
 
 def coloc_top_acc(latent: pd.DataFrame, 
                   true_df_dict: Dict[int, pd.DataFrame], 
