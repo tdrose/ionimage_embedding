@@ -44,7 +44,7 @@ top_acc = 7
 DSID = iie.datasets.KIDNEY_LARGE
 DS_NAME = 'KIDNEY_LARGE'
 # Number of bootstraps
-N_BOOTSTRAPS = 100
+N_BOOTSTRAPS = 10
 
 
 hyperparams_avail = {
@@ -108,10 +108,13 @@ mylogger = iie.logger.DictLogger()
 
 # %%
     
-acc_perf = iie.logger.PerformanceLogger('Model','Accuracy', 
-                                        'Evaluation', 'Fraction')
-mse_perf = iie.logger.PerformanceLogger('Model','MSE',
-                                        'Evaluation', 'Fraction')
+# acc_perf = iie.logger.PerformanceLogger('Model','Accuracy', 
+#                                         'Evaluation', 'Fraction')
+# mse_perf = iie.logger.PerformanceLogger('Model','MSE',
+#                                         'Evaluation', 'Fraction')
+
+perf_df: pd.DataFrame | None = None
+
 # Training
 for i in range(N_BOOTSTRAPS):
     print('# #######')
@@ -143,41 +146,56 @@ for i in range(N_BOOTSTRAPS):
         pred_gnn_t, 
         iie.evaluation.utils_gnn.coloc_ion_labels(dat, dat._test_set))
     
-    # Accuracy
-    avail, trans, _ = iie.evaluation.metrics.coloc_top_acc_gnn(pred_mc, dat, 
-                                                                      pred_mc, top=top_acc)
-    acc_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1)
-
-    avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_gnn(coloc_cu, dat, 
-                                                                      pred_mc, top=top_acc)
-    acc_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction)
-    acc_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction)
-
-    avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_gnn(coloc_gnn_t, dat, 
-                                                                      pred_mc, top=top_acc)
-    acc_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction)
-    acc_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction)
-
-    avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_gnn_random(pred_mc, dat, 
-                                                                             pred_mc, top=top_acc) 
-    acc_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction)
-    acc_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
+    # Log performance metrics
+    perf_df = iie.evaluation.metrics.evaluation_gnn(perf_df, iie.constants.MEAN_COLOC,
+                                                    pred_mc, dat, pred_mc, top_acc=top_acc)
     
-    # MSE
-    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_gnn(pred_mc, pred_mc, dat)
-    mse_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1)
+    perf_df = iie.evaluation.metrics.evaluation_gnn(perf_df, iie.constants.UMAP,
+                                                    coloc_cu, dat, pred_mc, top_acc=top_acc)
+    
+    perf_df = iie.evaluation.metrics.evaluation_gnn(perf_df, iie.constants.GNN,
+                                                    coloc_gnn_t, dat, pred_mc, top_acc=top_acc)
+    
+    perf_df = iie.evaluation.metrics.evaluation_gnn(perf_df, iie.constants.RANDOM,
+                                                    coloc_gnn_t, dat, pred_mc, top_acc=top_acc, 
+                                                    random=True)
+    
+    
+    # Accuracy
+    # avail, trans, _ = iie.evaluation.metrics.coloc_top_acc_gnn(pred_mc, dat, 
+    #                                                                   pred_mc, top=top_acc)
+    # acc_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1)
 
-    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_gnn(coloc_cu, pred_mc, dat)
-    mse_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction)
-    mse_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction)
+    # avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_gnn(coloc_cu, dat, 
+    #                                                                   pred_mc, top=top_acc)
+    # acc_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction)
+    # acc_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction)
 
-    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_gnn(coloc_gnn_t, pred_mc, dat)
-    mse_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction)
-    mse_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction)
+    # avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_gnn(coloc_gnn_t, dat, 
+    #                                                                   pred_mc, top=top_acc)
+    # acc_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction)
+    # acc_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction)
 
-    avail, trans, fraction = iie.evaluation.metrics.coloc_mse_gnn_random(coloc_gnn_t, pred_mc, dat)
-    mse_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction)
-    mse_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
+    # avail, trans, fraction = iie.evaluation.metrics.coloc_top_acc_gnn_random(pred_mc, dat, 
+    #                                                                          pred_mc, top=top_acc) 
+    # acc_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction)
+    # acc_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
+    
+    # # MSE
+    # avail, trans, fraction = iie.evaluation.metrics.coloc_mse_gnn(pred_mc, pred_mc, dat)
+    # mse_perf.add_result(iie.constants.MEAN_COLOC, avail, 'Co-detected', 1)
+
+    # avail, trans, fraction = iie.evaluation.metrics.coloc_mse_gnn(coloc_cu, pred_mc, dat)
+    # mse_perf.add_result(iie.constants.UMAP, avail, 'Co-detected', fraction)
+    # mse_perf.add_result(iie.constants.UMAP, trans, 'Transitivity', 1-fraction)
+
+    # avail, trans, fraction = iie.evaluation.metrics.coloc_mse_gnn(coloc_gnn_t, pred_mc, dat)
+    # mse_perf.add_result(iie.constants.GNN, avail, 'Co-detected', fraction)
+    # mse_perf.add_result(iie.constants.GNN, trans, 'Transitivity', 1-fraction)
+
+    # avail, trans, fraction = iie.evaluation.metrics.coloc_mse_gnn_random(coloc_gnn_t, pred_mc, dat)
+    # mse_perf.add_result(iie.constants.RANDOM, avail, 'Co-detected', fraction)
+    # mse_perf.add_result(iie.constants.RANDOM, trans, 'Transitivity', 1-fraction)
 
 
 # %% Plotting parameter
@@ -212,20 +230,16 @@ my_pal = iie.constants.MODEL_PALLETE
 
 # %%
 # Accuracy 
-df = acc_perf.get_df()
-df = df.rename(columns={'Scenario': 'Model'})
-
-
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
 
-sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Model', y='Accuracy', ax=ax1, 
+sns.violinplot(data=perf_df, x='model', y='co-detection accuracy', ax=ax1, 
                palette=my_pal, cut=0)
 ax1.set_ylabel(f'Top-{top_acc} Accuracy (Co-detected)')
 ax1.set_ylim(0, 1)
 
-sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Model', y='Accuracy', ax=ax2,
+sns.violinplot(data=perf_df, x='model', y='transitivity accuracy', ax=ax2,
                palette=my_pal, cut=0)
-frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
+frac = perf_df['nan_fraction'].mean()
 ax2.set_title('Mean transitivity fraction: {:.2f}'.format(frac))
 ax2.set_ylabel(f'Top-{top_acc} Accuracy (Transitivity)')
 ax2.set_ylim(0, 1)
@@ -235,25 +249,54 @@ plt.show()
 
 # %%
 # MSE
-df = mse_perf.get_df()
-df = df.rename(columns={'Scenario': 'Model'})
-
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
 
-sns.violinplot(data=df[df['Evaluation']=='Co-detected'], x='Model', y='MSE', ax=ax1,
+sns.violinplot(data=perf_df, x='model', y='co-detection mse', ax=ax1,
                palette=my_pal, cut=0)
 sns.despine(offset=5, trim=False, ax=ax1)
 ax1.set_ylabel(f'MSE (Co-detected)')
 
-sns.violinplot(data=df[df['Evaluation']=='Transitivity'], x='Model', y='MSE', ax=ax2,
+sns.violinplot(data=perf_df, x='model', y='transitivity mse', ax=ax2,
                palette=my_pal, cut=0)
-frac = df[df['Evaluation']=='Transitivity']['Fraction'].mean()
+frac = perf_df['nan_fraction'].mean()
 ax2.set_title('Transitivity fraction: {:.1%}'.format(frac))
 ax2.set_ylabel(f'MSE (Transitivity)')
 sns.despine(offset=5, trim=False, ax=ax2)
 
 #plt.show()
-plt.savefig('/g/alexandr/tim/tmp/mse_df_fig.pdf', bbox_inches='tight')
+# plt.savefig('/g/alexandr/tim/tmp/mse_df_fig.pdf', bbox_inches='tight')
+
+# %%
+# MAE
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+
+sns.violinplot(data=perf_df, x='model', y='co-detection mae', ax=ax1,
+               palette=my_pal, cut=0)
+sns.despine(offset=5, trim=False, ax=ax1)
+ax1.set_ylabel(f'MAE (Co-detected)')
+
+sns.violinplot(data=perf_df, x='model', y='transitivity mae', ax=ax2,
+               palette=my_pal, cut=0)
+frac = perf_df['nan_fraction'].mean()
+ax2.set_title('Transitivity fraction: {:.1%}'.format(frac))
+ax2.set_ylabel(f'MAE (Transitivity)')
+sns.despine(offset=5, trim=False, ax=ax2)
+
+# %%
+# SMAPE
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+
+sns.violinplot(data=perf_df, x='model', y='co-detection smape', ax=ax1,
+               palette=my_pal, cut=0)
+sns.despine(offset=5, trim=False, ax=ax1)
+ax1.set_ylabel(f'SMAPE (Co-detected)')
+
+sns.violinplot(data=perf_df, x='model', y='transitivity smape', ax=ax2,
+               palette=my_pal, cut=0)
+frac = perf_df['nan_fraction'].mean()
+ax2.set_title('Transitivity fraction: {:.1%}'.format(frac))
+ax2.set_ylabel(f'SMAPE (Transitivity)')
+sns.despine(offset=5, trim=False, ax=ax2)
 
 # %%
 plt.plot(mylogger.logged_metrics['Validation loss'], label='Validation loss', color='orange')
