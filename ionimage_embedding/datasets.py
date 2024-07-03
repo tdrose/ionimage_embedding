@@ -1,6 +1,9 @@
 from typing import List, Final
 
 # Sets of selected METASPACE datasets that are used for training
+# Based on the dataset filtering and processing from the following repository:
+# https://github.com/tdrose/metaspace_analysis
+
 
 KIDNEY_SMALL: Final[List[str]] = [
     '2022-12-07_02h13m50s', '2022-12-07_02h13m20s', '2022-12-07_02h10m45s', '2022-12-07_02h09m41s',

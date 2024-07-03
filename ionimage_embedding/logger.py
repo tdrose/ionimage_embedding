@@ -7,7 +7,8 @@ from lightning.pytorch.utilities import rank_zero_only
 
 class DictLogger(Logger):
     """
-    Minimal Logger to save all recorded metrics during training into a dictionary
+    Minimal Logger for logging recorded metrics of a lightning model 
+    during training into a dictionary.
     """
     
     def __init__(self):
@@ -63,6 +64,11 @@ class DictLogger(Logger):
 
 
 class PerformanceLogger:
+    """
+    Custom logger for storing performance metrics of different models.
+    Is used to log model performance on the test dataset across different
+    models and bootstraps.
+    """
     
     def __init__(self, *args, verbose: bool=False):
 

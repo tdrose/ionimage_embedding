@@ -7,7 +7,7 @@ import numpy as np
 
 class mzImageDataset(Dataset):
     """
-    Images small enough, can be loaded into memory directly
+    Torch dataset wrapper to that stores imagesm dataset labels, ion labels, and ion composition.
     """
     def __init__(self, 
                  images,
