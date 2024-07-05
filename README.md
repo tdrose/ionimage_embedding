@@ -9,8 +9,8 @@ New models will be implemented and further model evaluation is currently being p
 All class/function APIs might be changed without anouncements or versioning,
 until a first stable version will be published.
 
-We are currently preparing a publication for this work.
-Until then, you may cite:
+The work in currently on hold.
+In the meantime, you may cite:
 
 > Rose et al. 
 > "Generalizing Colocalization to Capture Molecular Relationships in Spatial Metabolomics Using Graph Neural Networks"
@@ -34,6 +34,11 @@ scenarios can be found in the directory `scripts/`.
 A full tutorial and documentation is not available yet, 
 but will made once the project is fully published.
 
+### For team members:
+
+A more detailed description of the project can be found 
+[here](https://docs.google.com/document/d/1ymz_QkjclIELe1EUq3NTapcnhDboOSiP1rANfnY1v3M/edit?usp=sharing) 
+(for lab members only). 
 
 ## License
 This code is published under the GPLv3 license. 
